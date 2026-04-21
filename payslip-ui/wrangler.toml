@@ -1,0 +1,8 @@
+name = "ksom-payslip-app"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-04-05"
+
+[[d1_databases]]
+binding = "ksom_payslip_db"
+database_name = "ksom_payslip_db"
+database_id = "5e303825-c6f6-4c4b-9b7f-f51394312e93"
