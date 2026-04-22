@@ -11,6 +11,7 @@ const emptyForm = {
   category: 'state',
   email_id: '',
   mob_no: '',
+  epf_uan: '',
   is_active: 1
 };
 
@@ -63,6 +64,7 @@ const Employees = () => {
       category: emp.category || 'state',
       email_id: emp.email_id || '',
       mob_no: emp.mob_no || '',
+      epf_uan: emp.epf_uan || '',
       is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1
     });
     setIsEditMode(true);
@@ -217,11 +219,21 @@ const Employees = () => {
                   className="form-control" placeholder="employee@example.com" />
               </div>
               <div className="form-group">
+                <label className="form-label">EPF UAN</label>
+                <input type="text" name="epf_uan" value={formData.epf_uan} onChange={handleInputChange}
+                  className="form-control" placeholder="12-digit UAN" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
                 <label className="form-label">Status</label>
                 <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
                   <option value={1}>Active</option>
                   <option value={0}>Inactive</option>
                 </select>
+              </div>
+              <div className="form-group">
               </div>
             </div>
 

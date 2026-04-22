@@ -4,8 +4,8 @@ export async function onRequestGet(context) {
     
     // We join with employees to return names and designations alongside earnings
     const { results } = await context.env.ksom_payslip_db.prepare(`
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active,
-             m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
+      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining,
+             m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
              m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow
       FROM employees e
       LEFT JOIN monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?

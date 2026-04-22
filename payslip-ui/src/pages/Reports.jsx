@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Table } from 'lucide-react';
+import { FileText, Table, Mail, CheckSquare } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -13,7 +13,7 @@ const loadImage = (src) => new Promise((resolve, reject) => {
   img.onerror = (e) => reject(e);
 });
 
-const generatePDFPayslip = async (employee, monthYear) => {
+const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBase64 = false) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 15;
@@ -46,7 +46,7 @@ const generatePDFPayslip = async (employee, monthYear) => {
 
   // ── PAY SLIP INFO TABLE ──────────────────────────────────────────────────
   const infoY = 38;
-  const infoH = 50; // total height of info block
+  const infoH = 55; // total height of info block
   doc.setLineWidth(0.4);
   doc.rect(margin, infoY, contentW, infoH);
 
@@ -77,7 +77,8 @@ const generatePDFPayslip = async (employee, monthYear) => {
     ['Name', employee.name || '', 'Month & Year', monthDisplay],
     ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
     ['Scale of Pay', employee.scale_of_pay || '', 'Category', (employee.category || '').toUpperCase()],
-    ['D.O.J', employee.date_of_joining || '', '', ''],
+    ['D.O.B', employee.date_of_birth || '', 'D.O.J', employee.date_of_joining || ''],
+    ['EPF UAN', employee.epf_uan || '', '', ''],
   ];
 
   infoRows.forEach((row, i) => {
@@ -96,8 +97,17 @@ const generatePDFPayslip = async (employee, monthYear) => {
     doc.line(margin + contentW / 2, infoY + 10, margin + contentW / 2, infoY + infoH);
   });
 
+  // DA & HRA Rules text
+  const isState = employee.category === 'state';
+  const isUGC = employee.category === 'ugc';
+  const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
+  const hra_pct = isState ? (activeRule.hra_state_percentage || 0) : isUGC ? (activeRule.hra_ugc_percentage || 0) : 0;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.text(`DA: ${da_pct}%  |  HRA: ${hra_pct}%`, margin, infoY + infoH + 3);
+
   // ── EARNINGS & DEDUCTIONS SIDE-BY-SIDE ──────────────────────────────────
-  const tableTop = infoY + infoH + 4;
+  const tableTop = infoY + infoH + 6;
   const halfW = contentW / 2 - 1;
 
   const da = (parseFloat(employee.da_state) || 0) + (parseFloat(employee.da_ugc) || 0);
@@ -222,7 +232,11 @@ const generatePDFPayslip = async (employee, monthYear) => {
   doc.text("Authorised Signatory", pageW - margin - 35, sigY);
 
   const fileName = `Payslip_${(employee.name || 'Emp').replace(/\s+/g, '_')}_${monthYear}.pdf`;
-  doc.save(fileName);
+  if (returnBase64) {
+    return { fileName, content: doc.output('datauristring').split(',')[1] };
+  } else {
+    doc.save(fileName);
+  }
 };
 
 const Reports = () => {
@@ -232,16 +246,22 @@ const Reports = () => {
   });
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [globalSettingsList, setGlobalSettingsList] = useState([]);
+  const [selectedEmps, setSelectedEmps] = useState(new Set());
+  const [sendingEmails, setSendingEmails] = useState(false);
 
   useEffect(() => { loadDataForMonth(monthYear); }, [monthYear]);
 
   const loadDataForMonth = async (targetMonth) => {
     setLoading(true);
+    setSelectedEmps(new Set());
     try {
-      const [earnRes, deduxRes] = await Promise.all([
+      const [earnRes, deduxRes, settingsRes] = await Promise.all([
         fetch(`/api/earnings/${targetMonth}`),
-        fetch(`/api/deductions/${targetMonth}`)
+        fetch(`/api/deductions/${targetMonth}`),
+        fetch('/api/settings')
       ]);
+      setGlobalSettingsList(await settingsRes.json());
       const earnData = await earnRes.json();
       const deduxData = await deduxRes.json();
 
@@ -253,7 +273,13 @@ const Reports = () => {
         const dedux = (d.epf||0)+(d.cpf||0)+(d.professional_tax||0)+(d.income_tax||0)+(d.sli||0)+(d.gis||0)+(d.lic||0)+(d.onam_advance||0)+(d.hra_recovery||0)+(d.other_deductions||0);
         return { ...e, ...d, da, hra, gross, dedux, net: gross - dedux };
       });
-      setData(combined.filter(e => typeof e.is_active === 'undefined' || e.is_active === 1));
+      setData(combined.filter(e => {
+        if (e.date_of_joining) {
+          const dojMonth = e.date_of_joining.substring(0, 7);
+          if (dojMonth > targetMonth) return false;
+        }
+        return typeof e.is_active === 'undefined' || e.is_active === 1 || e.earnings_id != null;
+      }));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -293,6 +319,56 @@ const Reports = () => {
     XLSX.writeFile(wb, `KSoM_Paybill_${monthYear}.xlsx`);
   };
 
+  const toggleSelectAll = () => {
+    if (selectedEmps.size === data.filter(e => e.email_id).length) {
+      setSelectedEmps(new Set());
+    } else {
+      setSelectedEmps(new Set(data.filter(e => e.email_id).map(e => e.emp_id)));
+    }
+  };
+
+  const toggleSelect = (emp_id) => {
+    const newSet = new Set(selectedEmps);
+    if (newSet.has(emp_id)) newSet.delete(emp_id);
+    else newSet.add(emp_id);
+    setSelectedEmps(newSet);
+  };
+
+  const handleSendEmails = async () => {
+    if (selectedEmps.size === 0) return;
+    if (!window.confirm(`Are you sure you want to email payslips to ${selectedEmps.size} employees?`)) return;
+    
+    setSendingEmails(true);
+    const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const emp_id of selectedEmps) {
+      const emp = data.find(e => e.emp_id === emp_id);
+      if (!emp || !emp.email_id) continue;
+      
+      try {
+        const { fileName, content } = await generatePDFPayslip(emp, monthYear, activeRule, true);
+        const res = await fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: emp.email_id,
+            subject: `KSoM Payslip - ${monthYear}`,
+            text: `Dear ${emp.name},\n\nPlease find attached your payslip for ${monthYear}.\n\nRegards,\nKerala School of Mathematics`,
+            attachments: [{ filename: fileName, content: content }]
+          })
+        });
+        if (res.ok) successCount++;
+        else failCount++;
+      } catch (e) {
+        failCount++;
+      }
+    }
+    setSendingEmails(false);
+    alert(`Emails sent! Success: ${successCount}, Failed: ${failCount}`);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -309,11 +385,17 @@ const Reports = () => {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.125rem' }}>Records — {monthYear} ({data.length} employees)</h3>
-          <button onClick={exportExcel} disabled={!data.length}
-            style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
-            className="btn">
-            <Table size={16} /> Export All to Excel
-          </button>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button onClick={handleSendEmails} disabled={selectedEmps.size === 0 || sendingEmails}
+              className="btn btn-primary">
+              <Mail size={16} /> {sendingEmails ? 'Sending...' : `Email Selected (${selectedEmps.size})`}
+            </button>
+            <button onClick={exportExcel} disabled={!data.length}
+              style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
+              className="btn">
+              <Table size={16} /> Export All to Excel
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -323,6 +405,12 @@ const Reports = () => {
             <table className="table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <input type="checkbox" 
+                      checked={data.filter(e => e.email_id).length > 0 && selectedEmps.size === data.filter(e => e.email_id).length}
+                      onChange={toggleSelectAll} 
+                      disabled={data.filter(e => e.email_id).length === 0} />
+                  </th>
                   <th>Employee</th>
                   <th>Gross Pay</th>
                   <th>Total Deductions</th>
@@ -332,13 +420,23 @@ const Reports = () => {
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No data for this month. Please save the paybill first.</td></tr>
+                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No data for this month. Please save the paybill first.</td></tr>
                 )}
-                {data.map(emp => (
+                {data.map(emp => {
+                  const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
+                  return (
                   <tr key={emp.emp_id}>
+                    <td style={{ textAlign: 'center' }}>
+                      <input type="checkbox" 
+                        checked={selectedEmps.has(emp.emp_id)}
+                        onChange={() => toggleSelect(emp.emp_id)}
+                        disabled={!emp.email_id}
+                        title={!emp.email_id ? "No email address found" : ""} />
+                    </td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{emp.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{emp.designation}</div>
+                      {!emp.email_id && <div style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>No Email</div>}
                     </td>
                     <td>₹ {fmt(emp.gross)}</td>
                     <td>₹ {fmt(emp.dedux)}</td>
@@ -346,12 +444,13 @@ const Reports = () => {
                     <td style={{ textAlign: 'center' }}>
                       <button className="btn btn-secondary"
                         style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}
-                        onClick={() => generatePDFPayslip(emp, monthYear)}>
+                        onClick={() => generatePDFPayslip(emp, monthYear, activeRule)}>
                         <FileText size={15} /> Download PDF
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

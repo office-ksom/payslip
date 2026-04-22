@@ -50,7 +50,13 @@ const Paybill = () => {
         };
       });
 
-      setEmployees(combined.filter(e => typeof e.is_active === 'undefined' || e.is_active === 1));
+      setEmployees(combined.filter(e => {
+        if (e.date_of_joining) {
+          const dojMonth = e.date_of_joining.substring(0, 7);
+          if (dojMonth > targetMonth) return false;
+        }
+        return typeof e.is_active === 'undefined' || e.is_active === 1 || e.earnings_id != null;
+      }));
     } catch (err) {
       console.error(err);
     } finally {
