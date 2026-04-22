@@ -9,7 +9,7 @@ export async function onRequestPost(context) {
     }
 
     const resendPayload = {
-      from: "Payslip Portal <office@office.ksom.res.in>",
+      from: "KSoM Payslip <office@office.ksom.res.in>",
       to: [to],
       subject: subject || "Your Payslip",
       text: text || "Please find your payslip attached.",
