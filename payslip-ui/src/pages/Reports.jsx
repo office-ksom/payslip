@@ -285,37 +285,65 @@ const Reports = () => {
   };
 
   const exportExcel = () => {
-    const rows = data.map(emp => ({
-      'Employee ID': emp.emp_id,
-      'Name': emp.name,
-      'Designation': emp.designation,
-      'Basic Pay': emp.basic_pay || 0,
-      'DP/GP': emp.dp_gp || 0,
-      'DA': emp.da || 0,
-      'HRA': emp.hra || 0,
-      'CCA': emp.cca || 0,
-      'Spl. Pay': emp.spl_pay || 0,
-      'Tr. Allow': emp.tr_allow || 0,
-      'Spl. Allow': emp.spl_allow || 0,
-      'Fest. Allow': emp.fest_allow || 0,
-      'Other Earnings': emp.other_earnings || 0,
-      'Gross Pay': emp.gross || 0,
-      'EPF': emp.epf || 0,
-      'CPF': emp.cpf || 0,
-      'Professional Tax': emp.professional_tax || 0,
-      'Income Tax': emp.income_tax || 0,
-      'SLI': emp.sli || 0,
-      'GIS': emp.gis || 0,
-      'LIC': emp.lic || 0,
-      'Onam Advance': emp.onam_advance || 0,
-      'HRA Recovery': emp.hra_recovery || 0,
-      'Other Deductions': emp.other_deductions || 0,
-      'Total Deductions': emp.dedux || 0,
-      'Net Pay': emp.net || 0
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const monthDisplay = new Date(monthYear + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const aoa = [
+      ['Kerala School of Mathematics'],
+      ['Kunnamangalam PO, Kozhikode'],
+      ['Pay Bill Statement for the Month of ' + monthDisplay],
+      ['EARNINGS'],
+      ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow', 'Others', 'Gross Pay']
+    ];
+
+    let sumBasic = 0, sumGP = 0, sumDA = 0, sumHRA = 0, sumCCA = 0, sumSpl = 0, sumTr = 0, sumFest = 0, sumOther = 0, sumGross = 0;
+
+    data.forEach((emp, i) => {
+      const basic = parseFloat(emp.basic_pay) || 0;
+      const gp = parseFloat(emp.dp_gp) || 0;
+      const da = parseFloat(emp.da) || 0;
+      const hra = parseFloat(emp.hra) || 0;
+      const cca = parseFloat(emp.cca) || 0;
+      const spl = (parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0);
+      const tr = parseFloat(emp.tr_allow) || 0;
+      const fest = parseFloat(emp.fest_allow) || 0;
+      const other = parseFloat(emp.other_earnings) || 0;
+      const gross = parseFloat(emp.gross) || 0;
+
+      sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; sumOther += other; sumGross += gross;
+
+      aoa.push([i + 1, emp.name, emp.designation, emp.scale_of_pay, basic, gp, da, hra, cca, spl, tr, fest, other, gross]);
+    });
+
+    aoa.push(['TOTAL', '', '', '', sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest, sumOther, sumGross]);
+    aoa.push([]);
+    aoa.push(['DEDUCTIONS']);
+    aoa.push(['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA Recovery', 'Onam Advance', 'Others', 'Total Ded', 'Net Pay']);
+    
+    let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRARec = 0, sumOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
+
+    data.forEach((emp, i) => {
+      const epf = parseFloat(emp.epf) || 0;
+      const cpf = parseFloat(emp.cpf) || 0;
+      const it = parseFloat(emp.income_tax) || 0;
+      const gis = parseFloat(emp.gis) || 0;
+      const sli = parseFloat(emp.sli) || 0;
+      const lic = parseFloat(emp.lic) || 0;
+      const pt = parseFloat(emp.professional_tax) || 0;
+      const hrar = parseFloat(emp.hra_recovery) || 0;
+      const onam = parseFloat(emp.onam_advance) || 0;
+      const otherd = parseFloat(emp.other_deductions) || 0;
+      const dedux = parseFloat(emp.dedux) || 0;
+      const net = parseFloat(emp.net) || 0;
+
+      sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRARec += hrar; sumOnam += onam; sumOtherDed += otherd; sumTotDed += dedux; sumNet += net;
+
+      aoa.push([i + 1, emp.name, emp.designation, emp.scale_of_pay, epf, cpf, it, gis, sli, lic, pt, hrar, onam, otherd, dedux, net]);
+    });
+
+    aoa.push(['TOTAL', '', '', '', sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRARec, sumOnam, sumOtherDed, sumTotDed, sumNet]);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Paybill');
+    XLSX.utils.book_append_sheet(wb, ws, "Paybill");
     XLSX.writeFile(wb, `KSoM_Paybill_${monthYear}.xlsx`);
   };
 
@@ -359,14 +387,24 @@ const Reports = () => {
             attachments: [{ filename: fileName, content: content }]
           })
         });
-        if (res.ok) successCount++;
-        else failCount++;
+        if (res.ok) {
+          successCount++;
+        } else {
+          const errData = await res.json();
+          console.error(`Email failed for ${emp.name}:`, errData);
+          alert(`Failed to send to ${emp.name}: ${errData.error || 'Unknown error'}`);
+          failCount++;
+        }
       } catch (e) {
+        console.error(e);
+        alert(`Error sending to ${emp.name}: ${e.message}`);
         failCount++;
       }
     }
     setSendingEmails(false);
-    alert(`Emails sent! Success: ${successCount}, Failed: ${failCount}`);
+    if (successCount > 0 || failCount === 0) {
+      alert(`Email process finished. Success: ${successCount}, Failed: ${failCount}`);
+    }
   };
 
   return (
