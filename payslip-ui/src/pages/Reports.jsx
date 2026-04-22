@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Table, Mail, CheckSquare } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
@@ -284,67 +285,143 @@ const Reports = () => {
     finally { setLoading(false); }
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     const monthDisplay = new Date(monthYear + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-    const aoa = [
-      ['Kerala School of Mathematics'],
-      ['Kunnamangalam PO, Kozhikode'],
-      ['Pay Bill Statement for the Month of ' + monthDisplay],
-      ['EARNINGS'],
-      ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow', 'Others', 'Gross Pay']
-    ];
-
-    let sumBasic = 0, sumGP = 0, sumDA = 0, sumHRA = 0, sumCCA = 0, sumSpl = 0, sumTr = 0, sumFest = 0, sumOther = 0, sumGross = 0;
-
-    data.forEach((emp, i) => {
-      const basic = parseFloat(emp.basic_pay) || 0;
-      const gp = parseFloat(emp.dp_gp) || 0;
-      const da = parseFloat(emp.da) || 0;
-      const hra = parseFloat(emp.hra) || 0;
-      const cca = parseFloat(emp.cca) || 0;
-      const spl = (parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0);
-      const tr = parseFloat(emp.tr_allow) || 0;
-      const fest = parseFloat(emp.fest_allow) || 0;
-      const other = parseFloat(emp.other_earnings) || 0;
-      const gross = parseFloat(emp.gross) || 0;
-
-      sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; sumOther += other; sumGross += gross;
-
-      aoa.push([i + 1, emp.name, emp.designation, emp.scale_of_pay, basic, gp, da, hra, cca, spl, tr, fest, other, gross]);
-    });
-
-    aoa.push(['TOTAL', '', '', '', sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest, sumOther, sumGross]);
-    aoa.push([]);
-    aoa.push(['DEDUCTIONS']);
-    aoa.push(['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA Recovery', 'Onam Advance', 'Others', 'Total Ded', 'Net Pay']);
     
-    let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRARec = 0, sumOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
+    try {
+      const response = await fetch('/pay_bill-format.xlsx');
+      const arrayBuffer = await response.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      const sheet = workbook.worksheets[0];
 
-    data.forEach((emp, i) => {
-      const epf = parseFloat(emp.epf) || 0;
-      const cpf = parseFloat(emp.cpf) || 0;
-      const it = parseFloat(emp.income_tax) || 0;
-      const gis = parseFloat(emp.gis) || 0;
-      const sli = parseFloat(emp.sli) || 0;
-      const lic = parseFloat(emp.lic) || 0;
-      const pt = parseFloat(emp.professional_tax) || 0;
-      const hrar = parseFloat(emp.hra_recovery) || 0;
-      const onam = parseFloat(emp.onam_advance) || 0;
-      const otherd = parseFloat(emp.other_deductions) || 0;
-      const dedux = parseFloat(emp.dedux) || 0;
-      const net = parseFloat(emp.net) || 0;
+      sheet.getCell('B3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
 
-      sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRARec += hrar; sumOnam += onam; sumOtherDed += otherd; sumTotDed += dedux; sumNet += net;
+      const dataStyle = sheet.getCell('B6').style;
+      const totalStyle = sheet.getCell('F15').style;
+      const totalLabelStyle = sheet.getCell('B15').style;
+      const dedTitleStyle = sheet.getCell('B16').style;
+      const dedHeaderStyle = sheet.getCell('B17').style;
 
-      aoa.push([i + 1, emp.name, emp.designation, emp.scale_of_pay, epf, cpf, it, gis, sli, lic, pt, hrar, onam, otherd, dedux, net]);
-    });
+      const maxRows = Math.max(sheet.rowCount, 30);
+      for (let i = maxRows; i >= 6; i--) {
+        sheet.spliceRows(i, 1);
+      }
 
-    aoa.push(['TOTAL', '', '', '', sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRARec, sumOnam, sumOtherDed, sumTotDed, sumNet]);
+      let currentRow = 6;
+      let sumBasic = 0, sumGP = 0, sumDA = 0, sumHRA = 0, sumCCA = 0, sumSpl = 0, sumTr = 0, sumFest = 0, sumOther = 0, sumGross = 0;
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Paybill");
-    XLSX.writeFile(wb, `KSoM_Paybill_${monthYear}.xlsx`);
+      data.forEach((emp, i) => {
+        const basic = parseFloat(emp.basic_pay) || 0;
+        const gp = parseFloat(emp.dp_gp) || 0;
+        const da = parseFloat(emp.da) || 0;
+        const hra = parseFloat(emp.hra) || 0;
+        const cca = parseFloat(emp.cca) || 0;
+        const spl = (parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0);
+        const tr = parseFloat(emp.tr_allow) || 0;
+        const fest = parseFloat(emp.fest_allow) || 0;
+        const other = parseFloat(emp.other_earnings) || 0;
+        const gross = parseFloat(emp.gross) || 0;
+
+        sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; sumOther += other; sumGross += gross;
+
+        const row = sheet.getRow(currentRow);
+        const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest, other, gross];
+        values.forEach((val, colIdx) => {
+          if (colIdx > 0) {
+            const cell = row.getCell(colIdx + 1);
+            cell.value = val;
+            cell.style = dataStyle;
+            if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            }
+          }
+        });
+        row.commit();
+        currentRow++;
+      });
+
+      const totalRow = sheet.getRow(currentRow);
+      totalRow.getCell(2).value = 'TOTAL';
+      totalRow.getCell(2).style = totalLabelStyle;
+      sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+      [sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest, sumOther, sumGross].forEach((val, idx) => {
+        const cell = totalRow.getCell(6 + idx);
+        cell.value = val;
+        cell.style = totalStyle;
+      });
+      totalRow.commit();
+      currentRow++;
+
+      currentRow++; // Empty row
+
+      const dedTitleRow = sheet.getRow(currentRow);
+      dedTitleRow.getCell(2).value = 'DEDUCTIONS';
+      dedTitleRow.getCell(2).style = dedTitleStyle;
+      sheet.mergeCells(`B${currentRow}:O${currentRow}`);
+      dedTitleRow.commit();
+      currentRow++;
+
+      const dedHeaders = [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam', 'Total Ded', 'Net Pay'];
+      const dedHeaderRow = sheet.getRow(currentRow);
+      dedHeaders.forEach((val, colIdx) => {
+        if (colIdx > 0) {
+          const cell = dedHeaderRow.getCell(colIdx + 1);
+          cell.value = val;
+          cell.style = dedHeaderStyle;
+        }
+      });
+      dedHeaderRow.commit();
+      currentRow++;
+
+      let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRAOnam = 0, sumTotDed = 0, sumNet = 0;
+      data.forEach((emp, i) => {
+        const epf = parseFloat(emp.epf) || 0;
+        const cpf = parseFloat(emp.cpf) || 0;
+        const it = parseFloat(emp.income_tax) || 0;
+        const gis = parseFloat(emp.gis) || 0;
+        const sli = parseFloat(emp.sli) || 0;
+        const lic = parseFloat(emp.lic) || 0;
+        const pt = parseFloat(emp.professional_tax) || 0;
+        const hraOnam = (parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0) + (parseFloat(emp.other_deductions) || 0);
+        const dedux = parseFloat(emp.dedux) || 0;
+        const net = parseFloat(emp.net) || 0;
+
+        sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRAOnam += hraOnam; sumTotDed += dedux; sumNet += net;
+
+        const row = sheet.getRow(currentRow);
+        const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', epf, cpf, it, gis, sli, lic, pt, hraOnam, dedux, net];
+        values.forEach((val, colIdx) => {
+          if (colIdx > 0) {
+            const cell = row.getCell(colIdx + 1);
+            cell.value = val;
+            cell.style = dataStyle;
+            if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            }
+          }
+        });
+        row.commit();
+        currentRow++;
+      });
+
+      const dedTotalRow = sheet.getRow(currentRow);
+      dedTotalRow.getCell(2).value = 'TOTAL';
+      dedTotalRow.getCell(2).style = totalLabelStyle;
+      sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+      [sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam, sumTotDed, sumNet].forEach((val, idx) => {
+        const cell = dedTotalRow.getCell(6 + idx);
+        cell.value = val;
+        cell.style = totalStyle;
+      });
+      dedTotalRow.commit();
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `KSoM_Paybill_${monthYear}.xlsx`);
+    } catch (err) {
+      console.error("Error generating Excel:", err);
+      alert("Failed to generate Excel: " + err.message);
+    }
   };
 
   const toggleSelectAll = () => {
