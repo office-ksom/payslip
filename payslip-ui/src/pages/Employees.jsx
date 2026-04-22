@@ -179,7 +179,7 @@ const Employees = () => {
                 <label className="form-label">Category</label>
                 <select name="category" value={formData.category} onChange={handleInputChange} className="form-control">
                   <option value="state">State</option>
-                  <option value="ugc">UGC</option>
+                  <option value="ugc">UGC/CSIR</option>
                   <option value="temporary">Temporary</option>
                   <option value="contract">Contract</option>
                 </select>
@@ -290,7 +290,9 @@ const Employees = () => {
                       <td>{emp.name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
                       <td>
-                        <span className={`badge badge-${emp.category}`}>{emp.category || '—'}</span>
+                        <span className={`badge badge-${emp.category}`}>
+                          {emp.category === 'ugc' ? 'UGC/CSIR' : (emp.category ? emp.category.charAt(0).toUpperCase() + emp.category.slice(1) : '—')}
+                        </span>
                         <div style={{ marginTop: '0.25rem' }}>
                           <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
                             {emp.is_active ? 'Active' : 'Inactive'}
