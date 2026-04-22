@@ -15,7 +15,7 @@ export async function onRequestPost(context) {
   try {
     const data = await context.request.json();
     const { effective_from, da_state_percentage, da_ugc_percentage, hra_state_percentage, hra_ugc_percentage } = data;
-    
+
     // We insert, or if there is conflict on effective_from, we replace
     await context.env.ksom_payslip_db.prepare(
       `INSERT INTO allowances_settings (effective_from, da_state_percentage, da_ugc_percentage, hra_state_percentage, hra_ugc_percentage) 

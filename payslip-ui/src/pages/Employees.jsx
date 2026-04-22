@@ -10,7 +10,8 @@ const emptyForm = {
   scale_of_pay: '',
   category: 'state',
   email_id: '',
-  mob_no: ''
+  mob_no: '',
+  is_active: 1
 };
 
 const Employees = () => {
@@ -61,7 +62,8 @@ const Employees = () => {
       scale_of_pay: emp.scale_of_pay || '',
       category: emp.category || 'state',
       email_id: emp.email_id || '',
-      mob_no: emp.mob_no || ''
+      mob_no: emp.mob_no || '',
+      is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1
     });
     setIsEditMode(true);
     setShowForm(true);
@@ -214,7 +216,13 @@ const Employees = () => {
                 <input type="email" name="email_id" value={formData.email_id} onChange={handleInputChange}
                   className="form-control" placeholder="employee@example.com" />
               </div>
-              <div className="form-group" /> {/* spacer */}
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
+                  <option value={1}>Active</option>
+                  <option value={0}>Inactive</option>
+                </select>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -271,6 +279,11 @@ const Employees = () => {
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
                       <td>
                         <span className={`badge badge-${emp.category}`}>{emp.category || '—'}</span>
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
+                            {emp.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
                       </td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.scale_of_pay || '—'}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.mob_no || '—'}</td>

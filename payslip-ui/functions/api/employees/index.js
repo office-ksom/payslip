@@ -14,12 +14,13 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active } = data;
+    const activeVal = typeof is_active !== 'undefined' ? Number(is_active) : 1;
     
     await context.env.ksom_payslip_db.prepare(
-      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null).run();
+      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal).run();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
@@ -33,14 +34,15 @@ export async function onRequestPost(context) {
 export async function onRequestPut(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active } = data;
+    const activeVal = typeof is_active !== 'undefined' ? Number(is_active) : 1;
 
     await context.env.ksom_payslip_db.prepare(
       `UPDATE employees 
        SET name = ?, designation = ?, date_of_birth = ?, date_of_joining = ?, 
-           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?
+           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?, is_active = ?
        WHERE emp_id = ?`
-    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, emp_id).run();
+    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, emp_id).run();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, AlertCircle, Plus, Calendar } from 'lucide-react';
+import { Save, AlertCircle, Plus, Calendar, Pencil } from 'lucide-react';
 
 const Settings = () => {
   const [settingsList, setSettingsList] = useState([]);
@@ -33,6 +33,18 @@ const Settings = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEdit = (rule) => {
+    setFormData({
+      effective_from: rule.effective_from,
+      da_state_percentage: rule.da_state_percentage || 0,
+      da_ugc_percentage: rule.da_ugc_percentage || 0,
+      hra_state_percentage: rule.hra_state_percentage || 0,
+      hra_ugc_percentage: rule.hra_ugc_percentage || 0
+    });
+    setShowAddForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleChange = (e) => {
@@ -164,6 +176,7 @@ const Settings = () => {
                 <th>Effective Month</th>
                 <th>DA (State / UGC)</th>
                 <th>HRA (State / UGC)</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -177,6 +190,13 @@ const Settings = () => {
                     <td style={{ fontWeight: 600 }}>{rule.effective_from} {idx === 0 && <span className="badge badge-contract" style={{marginLeft: '0.5rem'}}>Active</span>}</td>
                     <td>{rule.da_state_percentage}% / {rule.da_ugc_percentage}%</td>
                     <td>{rule.hra_state_percentage}% / {rule.hra_ugc_percentage}%</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', gap: '0.35rem' }}
+                        onClick={() => handleEdit(rule)}>
+                        <Pencil size={14} /> Edit
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

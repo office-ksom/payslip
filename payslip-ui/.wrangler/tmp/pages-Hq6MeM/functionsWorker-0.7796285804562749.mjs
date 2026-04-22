@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-Ua52UF/checked-fetch.js
+// ../.wrangler/tmp/bundle-SVPtEY/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -32,8 +32,9 @@ async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
     const { results } = await context.env.ksom_payslip_db.prepare(`
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, 
-             d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions
+      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active,
+             d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
+             d.cpf, d.hra_recovery
       FROM employees e
       LEFT JOIN monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
       ORDER BY e.name ASC
@@ -55,8 +56,8 @@ async function onRequestPost(context) {
     for (const record of records) {
       statements.push(
         db.prepare(`
-          INSERT INTO monthly_deductions (emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO monthly_deductions (emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions, cpf, hra_recovery)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(emp_id, month_year) DO UPDATE SET 
             epf=excluded.epf,
             professional_tax=excluded.professional_tax,
@@ -65,7 +66,9 @@ async function onRequestPost(context) {
             lic=excluded.lic,
             income_tax=excluded.income_tax,
             onam_advance=excluded.onam_advance,
-            other_deductions=excluded.other_deductions
+            other_deductions=excluded.other_deductions,
+            cpf=excluded.cpf,
+            hra_recovery=excluded.hra_recovery
         `).bind(
           record.emp_id,
           monthYear,
@@ -76,7 +79,9 @@ async function onRequestPost(context) {
           record.lic || 0,
           record.income_tax || 0,
           record.onam_advance || 0,
-          record.other_deductions || 0
+          record.other_deductions || 0,
+          record.cpf || 0,
+          record.hra_recovery || 0
         )
       );
     }
@@ -98,8 +103,9 @@ async function onRequestGet2(context) {
   try {
     const monthYear = context.params.month_year;
     const { results } = await context.env.ksom_payslip_db.prepare(`
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, 
-             m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings 
+      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active,
+             m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow
       FROM employees e
       LEFT JOIN monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
       ORDER BY e.name ASC
@@ -121,8 +127,8 @@ async function onRequestPost2(context) {
     for (const record of records) {
       statements.push(
         db.prepare(`
-          INSERT INTO monthly_earnings (emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO monthly_earnings (emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings, spl_pay, tr_allow, spl_allow, fest_allow)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(emp_id, month_year) DO UPDATE SET 
             basic_pay=excluded.basic_pay,
             dp_gp=excluded.dp_gp,
@@ -131,7 +137,11 @@ async function onRequestPost2(context) {
             hra_state=excluded.hra_state,
             hra_ugc=excluded.hra_ugc,
             cca=excluded.cca,
-            other_earnings=excluded.other_earnings
+            other_earnings=excluded.other_earnings,
+            spl_pay=excluded.spl_pay,
+            tr_allow=excluded.tr_allow,
+            spl_allow=excluded.spl_allow,
+            fest_allow=excluded.fest_allow
         `).bind(
           record.emp_id,
           monthYear,
@@ -142,7 +152,11 @@ async function onRequestPost2(context) {
           record.hra_state || 0,
           record.hra_ugc || 0,
           record.cca || 0,
-          record.other_earnings || 0
+          record.other_earnings || 0,
+          record.spl_pay || 0,
+          record.tr_allow || 0,
+          record.spl_allow || 0,
+          record.fest_allow || 0
         )
       );
     }
@@ -176,11 +190,12 @@ __name(onRequestGet3, "onRequestGet");
 async function onRequestPost3(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active } = data;
+    const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
     await context.env.ksom_payslip_db.prepare(
-      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null).run();
+      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -193,13 +208,14 @@ __name(onRequestPost3, "onRequestPost");
 async function onRequestPut(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active } = data;
+    const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
     await context.env.ksom_payslip_db.prepare(
       `UPDATE employees 
        SET name = ?, designation = ?, date_of_birth = ?, date_of_joining = ?, 
-           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?
+           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?, is_active = ?
        WHERE emp_id = ?`
-    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, emp_id).run();
+    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, emp_id).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -801,7 +817,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-Ua52UF/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-SVPtEY/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -833,7 +849,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-Ua52UF/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-SVPtEY/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

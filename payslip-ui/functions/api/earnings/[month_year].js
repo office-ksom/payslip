@@ -4,8 +4,9 @@ export async function onRequestGet(context) {
     
     // We join with employees to return names and designations alongside earnings
     const { results } = await context.env.ksom_payslip_db.prepare(`
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, 
-             m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings 
+      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active,
+             m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow
       FROM employees e
       LEFT JOIN monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
       ORDER BY e.name ASC
@@ -32,8 +33,8 @@ export async function onRequestPost(context) {
     for (const record of records) {
       statements.push(
         db.prepare(`
-          INSERT INTO monthly_earnings (emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO monthly_earnings (emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings, spl_pay, tr_allow, spl_allow, fest_allow)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(emp_id, month_year) DO UPDATE SET 
             basic_pay=excluded.basic_pay,
             dp_gp=excluded.dp_gp,
@@ -42,13 +43,19 @@ export async function onRequestPost(context) {
             hra_state=excluded.hra_state,
             hra_ugc=excluded.hra_ugc,
             cca=excluded.cca,
-            other_earnings=excluded.other_earnings
+            other_earnings=excluded.other_earnings,
+            spl_pay=excluded.spl_pay,
+            tr_allow=excluded.tr_allow,
+            spl_allow=excluded.spl_allow,
+            fest_allow=excluded.fest_allow
         `).bind(
           record.emp_id, monthYear, 
           record.basic_pay || 0, record.dp_gp || 0, 
           record.da_state || 0, record.da_ugc || 0, 
           record.hra_state || 0, record.hra_ugc || 0, 
-          record.cca || 0, record.other_earnings || 0
+          record.cca || 0, record.other_earnings || 0,
+          record.spl_pay || 0, record.tr_allow || 0,
+          record.spl_allow || 0, record.fest_allow || 0
         )
       );
     }
