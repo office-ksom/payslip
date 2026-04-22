@@ -377,6 +377,11 @@ const Reports = () => {
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
             Generate formal KSoM payslips in PDF or batch-export to Excel.
           </p>
+          {globalSettingsList.length > 0 && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-primary)', background: 'rgba(59,130,246,0.1)', padding: '0.4rem 0.8rem', borderRadius: '4px', display: 'inline-block' }}>
+              <strong>Active Rules for {monthYear}:</strong> State (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_state_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_state_percentage || 0}%) | UGC (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_ugc_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_ugc_percentage || 0}%)
+            </div>
+          )}
         </div>
         <input type="month" className="form-control" value={monthYear}
           onChange={(e) => setMonthYear(e.target.value)} />
