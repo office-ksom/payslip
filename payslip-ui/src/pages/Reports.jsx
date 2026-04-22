@@ -287,6 +287,7 @@ const Reports = () => {
 
   const exportExcel = async () => {
     const monthDisplay = new Date(monthYear + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const activeRule = globalSettingsList.find(r => r.effective_from <= monthYear) || {};
     
     try {
       const response = await fetch('/pay_bill-format.xlsx');
@@ -332,8 +333,13 @@ const Reports = () => {
             const cell = row.getCell(colIdx);
             cell.value = val;
             cell.style = dataStyle;
-            if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+            if (colIdx === 1) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
+            } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            } else if (colIdx >= 5) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+              cell.numFmt = '0.00';
             }
           }
         });
@@ -349,6 +355,8 @@ const Reports = () => {
         const cell = totalRow.getCell(5 + idx);
         cell.value = val;
         cell.style = totalStyle;
+        cell.alignment = { ...totalStyle.alignment, horizontal: 'right' };
+        cell.numFmt = '0.00';
       });
       totalRow.commit();
       currentRow++;
@@ -396,8 +404,13 @@ const Reports = () => {
             const cell = row.getCell(colIdx);
             cell.value = val;
             cell.style = dataStyle;
-            if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+            if (colIdx === 1) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
+            } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            } else if (colIdx >= 5) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+              cell.numFmt = '0.00';
             }
           }
         });
@@ -413,8 +426,45 @@ const Reports = () => {
         const cell = dedTotalRow.getCell(5 + idx);
         cell.value = val;
         cell.style = totalStyle;
+        cell.alignment = { ...totalStyle.alignment, horizontal: 'right' };
+        cell.numFmt = '0.00';
       });
       dedTotalRow.commit();
+      currentRow++;
+
+      currentRow++; // Empty row after deductions total
+
+      const bottomRows = [
+        ['UGC/CSIR - DA Rate (%) 7th CPC', activeRule.da_ugc_percentage || ''],
+        ['State DA (%) 11th Pay', activeRule.da_state_percentage || ''],
+        ['UGC - HRA (%) 7th CPC', activeRule.hra_ugc_percentage || ''],
+        ['STATE HRA - 10 % BASIC', activeRule.hra_state_percentage || ''],
+        ['7th CPC DA Rate -Deputation', ''],
+        ['7th CPC DA HRA - Deputation', ''],
+        ['7th CPC Travel Allowance', 3600],
+        ['7th CPC Deputation Allowance', 6800],
+        [],
+        ['Gross Pay', sumGross],
+        ['Net Pay', sumNet]
+      ];
+
+      bottomRows.forEach(br => {
+        const r = sheet.getRow(currentRow);
+        if (br.length > 0) {
+          r.getCell(3).value = br[0];
+          r.getCell(4).value = br[1];
+          r.getCell(3).font = { name: 'Arial Narrow', size: 10, bold: true };
+          r.getCell(4).font = { name: 'Arial Narrow', size: 10, bold: true };
+          if (typeof br[1] === 'number' || parseFloat(br[1])) {
+             r.getCell(4).alignment = { horizontal: 'right' };
+             if (br[0] === 'Gross Pay' || br[0] === 'Net Pay') {
+                 r.getCell(4).numFmt = '0.00';
+             }
+          }
+        }
+        r.commit();
+        currentRow++;
+      });
 
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(new Blob([buffer]), `KSoM_Paybill_${monthYear}.xlsx`);
