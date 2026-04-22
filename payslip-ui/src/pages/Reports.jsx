@@ -295,13 +295,13 @@ const Reports = () => {
       await workbook.xlsx.load(arrayBuffer);
       const sheet = workbook.worksheets[0];
 
-      sheet.getCell('B3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
+      sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
 
-      const dataStyle = sheet.getCell('B6').style;
-      const totalStyle = sheet.getCell('F15').style;
-      const totalLabelStyle = sheet.getCell('B15').style;
-      const dedTitleStyle = sheet.getCell('B16').style;
-      const dedHeaderStyle = sheet.getCell('B17').style;
+      const dataStyle = sheet.getCell('A6').style;
+      const totalStyle = sheet.getCell('E15').style;
+      const totalLabelStyle = sheet.getCell('A15').style;
+      const dedTitleStyle = sheet.getCell('A16').style;
+      const dedHeaderStyle = sheet.getCell('A17').style;
 
       const maxRows = Math.max(sheet.rowCount, 30);
       for (let i = maxRows; i >= 6; i--) {
@@ -329,7 +329,7 @@ const Reports = () => {
         const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest, other, gross];
         values.forEach((val, colIdx) => {
           if (colIdx > 0) {
-            const cell = row.getCell(colIdx + 1);
+            const cell = row.getCell(colIdx);
             cell.value = val;
             cell.style = dataStyle;
             if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
@@ -342,11 +342,11 @@ const Reports = () => {
       });
 
       const totalRow = sheet.getRow(currentRow);
-      totalRow.getCell(2).value = 'TOTAL';
-      totalRow.getCell(2).style = totalLabelStyle;
-      sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+      totalRow.getCell(1).value = 'TOTAL';
+      totalRow.getCell(1).style = totalLabelStyle;
+      sheet.mergeCells(`A${currentRow}:D${currentRow}`);
       [sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest, sumOther, sumGross].forEach((val, idx) => {
-        const cell = totalRow.getCell(6 + idx);
+        const cell = totalRow.getCell(5 + idx);
         cell.value = val;
         cell.style = totalStyle;
       });
@@ -356,9 +356,9 @@ const Reports = () => {
       currentRow++; // Empty row
 
       const dedTitleRow = sheet.getRow(currentRow);
-      dedTitleRow.getCell(2).value = 'DEDUCTIONS';
-      dedTitleRow.getCell(2).style = dedTitleStyle;
-      sheet.mergeCells(`B${currentRow}:O${currentRow}`);
+      dedTitleRow.getCell(1).value = 'DEDUCTIONS';
+      dedTitleRow.getCell(1).style = dedTitleStyle;
+      sheet.mergeCells(`A${currentRow}:N${currentRow}`);
       dedTitleRow.commit();
       currentRow++;
 
@@ -366,7 +366,7 @@ const Reports = () => {
       const dedHeaderRow = sheet.getRow(currentRow);
       dedHeaders.forEach((val, colIdx) => {
         if (colIdx > 0) {
-          const cell = dedHeaderRow.getCell(colIdx + 1);
+          const cell = dedHeaderRow.getCell(colIdx);
           cell.value = val;
           cell.style = dedHeaderStyle;
         }
@@ -393,7 +393,7 @@ const Reports = () => {
         const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', epf, cpf, it, gis, sli, lic, pt, hraOnam, dedux, net];
         values.forEach((val, colIdx) => {
           if (colIdx > 0) {
-            const cell = row.getCell(colIdx + 1);
+            const cell = row.getCell(colIdx);
             cell.value = val;
             cell.style = dataStyle;
             if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
@@ -406,11 +406,11 @@ const Reports = () => {
       });
 
       const dedTotalRow = sheet.getRow(currentRow);
-      dedTotalRow.getCell(2).value = 'TOTAL';
-      dedTotalRow.getCell(2).style = totalLabelStyle;
-      sheet.mergeCells(`B${currentRow}:E${currentRow}`);
+      dedTotalRow.getCell(1).value = 'TOTAL';
+      dedTotalRow.getCell(1).style = totalLabelStyle;
+      sheet.mergeCells(`A${currentRow}:D${currentRow}`);
       [sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam, sumTotDed, sumNet].forEach((val, idx) => {
-        const cell = dedTotalRow.getCell(6 + idx);
+        const cell = dedTotalRow.getCell(5 + idx);
         cell.value = val;
         cell.style = totalStyle;
       });
