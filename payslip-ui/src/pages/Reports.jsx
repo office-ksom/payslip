@@ -316,17 +316,24 @@ const Reports = () => {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const sheet = workbook.worksheets[0];
-      // Unmerge any existing merged ranges in row 3 before re-merging
-      const mergesInRow3 = Object.keys(sheet._merges || {}).filter(k => {
-        const m = sheet._merges[k];
-        return m && m.model && m.model.top === 3;
-      });
-      mergesInRow3.forEach(k => {
-        try { sheet.unMergeCells(sheet._merges[k].model); } catch(e) {}
-      });
+      // Helper: safely merge cells — unmerges any overlapping ranges first
+      const safeMerge = (range) => {
+        const [tl, br] = range.split(':');
+        const tlRow = parseInt(tl.replace(/[A-Z]+/i, ''));
+        const brRow = parseInt(br.replace(/[A-Z]+/i, ''));
+        // Unmerge any existing template merges that touch rows in this range
+        const merges = (sheet.model.merges || []).filter(m => {
+          const [ms, me] = m.split(':');
+          const mRow1 = parseInt(ms.replace(/[A-Z]+/i, ''));
+          const mRow2 = parseInt(me.replace(/[A-Z]+/i, ''));
+          return mRow1 <= brRow && mRow2 >= tlRow;
+        });
+        merges.forEach(m => { try { sheet.unMergeCells(m); } catch(e) {} });
+        try { sheet.mergeCells(range); } catch(e) {}
+      };
 
       sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
-      sheet.mergeCells('A3:N3');
+      safeMerge('A3:N3');
       sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
       const dataStyle = sheet.getCell('A6').style;
