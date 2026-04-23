@@ -316,6 +316,14 @@ const Reports = () => {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const sheet = workbook.worksheets[0];
+      // Unmerge any existing merged ranges in row 3 before re-merging
+      const mergesInRow3 = Object.keys(sheet._merges || {}).filter(k => {
+        const m = sheet._merges[k];
+        return m && m.model && m.model.top === 3;
+      });
+      mergesInRow3.forEach(k => {
+        try { sheet.unMergeCells(sheet._merges[k].model); } catch(e) {}
+      });
 
       sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
       sheet.mergeCells('A3:N3');
