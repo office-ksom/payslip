@@ -1,7 +1,7 @@
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
-    
+
     // We join with employees to return names and designations alongside earnings
     const { results } = await context.env.ksom_payslip_db.prepare(`
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan,
@@ -24,12 +24,12 @@ export async function onRequestPost(context) {
   try {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
-    
+
     const db = context.env.ksom_payslip_db;
-    
+
     // Cloudflare D1 supports batching statements to execute multiple inserts/updates at once
     const statements = [];
-    
+
     for (const record of records) {
       statements.push(
         db.prepare(`
@@ -49,10 +49,10 @@ export async function onRequestPost(context) {
             spl_allow=excluded.spl_allow,
             fest_allow=excluded.fest_allow
         `).bind(
-          record.emp_id, monthYear, 
-          record.basic_pay || 0, record.dp_gp || 0, 
-          record.da_state || 0, record.da_ugc || 0, 
-          record.hra_state || 0, record.hra_ugc || 0, 
+          record.emp_id, monthYear,
+          record.basic_pay || 0, record.dp_gp || 0,
+          record.da_state || 0, record.da_ugc || 0,
+          record.hra_state || 0, record.hra_ugc || 0,
           record.cca || 0, record.other_earnings || 0,
           record.spl_pay || 0, record.tr_allow || 0,
           record.spl_allow || 0, record.fest_allow || 0
