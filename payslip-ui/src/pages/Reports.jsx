@@ -21,10 +21,16 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   const contentW = pageW - 2 * margin;
 
   let logoImg = null;
+  let sealImg = null;
   try {
     logoImg = await loadImage('/logo.png');
   } catch(e) {
     console.warn("Could not load logo", e);
+  }
+  try {
+    sealImg = await loadImage('/KSoM_seal.png');
+  } catch(e) {
+    console.warn("Could not load seal", e);
   }
 
   // ── HEADER ──────────────────────────────────────────────────────────────
@@ -217,6 +223,16 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
     doc.setGState(new doc.GState({ opacity: 1 }));
   }
 
+  // ── SEAL + TIMESTAMP ───────────────────────────────────────────────────
+  const pageH = doc.internal.pageSize.getHeight();
+  const bottomY = pageH - 15;
+
+  // Seal image at bottom left
+  if (sealImg) {
+    const sealSize = 28;
+    doc.addImage(sealImg, 'PNG', margin, bottomY - sealSize, sealSize, sealSize);
+  }
+
   // ── SIGNATURE ───────────────────────────────────────────────────────────
   const sigY = doc.lastAutoTable.finalY + 25;
   doc.setFontSize(9);
@@ -229,8 +245,17 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   doc.line(pageW / 2 - 15, sigY - 5, pageW / 2 + 25, sigY - 5);
   doc.line(pageW - margin - 35, sigY - 5, pageW - margin, sigY - 5);
   
-  doc.text("Prepared By", pageW / 2 - 15, sigY);
+  doc.text("Prepared by Asst-Accounts", pageW / 2 - 15, sigY);
   doc.text("Authorised Signatory", pageW - margin - 35, sigY);
+
+  // Timestamp at bottom right
+  const now = new Date();
+  const tsString = `Payslip generated at: ${now.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`;
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(120, 120, 120);
+  doc.text(tsString, pageW - margin, bottomY, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
 
   const fileName = `Payslip_${(employee.name || 'Emp').replace(/\s+/g, '_')}_${monthYear}.pdf`;
   if (returnBase64) {
