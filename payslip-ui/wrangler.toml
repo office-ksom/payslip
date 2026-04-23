@@ -1,4 +1,4 @@
-name = "ksom-payslip"
+name = "payslip"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-04-05"
 
