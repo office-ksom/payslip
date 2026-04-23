@@ -1,0 +1,36 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build & Deploy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: payslip-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: payslip-ui
+
+      - name: Build
+        run: npm run build
+        working-directory: payslip-ui
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 89601c100f926df89b9069f1541aa36e
+          command: pages deploy dist --project-name=ksom-payslip --branch=main
+          workingDirectory: payslip-ui
