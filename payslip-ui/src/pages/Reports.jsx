@@ -330,6 +330,10 @@ const Reports = () => {
       sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
       const dataStyle = sheet.getCell('A6').style;
+      // Build a dedicated integer-format, centred style for Sl.No column
+      const slNoStyle = JSON.parse(JSON.stringify(dataStyle));
+      slNoStyle.numFmt = '0';
+      slNoStyle.alignment = { ...((slNoStyle.alignment) || {}), horizontal: 'center', vertical: 'center' };
       const totalStyle = sheet.getCell('E15').style;
       const totalLabelStyle = sheet.getCell('A15').style;
       const dedTitleStyle = sheet.getCell('A16').style;
@@ -363,15 +367,16 @@ const Reports = () => {
           if (colIdx > 0) {
             const cell = row.getCell(colIdx);
             cell.value = val;
-            cell.style = dataStyle;
             if (colIdx === 1) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
-              cell.numFmt = '0';
-            } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
-            } else if (colIdx >= 5) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
-              cell.numFmt = '0.00';
+              cell.style = slNoStyle;
+            } else {
+              cell.style = dataStyle;
+              if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+                cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+              } else if (colIdx >= 5) {
+                cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+                cell.numFmt = '0.00';
+              }
             }
           }
         });
@@ -435,15 +440,16 @@ const Reports = () => {
           if (colIdx > 0) {
             const cell = row.getCell(colIdx);
             cell.value = val;
-            cell.style = dataStyle;
             if (colIdx === 1) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
-              cell.numFmt = '0';
-            } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
-            } else if (colIdx >= 5) {
-              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
-              cell.numFmt = '0.00';
+              cell.style = slNoStyle;
+            } else {
+              cell.style = dataStyle;
+              if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
+                cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+              } else if (colIdx >= 5) {
+                cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+                cell.numFmt = '0.00';
+              }
             }
           }
         });
