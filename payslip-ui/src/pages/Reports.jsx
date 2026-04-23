@@ -318,6 +318,8 @@ const Reports = () => {
       const sheet = workbook.worksheets[0];
 
       sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
+      sheet.mergeCells('A3:N3');
+      sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
       const dataStyle = sheet.getCell('A6').style;
       const totalStyle = sheet.getCell('E15').style;
@@ -356,6 +358,7 @@ const Reports = () => {
             cell.style = dataStyle;
             if (colIdx === 1) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
+              cell.numFmt = '0';
             } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
             } else if (colIdx >= 5) {
@@ -427,6 +430,7 @@ const Reports = () => {
             cell.style = dataStyle;
             if (colIdx === 1) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'center' };
+              cell.numFmt = '0';
             } else if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
               cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
             } else if (colIdx >= 5) {
