@@ -505,6 +505,22 @@ const Reports = () => {
         currentRow++;
       });
 
+      // Skip one empty row then add designation labels (matching template row 41 layout)
+      currentRow++; // empty gap row
+      const sigRow = sheet.getRow(currentRow);
+      const sigFont = { name: 'Arial Narrow', size: 10, bold: true };
+      const sigAlign = { horizontal: 'center' };
+      sigRow.getCell(5).value  = 'Assistant - Gr.II';
+      sigRow.getCell(5).font   = sigFont;
+      sigRow.getCell(5).alignment = sigAlign;
+      sigRow.getCell(9).value  = 'AO';
+      sigRow.getCell(9).font   = sigFont;
+      sigRow.getCell(9).alignment = sigAlign;
+      sigRow.getCell(13).value = 'DIRECTOR';
+      sigRow.getCell(13).font  = sigFont;
+      sigRow.getCell(13).alignment = sigAlign;
+      sigRow.commit();
+
       const buffer = await workbook.xlsx.writeBuffer();
       saveAs(new Blob([buffer]), `KSoM_Paybill_${monthYear}.xlsx`);
     } catch (err) {
