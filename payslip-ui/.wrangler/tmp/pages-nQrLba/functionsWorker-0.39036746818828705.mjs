@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-vq3hxL/checked-fetch.js
+// ../.wrangler/tmp/bundle-EdPNVL/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -178,24 +178,29 @@ async function onRequestPost3(context) {
   try {
     const data = await context.request.json();
     const { to, subject, text, attachments } = data;
-    const apiKey = context.env.RESEND_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "RESEND_API_KEY is not configured on the server." }), { status: 500 });
+    const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = context.env;
+    if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+      return new Response(JSON.stringify({
+        error: "Gmail OAuth2 credentials (ID, Secret, or Refresh Token) are not configured."
+      }), { status: 500 });
     }
-    const resendPayload = {
-      from: "KSoM Payslip <office@office.ksom.res.in>",
-      to: [to],
+    const accessToken = await getAccessToken(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN);
+    const rawMessage = buildMimeMessage({
+      from: "KSoM Office <office@ksom.res.in>",
+      to,
       subject: subject || "Your Payslip",
       text: text || "Please find your payslip attached.",
       attachments: attachments || []
-    };
-    const response = await fetch("https://api.resend.com/emails", {
+    });
+    const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(resendPayload)
+      body: JSON.stringify({
+        raw: base64url(rawMessage)
+      })
     });
     const result = await response.json();
     if (response.ok) {
@@ -204,13 +209,66 @@ async function onRequestPost3(context) {
         status: 200
       });
     } else {
-      return new Response(JSON.stringify({ error: result.message || "Failed to send email" }), { status: response.status });
+      return new Response(JSON.stringify({ error: result.error?.message || "Failed to send email via Gmail" }), { status: response.status });
     }
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
 __name(onRequestPost3, "onRequestPost");
+async function getAccessToken(clientId, clientSecret, refreshToken) {
+  const url = "https://oauth2.googleapis.com/token";
+  const params = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: "refresh_token"
+  });
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Google OAuth error: ${data.error_description || data.error}`);
+  }
+  return data.access_token;
+}
+__name(getAccessToken, "getAccessToken");
+function buildMimeMessage({ from, to, subject, text, attachments }) {
+  const boundary = "boundary_" + Math.random().toString(36).substring(2);
+  let message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    text,
+    ""
+  ];
+  for (const attachment of attachments) {
+    message.push(`--${boundary}`);
+    message.push(`Content-Type: application/pdf; name="${attachment.filename}"`);
+    message.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
+    message.push("Content-Transfer-Encoding: base64");
+    message.push("");
+    message.push(attachment.content);
+    message.push("");
+  }
+  message.push(`--${boundary}--`);
+  return message.join("\r\n");
+}
+__name(buildMimeMessage, "buildMimeMessage");
+function base64url(str) {
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+__name(base64url, "base64url");
 
 // api/employees/index.js
 async function onRequestGet3(context) {
@@ -302,7 +360,7 @@ async function onRequestPost5(context) {
 }
 __name(onRequestPost5, "onRequestPost");
 
-// ../.wrangler/tmp/pages-1S6EAc/functionsRoutes-0.5729201056826586.mjs
+// ../.wrangler/tmp/pages-nQrLba/functionsRoutes-0.033363819850624865.mjs
 var routes = [
   {
     routePath: "/api/deductions/:month_year",
@@ -863,7 +921,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-vq3hxL/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-EdPNVL/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -895,7 +953,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-vq3hxL/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-EdPNVL/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -995,4 +1053,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.7260925967920402.mjs.map
+//# sourceMappingURL=functionsWorker-0.39036746818828705.mjs.map
