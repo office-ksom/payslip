@@ -591,9 +591,7 @@ const Reports = () => {
       }
     }
     setSendingEmails(false);
-    if (successCount > 0 || failCount === 0) {
-      alert(`Email process finished. Success: ${successCount}, Failed: ${failCount}`);
-    }
+    alert(`Email process finished. Success: ${successCount}, Failed: ${failCount}`);
   };
 
   return (
