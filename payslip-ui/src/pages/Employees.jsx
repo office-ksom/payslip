@@ -12,7 +12,9 @@ const emptyForm = {
   email_id: '',
   mob_no: '',
   epf_uan: '',
-  is_active: 1
+  is_active: 1,
+  title: 'Mr.',
+  sort_order: 0
 };
 
 const Employees = () => {
@@ -65,7 +67,9 @@ const Employees = () => {
       email_id: emp.email_id || '',
       mob_no: emp.mob_no || '',
       epf_uan: emp.epf_uan || '',
-      is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1
+      is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1,
+      title: emp.title || 'Mr.',
+      sort_order: emp.sort_order || 0
     });
     setIsEditMode(true);
     setShowForm(true);
@@ -163,9 +167,27 @@ const Employees = () => {
                   disabled={isEditMode} style={isEditMode ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
               </div>
               <div className="form-group">
+                <label className="form-label">Title</label>
+                <select name="title" value={formData.title} onChange={handleInputChange} className="form-control">
+                  <option value="Mr.">Mr.</option>
+                  <option value="Ms.">Ms.</option>
+                  <option value="Mrs.">Mrs.</option>
+                  <option value="Dr.">Dr.</option>
+                  <option value="Prof.">Prof.</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
                 <label className="form-label">Full Name *</label>
                 <input required type="text" name="name" value={formData.name} onChange={handleInputChange}
                   className="form-control" placeholder="Full Name" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Order (for sorting)</label>
+                <input type="number" name="sort_order" value={formData.sort_order} onChange={handleInputChange}
+                  className="form-control" placeholder="0" />
               </div>
             </div>
 
@@ -287,7 +309,7 @@ const Employees = () => {
                   filteredEmployees.map(emp => (
                     <tr key={emp.emp_id}>
                       <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
-                      <td>{emp.name}</td>
+                      <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
                       <td>
                         <span className={`badge badge-${emp.category}`}>

@@ -12,7 +12,12 @@ CREATE TABLE employees (
     date_of_birth TEXT, -- YYYY-MM-DD
     date_of_joining TEXT, -- YYYY-MM-DD
     scale_of_pay TEXT,
-    category TEXT -- state, ugc, temporary, contract
+    category TEXT, -- state, ugc, temporary, contract
+    title TEXT,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    email_id TEXT,
+    mob_no TEXT
 );
 
 -- 2. Allowances Settings (Global Rules/Percentages)

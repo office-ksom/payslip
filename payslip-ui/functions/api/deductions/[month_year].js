@@ -3,12 +3,12 @@ export async function onRequestGet(context) {
     const monthYear = context.params.month_year;
     
     const { results } = await context.env.ksom_payslip_db.prepare(`
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active,
+      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.title, e.sort_order,
              d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery
       FROM employees e
       LEFT JOIN monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
-      ORDER BY e.name ASC
+      ORDER BY e.sort_order ASC, e.name ASC
     `).bind(monthYear).all();
 
     return new Response(JSON.stringify(results), {

@@ -81,7 +81,7 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
 
   const infoRows = [
-    ['Name', employee.name || '', 'Month & Year', monthDisplay],
+    ['Name', (employee.title ? `${employee.title} ` : '') + (employee.name || ''), 'Month & Year', monthDisplay],
     ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
     ['Scale of Pay', employee.scale_of_pay || '', 'Category', (employee.category || '').toUpperCase()],
     ['D.O.B', employee.date_of_birth || '', 'D.O.J', employee.date_of_joining || ''],
@@ -253,7 +253,8 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   doc.text(tsString, pageW - margin, sigY + 8, { align: 'right' });
   doc.setTextColor(0, 0, 0);
 
-  const fileName = `Payslip_${(employee.name || 'Emp').replace(/\s+/g, '_')}_${monthYear}.pdf`;
+  const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
+  const fileName = `Payslip_${fullName.replace(/\s+/g, '_')}_${monthYear}.pdf`;
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -301,7 +302,7 @@ const Reports = () => {
           if (dojMonth > targetMonth) return false;
         }
         return typeof e.is_active === 'undefined' || e.is_active === 1 || e.earnings_id != null;
-      }));
+      }).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -369,7 +370,8 @@ const Reports = () => {
         sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; sumOther += other; sumGross += gross;
 
         const row = sheet.getRow(currentRow);
-        const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest, other, gross];
+        const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
+        const values = [null, i + 1, fullName, emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest, other, gross];
         values.forEach((val, colIdx) => {
           if (colIdx > 0) {
             const cell = row.getCell(colIdx);
@@ -664,7 +666,7 @@ const Reports = () => {
                         title={!emp.email_id ? "No email address found" : ""} />
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                      <div style={{ fontWeight: 600 }}>{emp.title ? `${emp.title} ` : ''}{emp.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{emp.designation}</div>
                       {!emp.email_id && <div style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>No Email</div>}
                     </td>

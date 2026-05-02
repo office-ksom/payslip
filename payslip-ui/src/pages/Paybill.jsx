@@ -56,7 +56,7 @@ const Paybill = () => {
           if (dojMonth > targetMonth) return false;
         }
         return typeof e.is_active === 'undefined' || e.is_active === 1 || e.earnings_id != null;
-      }));
+      }).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
     } catch (err) {
       console.error(err);
     } finally {
@@ -298,7 +298,7 @@ const Paybill = () => {
                     <tr key={emp.emp_id}>
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => openModal(emp)}>
-                          {emp.name}
+                          {emp.title ? `${emp.title} ` : ''}{emp.name}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>{emp.emp_id}</div>
                       </td>
@@ -343,7 +343,7 @@ const Paybill = () => {
         }}>
           <div className="card" style={{ width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Data Entry: {modalEmp.name} ({modalEmp.emp_id})</h2>
+              <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Data Entry: {modalEmp.title ? `${modalEmp.title} ` : ''}{modalEmp.name} ({modalEmp.emp_id})</h2>
               <button className="btn" style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer' }} onClick={() => setModalOpen(false)}>
                 <X size={20} />
               </button>
