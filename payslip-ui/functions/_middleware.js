@@ -2,37 +2,22 @@ export async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
 
-  // 1. Get user email from Cloudflare Access (or Cookie/Mock for local dev)
+  // 1. Get user email from Cloudflare Access or Cookie
   let email = request.headers.get('Cf-Access-Authenticated-User-Email');
   
-  // Local development mock fallback
-  if (!email && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
+  if (!email) {
     const cookieHeader = request.headers.get('Cookie') || '';
     const cookies = Object.fromEntries(cookieHeader.split(';').map(c => c.trim().split('=')));
-    email = cookies['mock_email'] || url.searchParams.get('mock_user');
+    email = cookies['mock_email'] || ( (url.hostname === 'localhost' || url.hostname === '127.0.0.1') ? url.searchParams.get('mock_user') : null );
   }
 
-  // 2. If no email, handle redirection or unauthorized response
+  // 2. If no email, handle unauthorized response
   if (!email) {
-    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    
-    // In production, force a redirect to login if accessing the main app or any API
-    if (!isLocal) {
-      // Don't redirect static assets like .js, .css, .png, etc.
-      const isStaticAsset = url.pathname.includes('.') && !url.pathname.startsWith('/api/');
-      if (!isStaticAsset) {
-        return new Response(null, {
-          status: 302,
-          headers: { 'Location': '/cdn-cgi/access/login' }
-        });
-      }
-    } else {
-      // Local dev: block API but let frontend load the mock login form
-      if (url.pathname.startsWith('/api/')) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { 
-          status: 401, headers: { 'Content-Type': 'application/json' }
-        });
-      }
+    // Block API but let frontend load the login form
+    if (url.pathname.startsWith('/api/')) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+        status: 401, headers: { 'Content-Type': 'application/json' }
+      });
     }
     return next();
   }

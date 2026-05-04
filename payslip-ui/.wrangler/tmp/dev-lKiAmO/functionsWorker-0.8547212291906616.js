@@ -592,28 +592,17 @@ async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
   let email = request.headers.get("Cf-Access-Authenticated-User-Email");
-  if (!email && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
+  if (!email) {
     const cookieHeader = request.headers.get("Cookie") || "";
     const cookies = Object.fromEntries(cookieHeader.split(";").map((c) => c.trim().split("=")));
-    email = cookies["mock_email"] || url.searchParams.get("mock_user");
+    email = cookies["mock_email"] || (url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.searchParams.get("mock_user") : null);
   }
   if (!email) {
-    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-    if (!isLocal) {
-      const isStaticAsset = url.pathname.includes(".") && !url.pathname.startsWith("/api/");
-      if (!isStaticAsset) {
-        return new Response(null, {
-          status: 302,
-          headers: { "Location": "/cdn-cgi/access/login" }
-        });
-      }
-    } else {
-      if (url.pathname.startsWith("/api/")) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
+    if (url.pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
     }
     return next();
   }
