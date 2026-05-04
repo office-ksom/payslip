@@ -1,0 +1,10 @@
+{
+  "name": "payslip-root",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm run dev:wrangler --prefix payslip-ui",
+    "build": "npm run build --prefix payslip-ui",
+    "migrate": "powershell -Command \"Get-ChildItem migration_*.sql | ForEach-Object { wrangler d1 execute ksom_payslip_db --local --file=$_.FullName }\"",
+    "install-all": "npm install --prefix payslip-ui"
+  }
+}
