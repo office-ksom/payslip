@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Save, Copy, X } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 
 const Paybill = () => {
+  const { user } = useOutletContext();
+  if (user && user.role === 'viewer') {
+    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
+  }
   const [monthYear, setMonthYear] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;

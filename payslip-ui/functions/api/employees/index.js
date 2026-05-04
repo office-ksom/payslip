@@ -1,8 +1,20 @@
 export async function onRequestGet(context) {
   try {
+    const userEmail = context.request.headers.get('X-User-Email');
+    const userRole = context.request.headers.get('X-User-Role');
+
+    let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
+    let params = [];
+
+    if (userRole === 'viewer' && userEmail) {
+      query = "SELECT * FROM employees WHERE email_id = ? ORDER BY sort_order ASC, name ASC";
+      params = [userEmail];
+    }
+
     const { results } = await context.env.ksom_payslip_db.prepare(
-      "SELECT * FROM employees ORDER BY sort_order ASC, name ASC"
-    ).all();
+      query
+    ).bind(...params).all();
+    
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
     });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Pencil, X, Check } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 
 const emptyForm = {
   emp_id: '',
@@ -18,6 +19,10 @@ const emptyForm = {
 };
 
 const Employees = () => {
+  const { user } = useOutletContext();
+  if (user && user.role === 'viewer') {
+    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
+  }
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

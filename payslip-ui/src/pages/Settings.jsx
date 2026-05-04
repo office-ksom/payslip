@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Save, AlertCircle, Plus, Calendar, Pencil } from 'lucide-react';
 
-const Settings = () => {
+const Settings = (props) => {
+  if (props.user && props.user.role === 'viewer') {
+    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
+  }
   const [settingsList, setSettingsList] = useState([]);
   
   const [formData, setFormData] = useState({

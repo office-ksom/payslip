@@ -1,4 +1,9 @@
 export async function onRequestPost(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
   try {
     const data = await context.request.json();
     const { to, subject, text, attachments } = data;

@@ -1,15 +1,26 @@
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
+    const userRole = context.request.headers.get('X-User-Role');
+    const userEmail = context.request.headers.get('X-User-Email');
     
-    const { results } = await context.env.ksom_payslip_db.prepare(`
+    let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.title, e.sort_order,
              d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery
       FROM employees e
       LEFT JOIN monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
-      ORDER BY e.sort_order ASC, e.name ASC
-    `).bind(monthYear).all();
+    `;
+    let params = [monthYear];
+
+    if (userRole === 'viewer') {
+      query += ` WHERE e.email_id = ?`;
+      params.push(userEmail);
+    }
+
+    query += ` ORDER BY e.sort_order ASC, e.name ASC`;
+
+    const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
 
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
@@ -20,6 +31,11 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
   try {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();

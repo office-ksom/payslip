@@ -1,4 +1,9 @@
 export async function onRequestGet(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -12,6 +17,11 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
   try {
     const data = await context.request.json();
     const { effective_from, da_state_percentage, da_ugc_percentage, hra_state_percentage, hra_ugc_percentage } = data;

@@ -1,16 +1,26 @@
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
+    const userRole = context.request.headers.get('X-User-Role');
+    const userEmail = context.request.headers.get('X-User-Email');
 
-    // We join with employees to return names and designations alongside earnings
-    const { results } = await context.env.ksom_payslip_db.prepare(`
+    let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
              m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
              m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow
       FROM employees e
       LEFT JOIN monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
-      ORDER BY e.sort_order ASC, e.name ASC
-    `).bind(monthYear).all();
+    `;
+    let params = [monthYear];
+
+    if (userRole === 'viewer') {
+      query += ` WHERE e.email_id = ?`;
+      params.push(userEmail);
+    }
+
+    query += ` ORDER BY e.sort_order ASC, e.name ASC`;
+
+    const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
 
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
@@ -21,13 +31,16 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPost(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
   try {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
 
     const db = context.env.ksom_payslip_db;
-
-    // Cloudflare D1 supports batching statements to execute multiple inserts/updates at once
     const statements = [];
 
     for (const record of records) {

@@ -324,3 +324,8 @@ a:hover {
 .badge-ugc { background-color: rgba(99, 102, 241, 0.1); color: var(--color-accent-secondary); }
 .badge-temporary { background-color: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
 .badge-contract { background-color: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

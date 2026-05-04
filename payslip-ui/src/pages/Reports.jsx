@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Table, Mail, CheckSquare } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
@@ -263,6 +264,9 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
 };
 
 const Reports = () => {
+  const { user } = useOutletContext();
+  const isViewer = user && user.role === 'viewer';
+  
   const [monthYear, setMonthYear] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -396,7 +400,7 @@ const Reports = () => {
       const totalRow = sheet.getRow(currentRow);
       totalRow.getCell(1).value = 'TOTAL';
       totalRow.getCell(1).style = totalLabelStyle;
-      sheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      safeMerge(`A${currentRow}:D${currentRow}`);
       [sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest, sumOther, sumGross].forEach((val, idx) => {
         const cell = totalRow.getCell(5 + idx);
         cell.value = val;
@@ -412,7 +416,7 @@ const Reports = () => {
       const dedTitleRow = sheet.getRow(currentRow);
       dedTitleRow.getCell(1).value = 'DEDUCTIONS';
       dedTitleRow.getCell(1).style = dedTitleStyle;
-      sheet.mergeCells(`A${currentRow}:N${currentRow}`);
+      safeMerge(`A${currentRow}:N${currentRow}`);
       dedTitleRow.commit();
       currentRow++;
 
@@ -469,7 +473,7 @@ const Reports = () => {
       const dedTotalRow = sheet.getRow(currentRow);
       dedTotalRow.getCell(1).value = 'TOTAL';
       dedTotalRow.getCell(1).style = totalLabelStyle;
-      sheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      safeMerge(`A${currentRow}:D${currentRow}`);
       [sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam, sumTotDed, sumNet].forEach((val, idx) => {
         const cell = dedTotalRow.getCell(5 + idx);
         cell.value = val;
@@ -602,9 +606,9 @@ const Reports = () => {
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Reports & Exports</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-            Generate formal KSoM payslips in PDF or batch-export to Excel.
+            {isViewer ? 'View and download your formal KSoM payslips.' : 'Generate formal KSoM payslips in PDF or batch-export to Excel.'}
           </p>
-          {globalSettingsList.length > 0 && (
+          {!isViewer && globalSettingsList.length > 0 && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-primary)', background: 'rgba(59,130,246,0.1)', padding: '0.4rem 0.8rem', borderRadius: '4px', display: 'inline-block' }}>
               <strong>Active Rules for {monthYear}:</strong> State (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_state_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_state_percentage || 0}%) | UGC (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_ugc_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_ugc_percentage || 0}%)
             </div>
@@ -616,18 +620,20 @@ const Reports = () => {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem' }}>Records — {monthYear} ({data.length} employees)</h3>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={handleSendEmails} disabled={selectedEmps.size === 0 || sendingEmails}
-              className="btn btn-primary">
-              <Mail size={16} /> {sendingEmails ? 'Sending...' : `Email Selected (${selectedEmps.size})`}
-            </button>
-            <button onClick={exportExcel} disabled={!data.length}
-              style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
-              className="btn">
-              <Table size={16} /> Export All to Excel
-            </button>
-          </div>
+          <h3 style={{ fontSize: '1.125rem' }}>{isViewer ? 'Your Records' : `Records — ${monthYear} (${data.length} employees)`}</h3>
+          {!isViewer && (
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button onClick={handleSendEmails} disabled={selectedEmps.size === 0 || sendingEmails}
+                className="btn btn-primary">
+                <Mail size={16} /> {sendingEmails ? 'Sending...' : `Email Selected (${selectedEmps.size})`}
+              </button>
+              <button onClick={exportExcel} disabled={!data.length}
+                style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
+                className="btn">
+                <Table size={16} /> Export All to Excel
+              </button>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -637,12 +643,14 @@ const Reports = () => {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>
-                    <input type="checkbox" 
-                      checked={data.filter(e => e.email_id).length > 0 && selectedEmps.size === data.filter(e => e.email_id).length}
-                      onChange={toggleSelectAll} 
-                      disabled={data.filter(e => e.email_id).length === 0} />
-                  </th>
+                  {!isViewer && (
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input type="checkbox" 
+                        checked={data.filter(e => e.email_id).length > 0 && selectedEmps.size === data.filter(e => e.email_id).length}
+                        onChange={toggleSelectAll} 
+                        disabled={data.filter(e => e.email_id).length === 0} />
+                    </th>
+                  )}
                   <th>Employee</th>
                   <th>Gross Pay</th>
                   <th>Total Deductions</th>
@@ -652,19 +660,21 @@ const Reports = () => {
               </thead>
               <tbody>
                 {data.length === 0 && (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No data for this month. Please save the paybill first.</td></tr>
+                  <tr><td colSpan={isViewer ? "5" : "6"} style={{ textAlign: 'center', padding: '2rem' }}>No data for this month.</td></tr>
                 )}
                 {data.map(emp => {
                   const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
                   return (
                   <tr key={emp.emp_id}>
-                    <td style={{ textAlign: 'center' }}>
-                      <input type="checkbox" 
-                        checked={selectedEmps.has(emp.emp_id)}
-                        onChange={() => toggleSelect(emp.emp_id)}
-                        disabled={!emp.email_id}
-                        title={!emp.email_id ? "No email address found" : ""} />
-                    </td>
+                    {!isViewer && (
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" 
+                          checked={selectedEmps.has(emp.emp_id)}
+                          onChange={() => toggleSelect(emp.emp_id)}
+                          disabled={!emp.email_id}
+                          title={!emp.email_id ? "No email address found" : ""} />
+                      </td>
+                    )}
                     <td>
                       <div style={{ fontWeight: 600 }}>{emp.title ? `${emp.title} ` : ''}{emp.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{emp.designation}</div>
