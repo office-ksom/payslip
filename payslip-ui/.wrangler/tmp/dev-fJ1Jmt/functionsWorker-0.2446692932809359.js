@@ -598,18 +598,22 @@ async function onRequest(context) {
     email = cookies["mock_email"] || url.searchParams.get("mock_user");
   }
   if (!email) {
-    if (url.pathname.startsWith("/api/")) {
-      const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-      if (!isLocal) {
+    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (!isLocal) {
+      const isStaticAsset = url.pathname.includes(".") && !url.pathname.startsWith("/api/");
+      if (!isStaticAsset) {
         return new Response(null, {
           status: 302,
           headers: { "Location": "/cdn-cgi/access/login" }
         });
       }
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
+    } else {
+      if (url.pathname.startsWith("/api/")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
     return next();
   }

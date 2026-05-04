@@ -14,18 +14,25 @@ export async function onRequest(context) {
 
   // 2. If no email, handle redirection or unauthorized response
   if (!email) {
-    // Only protect /api/* routes. Frontend assets should load so they can see the login state.
-    if (url.pathname.startsWith('/api/')) {
-       const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-       if (!isLocal) {
-         return new Response(null, {
-           status: 302,
-           headers: { 'Location': '/cdn-cgi/access/login' }
-         });
-       }
-       return new Response(JSON.stringify({ error: "Unauthorized" }), { 
-         status: 401, headers: { 'Content-Type': 'application/json' }
-       });
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    
+    // In production, force a redirect to login if accessing the main app or any API
+    if (!isLocal) {
+      // Don't redirect static assets like .js, .css, .png, etc.
+      const isStaticAsset = url.pathname.includes('.') && !url.pathname.startsWith('/api/');
+      if (!isStaticAsset) {
+        return new Response(null, {
+          status: 302,
+          headers: { 'Location': '/cdn-cgi/access/login' }
+        });
+      }
+    } else {
+      // Local dev: block API but let frontend load the mock login form
+      if (url.pathname.startsWith('/api/')) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+          status: 401, headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
     return next();
   }
