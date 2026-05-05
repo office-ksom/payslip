@@ -56,6 +56,66 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 async function onRequestGet(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  if (!code) {
+    return new Response("Missing code", { status: 400 });
+  }
+  const redirectUri = `${url.origin}/api/auth/callback`;
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.GMAIL_CLIENT_ID,
+      client_secret: env.GMAIL_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code"
+    })
+  });
+  const tokens = await tokenResponse.json();
+  if (tokens.error) {
+    return new Response(`Token error: ${tokens.error_description || tokens.error}`, { status: 500 });
+  }
+  const userResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${tokens.access_token}` }
+  });
+  const userInfo = await userResponse.json();
+  if (!userInfo.email) {
+    return new Response("Could not fetch user email", { status: 500 });
+  }
+  const response = Response.redirect(url.origin, 302);
+  response.headers.append("Set-Cookie", `payslip_auth=${userInfo.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`);
+  return response;
+}
+__name(onRequestGet, "onRequestGet");
+__name2(onRequestGet, "onRequestGet");
+async function onRequestGet2(context) {
+  const { env, request } = context;
+  const url = new URL(request.url);
+  const redirectUri = `${url.origin}/api/auth/callback`;
+  const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  googleAuthUrl.searchParams.set("client_id", env.GMAIL_CLIENT_ID);
+  googleAuthUrl.searchParams.set("redirect_uri", redirectUri);
+  googleAuthUrl.searchParams.set("response_type", "code");
+  googleAuthUrl.searchParams.set("scope", "openid email profile");
+  googleAuthUrl.searchParams.set("access_type", "online");
+  googleAuthUrl.searchParams.set("prompt", "select_account");
+  return Response.redirect(googleAuthUrl.toString(), 302);
+}
+__name(onRequestGet2, "onRequestGet2");
+__name2(onRequestGet2, "onRequestGet");
+async function onRequestGet3(context) {
+  const url = new URL(context.request.url);
+  const response = Response.redirect(url.origin, 302);
+  response.headers.append("Set-Cookie", "payslip_auth=; Path=/; Max-Age=0");
+  response.headers.append("Set-Cookie", "mock_email=; Path=/; Max-Age=0");
+  return response;
+}
+__name(onRequestGet3, "onRequestGet3");
+__name2(onRequestGet3, "onRequestGet");
+async function onRequestGet4(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
@@ -67,8 +127,8 @@ async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet, "onRequestGet");
-__name2(onRequestGet, "onRequestGet");
+__name(onRequestGet4, "onRequestGet4");
+__name2(onRequestGet4, "onRequestGet");
 async function onRequestPost(context) {
   try {
     const data = await context.request.json();
@@ -87,7 +147,7 @@ async function onRequestPost(context) {
 }
 __name(onRequestPost, "onRequestPost");
 __name2(onRequestPost, "onRequestPost");
-async function onRequestGet2(context) {
+async function onRequestGet5(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -113,8 +173,8 @@ async function onRequestGet2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet2, "onRequestGet2");
-__name2(onRequestGet2, "onRequestGet");
+__name(onRequestGet5, "onRequestGet5");
+__name2(onRequestGet5, "onRequestGet");
 async function onRequestPost2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -170,7 +230,7 @@ async function onRequestPost2(context) {
 }
 __name(onRequestPost2, "onRequestPost2");
 __name2(onRequestPost2, "onRequestPost");
-async function onRequestGet3(context) {
+async function onRequestGet6(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -196,8 +256,8 @@ async function onRequestGet3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet3, "onRequestGet3");
-__name2(onRequestGet3, "onRequestGet");
+__name(onRequestGet6, "onRequestGet6");
+__name2(onRequestGet6, "onRequestGet");
 async function onRequestPost3(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -257,7 +317,7 @@ async function onRequestPost3(context) {
 }
 __name(onRequestPost3, "onRequestPost3");
 __name2(onRequestPost3, "onRequestPost");
-async function onRequestGet4(context) {
+async function onRequestGet7(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const tables = ["employees", "allowances_settings", "monthly_earnings", "monthly_deductions"];
@@ -306,8 +366,8 @@ PRAGMA defer_foreign_keys=TRUE;
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet4, "onRequestGet4");
-__name2(onRequestGet4, "onRequestGet");
+__name(onRequestGet7, "onRequestGet7");
+__name2(onRequestGet7, "onRequestGet");
 async function onRequestPost4(context) {
   try {
     const db = context.env.ksom_payslip_db;
@@ -430,7 +490,7 @@ function base64url(str) {
 }
 __name(base64url, "base64url");
 __name2(base64url, "base64url");
-async function onRequestGet5(context) {
+async function onRequestGet8(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
@@ -450,8 +510,8 @@ async function onRequestGet5(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet5, "onRequestGet5");
-__name2(onRequestGet5, "onRequestGet");
+__name(onRequestGet8, "onRequestGet8");
+__name2(onRequestGet8, "onRequestGet");
 async function onRequestPost6(context) {
   try {
     const data = await context.request.json();
@@ -494,7 +554,7 @@ async function onRequestPut(context) {
 }
 __name(onRequestPut, "onRequestPut");
 __name2(onRequestPut, "onRequestPut");
-async function onRequestGet6(context) {
+async function onRequestGet9(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -510,8 +570,8 @@ async function onRequestGet6(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet6, "onRequestGet6");
-__name2(onRequestGet6, "onRequestGet");
+__name(onRequestGet9, "onRequestGet9");
+__name2(onRequestGet9, "onRequestGet");
 async function onRequestPost7(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -539,7 +599,7 @@ async function onRequestPost7(context) {
 }
 __name(onRequestPost7, "onRequestPost7");
 __name2(onRequestPost7, "onRequestPost");
-async function onRequestGet7(context) {
+async function onRequestGet10(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -551,8 +611,8 @@ async function onRequestGet7(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet7, "onRequestGet7");
-__name2(onRequestGet7, "onRequestGet");
+__name(onRequestGet10, "onRequestGet10");
+__name2(onRequestGet10, "onRequestGet");
 async function onRequestPost8(context) {
   try {
     const data = await context.request.json();
@@ -595,7 +655,7 @@ async function onRequest(context) {
   if (!email) {
     const cookieHeader = request.headers.get("Cookie") || "";
     const cookies = Object.fromEntries(cookieHeader.split(";").map((c) => c.trim().split("=")));
-    email = cookies["mock_email"] || (url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.searchParams.get("mock_user") : null);
+    email = cookies["payslip_auth"] || cookies["mock_email"] || (url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.searchParams.get("mock_user") : null);
   }
   if (!email) {
     if (url.pathname.startsWith("/api/")) {
@@ -669,11 +729,32 @@ __name(forbiddenResponse, "forbiddenResponse");
 __name2(forbiddenResponse, "forbiddenResponse");
 var routes = [
   {
+    routePath: "/api/auth/callback",
+    mountPath: "/api/auth",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet]
+  },
+  {
+    routePath: "/api/auth/google",
+    mountPath: "/api/auth",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet2]
+  },
+  {
+    routePath: "/api/auth/logout",
+    mountPath: "/api/auth",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet3]
+  },
+  {
     routePath: "/api/settings/backup",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet]
+    modules: [onRequestGet4]
   },
   {
     routePath: "/api/settings/backup",
@@ -687,7 +768,7 @@ var routes = [
     mountPath: "/api/deductions",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet2]
+    modules: [onRequestGet5]
   },
   {
     routePath: "/api/deductions/:month_year",
@@ -701,7 +782,7 @@ var routes = [
     mountPath: "/api/earnings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet3]
+    modules: [onRequestGet6]
   },
   {
     routePath: "/api/earnings/:month_year",
@@ -715,7 +796,7 @@ var routes = [
     mountPath: "/api",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet4]
+    modules: [onRequestGet7]
   },
   {
     routePath: "/api/backup",
@@ -736,7 +817,7 @@ var routes = [
     mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet5]
+    modules: [onRequestGet8]
   },
   {
     routePath: "/api/employees",
@@ -757,7 +838,7 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet6]
+    modules: [onRequestGet9]
   },
   {
     routePath: "/api/settings",
@@ -778,7 +859,7 @@ var routes = [
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet7]
+    modules: [onRequestGet10]
   },
   {
     routePath: "/api/users",

@@ -8,7 +8,7 @@ export async function onRequest(context) {
   if (!email) {
     const cookieHeader = request.headers.get('Cookie') || '';
     const cookies = Object.fromEntries(cookieHeader.split(';').map(c => c.trim().split('=')));
-    email = cookies['mock_email'] || ( (url.hostname === 'localhost' || url.hostname === '127.0.0.1') ? url.searchParams.get('mock_user') : null );
+    email = cookies['payslip_auth'] || cookies['mock_email'] || ( (url.hostname === 'localhost' || url.hostname === '127.0.0.1') ? url.searchParams.get('mock_user') : null );
   }
 
   // 2. If no email, handle unauthorized response

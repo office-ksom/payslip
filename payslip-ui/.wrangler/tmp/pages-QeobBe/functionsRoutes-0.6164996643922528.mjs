@@ -1,3 +1,6 @@
+import { onRequestGet as __api_auth_callback_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\callback.js"
+import { onRequestGet as __api_auth_google_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\google.js"
+import { onRequestGet as __api_auth_logout_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\logout.js"
 import { onRequestGet as __api_settings_backup_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\backup.js"
 import { onRequestPost as __api_settings_backup_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\backup.js"
 import { onRequestGet as __api_deductions__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\[month_year].js"
@@ -19,6 +22,27 @@ import { onRequest as ___middleware_js_onRequest } from "D:\\KSOM\\Website\\Web 
 
 export const routes = [
     {
+      routePath: "/api/auth/callback",
+      mountPath: "/api/auth",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_auth_callback_js_onRequestGet],
+    },
+  {
+      routePath: "/api/auth/google",
+      mountPath: "/api/auth",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_auth_google_js_onRequestGet],
+    },
+  {
+      routePath: "/api/auth/logout",
+      mountPath: "/api/auth",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_auth_logout_js_onRequestGet],
+    },
+  {
       routePath: "/api/settings/backup",
       mountPath: "/api/settings",
       method: "GET",
