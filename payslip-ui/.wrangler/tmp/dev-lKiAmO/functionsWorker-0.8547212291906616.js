@@ -658,7 +658,7 @@ async function onRequest(context) {
     email = cookies["payslip_auth"] || cookies["mock_email"] || (url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.searchParams.get("mock_user") : null);
   }
   if (!email) {
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/auth/")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }

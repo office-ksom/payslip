@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-bRRGdQ/checked-fetch.js
+// ../.wrangler/tmp/bundle-9NpgYz/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -630,7 +630,7 @@ async function onRequest(context) {
     email = cookies["payslip_auth"] || cookies["mock_email"] || (url.hostname === "localhost" || url.hostname === "127.0.0.1" ? url.searchParams.get("mock_user") : null);
   }
   if (!email) {
-    if (url.pathname.startsWith("/api/")) {
+    if (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/auth/")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" }
@@ -1336,7 +1336,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-bRRGdQ/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-9NpgYz/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -1368,7 +1368,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-bRRGdQ/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-9NpgYz/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

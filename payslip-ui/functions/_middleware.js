@@ -14,7 +14,7 @@ export async function onRequest(context) {
   // 2. If no email, handle unauthorized response
   if (!email) {
     // Block API but let frontend load the login form
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth/')) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { 
         status: 401, headers: { 'Content-Type': 'application/json' }
       });
