@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-9NpgYz/checked-fetch.js
+// ../.wrangler/tmp/bundle-WlgxQn/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -35,7 +35,7 @@ async function onRequestGet(context) {
   if (!code) {
     return new Response("Missing code", { status: 400 });
   }
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL("/api/auth/callback", url.origin).toString();
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -68,7 +68,7 @@ __name(onRequestGet, "onRequestGet");
 async function onRequestGet2(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL("/api/auth/callback", url.origin).toString();
   const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleAuthUrl.searchParams.set("client_id", env.GMAIL_CLIENT_ID);
   googleAuthUrl.searchParams.set("redirect_uri", redirectUri);
@@ -1336,7 +1336,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-9NpgYz/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-WlgxQn/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -1368,7 +1368,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-9NpgYz/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-WlgxQn/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

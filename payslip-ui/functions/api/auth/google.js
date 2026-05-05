@@ -3,7 +3,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   
   // Construct redirect URI based on current origin
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL('/api/auth/callback', url.origin).toString();
   
   const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   googleAuthUrl.searchParams.set('client_id', env.GMAIL_CLIENT_ID);

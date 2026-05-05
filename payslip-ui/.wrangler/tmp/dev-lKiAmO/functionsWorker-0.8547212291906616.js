@@ -62,7 +62,7 @@ async function onRequestGet(context) {
   if (!code) {
     return new Response("Missing code", { status: 400 });
   }
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL("/api/auth/callback", url.origin).toString();
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -94,7 +94,7 @@ __name2(onRequestGet, "onRequestGet");
 async function onRequestGet2(context) {
   const { env, request } = context;
   const url = new URL(request.url);
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL("/api/auth/callback", url.origin).toString();
   const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleAuthUrl.searchParams.set("client_id", env.GMAIL_CLIENT_ID);
   googleAuthUrl.searchParams.set("redirect_uri", redirectUri);

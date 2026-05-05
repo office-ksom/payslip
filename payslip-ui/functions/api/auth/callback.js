@@ -7,7 +7,7 @@ export async function onRequestGet(context) {
     return new Response('Missing code', { status: 400 });
   }
 
-  const redirectUri = `${url.origin}/api/auth/callback`;
+  const redirectUri = new URL('/api/auth/callback', url.origin).toString();
 
   // 1. Exchange code for tokens
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
