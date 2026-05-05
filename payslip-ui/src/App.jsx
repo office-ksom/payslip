@@ -31,11 +31,7 @@ function App() {
   useEffect(() => {
     fetch('/api/me').then(res => {
       if (res.status === 401 || res.status === 403) {
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!isLocal) {
-          window.location.href = '/cdn-cgi/access/login';
-          return;
-        }
+        return null;
       }
       if (res.ok) return res.json();
       return null;
