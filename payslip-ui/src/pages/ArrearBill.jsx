@@ -110,7 +110,37 @@ const ArrearBill = (props) => {
     }
   };
 
+  const handleDelete = async (empId, date, type) => {
+    if (!window.confirm("Are you sure you want to delete this arrear bill?")) return;
+    try {
+      const payload = {
+        records: [{
+          emp_id: empId,
+          bill_date: date,
+          arrear_type: type,
+          arrear_amount: 0 // setting to 0 triggers deletion in backend
+        }]
+      };
+
+      const res = await fetch(`/api/arrears/${monthYear}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        alert("Arrear bill deleted successfully.");
+        loadArrearData(monthYear, staffCategory);
+      } else {
+        const err = await res.json();
+        alert("Deletion failed: " + err.error);
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
+  };
+
   const handleInputChange = (emp_id, field, value) => {
+
     setEmployees(prev => prev.map(emp => {
       if (emp.emp_id === emp_id) {
         const updated = { ...emp, [field]: value };
@@ -514,15 +544,18 @@ const ArrearBill = (props) => {
                   <th>Net Arrear (₹)</th>
                   <th>Bill Date</th>
                   <th>Description</th>
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ width: '80px' }}>Action</th>}
                 </tr>
+
               </thead>
               <tbody>
                 {filteredEmployees.length === 0 && (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                    <td colSpan={(user?.role === 'admin' || user?.role === 'super_admin') ? 8 : 7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
                       No employees found in category: {staffCategory?.toUpperCase()}.
                     </td>
                   </tr>
+
                 )}
                 {filteredEmployees.map(emp => {
                   const isRowApproved = emp.is_approved === 1;
@@ -647,7 +680,22 @@ const ArrearBill = (props) => {
                           style={{ color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit') }}
                         />
                       </td>
+                      {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                        <td>
+                          {emp.has_saved_bill && !isRowLocked && (
+                            <button 
+                              className="btn btn-danger" 
+                              onClick={() => handleDelete(emp.emp_id, emp.bill_date, arrearType)}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                              title="Delete Bill"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
+
                   );
                 })}
               </tbody>
@@ -667,7 +715,9 @@ const ArrearBill = (props) => {
                     </td>
                     <td></td>
                     <td></td>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <td></td>}
                   </tr>
+
                 </tfoot>
               )}
             </table>

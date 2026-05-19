@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle } from 'lucide-react';
+import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle, Trash2 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
+
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -177,8 +178,105 @@ const Paybill = (props) => {
       };
     }));
   };
+
+  const calculateEmp = (empId) => {
+    const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
+    setEmployees(prev => prev.map(emp => {
+      if (emp.emp_id !== empId) return emp;
+      const isState = emp.category === 'state';
+      const isUGC = emp.category === 'ugc/csir';
+      const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
+      const hra_pct = isState ? (activeRule.hra_state_percentage || 0) : isUGC ? (activeRule.hra_ugc_percentage || 0) : 0;
+      const base = emp.basic_pay + (emp.dp_gp || 0);
+      const da = (base * da_pct) / 100;
+      const hra = (base * hra_pct) / 100;
+      return {
+        ...emp,
+        da_state: isState ? da : 0,
+        da_ugc: isUGC ? da : 0,
+        hra_state: isState ? hra : 0,
+        hra_ugc: isUGC ? hra : 0,
+      };
+    }));
+  };
+
+  const copyFromPrevious = async (empId) => {
+    const [year, month] = monthYear.split('-');
+    let py = parseInt(year);
+    let pm = parseInt(month) - 1;
+    if (pm === 0) { pm = 12; py -= 1; }
+    const prevMonth = `${py}-${String(pm).padStart(2, '0')}`;
+    
+    try {
+      const earnRes = await fetch(`/api/earnings/${prevMonth}`);
+      const earnData = await earnRes.json();
+      const deduxRes = await fetch(`/api/deductions/${prevMonth}`);
+      const deduxData = await deduxRes.json();
+      
+      const prevE = earnData.find(e => e.emp_id === empId);
+      const prevD = deduxData.find(d => d.emp_id === empId);
+      
+      if (!prevE && !prevD) {
+        alert("No previous month data found for this employee.");
+        return;
+      }
+      
+      setEmployees(prev => prev.map(emp => {
+        if (emp.emp_id !== empId) return emp;
+        return {
+          ...emp,
+          basic_pay: prevE?.basic_pay || 0,
+          dp_gp: prevE?.dp_gp || 0,
+          da_state: prevE?.da_state || 0,
+          da_ugc: prevE?.da_ugc || 0,
+          hra_state: prevE?.hra_state || 0,
+          hra_ugc: prevE?.hra_ugc || 0,
+          cca: prevE?.cca || 0,
+          spl_pay: prevE?.spl_pay || 0,
+          tr_allow: prevE?.tr_allow || 0,
+          spl_allow: prevE?.spl_allow || 0,
+          fest_allow: prevE?.fest_allow || 0,
+          other_earnings: prevE?.other_earnings || 0,
+          epf: prevD?.epf || 0,
+          cpf: prevD?.cpf || 0,
+          professional_tax: prevD?.professional_tax || 0,
+          income_tax: prevD?.income_tax || 0,
+          sli: prevD?.sli || 0,
+          gis: prevD?.gis || 0,
+          lic: prevD?.lic || 0,
+          onam_advance: prevD?.onam_advance || 0,
+          hra_recovery: prevD?.hra_recovery || 0,
+          other_deductions: prevD?.other_deductions || 0,
+          other_earnings_breakdown: prevE?.other_earnings_breakdown ? JSON.parse(prevE.other_earnings_breakdown) : [],
+          other_deductions_breakdown: prevD?.other_deductions_breakdown ? JSON.parse(prevD.other_deductions_breakdown) : [],
+        };
+      }));
+    } catch(err) {
+      console.error(err);
+      alert('Failed to pull previous month data for this employee.');
+    }
+  };
+
+  const handleDelete = async (empId) => {
+    if (!window.confirm("Are you sure you want to delete the paybill record for this employee?")) return;
+    try {
+      const res = await fetch(`/api/earnings/${monthYear}?emp_id=${empId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        alert("Paybill record deleted successfully.");
+        loadDataForMonth(monthYear);
+      } else {
+        const err = await res.json();
+        alert("Deletion failed: " + err.error);
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
+  };
   
   const handleCopyPreviousMonth = async () => {
+
     const [year, month] = monthYear.split('-');
     let py = parseInt(year);
     let pm = parseInt(month) - 1;
@@ -660,13 +758,14 @@ const Paybill = (props) => {
               <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, boxShadow: '0 1px 0 var(--color-border)' }}>
                 <tr>
                   <th style={{ minWidth: '140px' }}>Employee</th>
-                  <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="10">
+                  <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="11">
                     ── EARNINGS ──
                   </th>
                   <th style={{ background: 'rgba(239,68,68,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="10">
                     ── DEDUCTIONS ──
                   </th>
                   <th>Net Pay</th>
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ minWidth: '120px' }}>Action</th>}
                 </tr>
                 <tr>
                   <th></th>
@@ -681,6 +780,7 @@ const Paybill = (props) => {
                   <th style={{ background: 'rgba(59,130,246,0.04)' }}>Spl.Allow</th>
                   <th style={{ background: 'rgba(59,130,246,0.04)' }}>Fest.Allow</th>
                   <th style={{ background: 'rgba(59,130,246,0.04)' }}>Others</th>
+                  <th style={{ background: 'rgba(59,130,246,0.04)', fontWeight: 'bold' }}>Gross</th>
                   {/* Deductions sub-headers */}
                   <th style={{ background: 'rgba(239,68,68,0.04)' }}>EPF</th>
                   <th style={{ background: 'rgba(239,68,68,0.04)' }}>CPF</th>
@@ -693,12 +793,14 @@ const Paybill = (props) => {
                   <th style={{ background: 'rgba(239,68,68,0.04)' }}>HRA Rec.</th>
                   <th style={{ background: 'rgba(239,68,68,0.04)' }}>Others</th>
                   <th></th>
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 && (
-                  <tr><td colSpan="22" style={{ textAlign: 'center', padding: '2rem' }}>Add employees first.</td></tr>
+                  <tr><td colSpan={(user?.role === 'admin' || user?.role === 'super_admin') ? 24 : 23} style={{ textAlign: 'center', padding: '2rem' }}>Add employees first.</td></tr>
                 )}
+
                 {employees.map(emp => {
                   const da = (emp.da_state || 0) + (emp.da_ugc || 0);
                   const hra = (emp.hra_state || 0) + (emp.hra_ugc || 0);
@@ -775,12 +877,35 @@ const Paybill = (props) => {
                       {(user?.role === 'admin' || user?.role === 'super_admin') && (
                         <td>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button className="btn btn-secondary" onClick={() => calculateEmp(emp.emp_id)} title="Auto-calculate DA & HRA" style={{ padding: '0.25rem 0.5rem' }}>
+                            <button 
+                              className="btn btn-secondary" 
+                              onClick={() => calculateEmp(emp.emp_id)} 
+                              title="Auto-calculate DA & HRA" 
+                              style={{ padding: '0.25rem 0.5rem' }}
+                              disabled={isReadOnly}
+                            >
                               <Calculator size={14} />
                             </button>
-                            <button className="btn btn-secondary" onClick={() => copyFromPrevious(emp.emp_id)} title="Copy from Previous" style={{ padding: '0.25rem 0.5rem' }}>
+                            <button 
+                              className="btn btn-secondary" 
+                              onClick={() => copyFromPrevious(emp.emp_id)} 
+                              title="Copy from Previous" 
+                              style={{ padding: '0.25rem 0.5rem' }}
+                              disabled={isReadOnly}
+                            >
                               <Copy size={14} />
                             </button>
+                            {emp.earnings_id != null && (
+                              <button 
+                                className="btn btn-danger" 
+                                onClick={() => handleDelete(emp.emp_id)} 
+                                title="Delete Paybill Record" 
+                                style={{ padding: '0.25rem 0.5rem' }}
+                                disabled={isReadOnly}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       )}

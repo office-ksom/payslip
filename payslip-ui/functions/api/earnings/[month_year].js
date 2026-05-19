@@ -95,3 +95,42 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
+
+export async function onRequestDelete(context) {
+  const userRole = context.request.headers.get('X-User-Role');
+  if (userRole === 'viewer') {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+  }
+
+  try {
+    const monthYear = context.params.month_year;
+    const url = new URL(context.request.url);
+    const empId = url.searchParams.get('emp_id');
+
+    if (!empId) {
+      return new Response(JSON.stringify({ error: 'Missing emp_id parameter.' }), { status: 400 });
+    }
+
+    const db = context.env.ksom_payslip_db;
+
+    // Check if month is approved
+    const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'This month is approved and locked. Only super_admin can modify it.' }), { status: 403 });
+    }
+
+    // Delete from monthly_earnings and monthly_deductions
+    const deleteEarnings = db.prepare("DELETE FROM monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+    const deleteDeductions = db.prepare("DELETE FROM monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+
+    await db.batch([deleteEarnings, deleteDeductions]);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+
