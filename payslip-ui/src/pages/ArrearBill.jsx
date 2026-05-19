@@ -4,6 +4,17 @@ import { useOutletContext } from 'react-router-dom';
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
+const formatMonthYear = (myStr) => {
+  if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
+  const [year, month] = myStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(month, 10) - 1;
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${year}-${months[monthIdx]}`;
+  }
+  return myStr;
+};
+
 const ArrearBill = (props) => {
   const { user: contextUser } = useOutletContext() || {};
   const user = props.user || contextUser;
@@ -202,7 +213,7 @@ const ArrearBill = (props) => {
     }
 
     const confirmMessage = `OFFICIAL CONFIRMATION REQUIRED:\n\n` +
-      `You are about to APPROVE the Arrear bills for ${selectedEmps.size} selected employee(s) in ${monthYear}.\n\n` +
+      `You are about to APPROVE the Arrear bills for ${selectedEmps.size} selected employee(s) in ${formatMonthYear(monthYear)}.\n\n` +
       `By clicking OK, you verify that all calculations are correct.\n` +
       `This action will PERMANENTLY LOCK their records.\n\n` +
       `Proceed with approval?`;
@@ -237,7 +248,7 @@ const ArrearBill = (props) => {
     }
 
     const confirmMessage = `CONFIRM REJECTION:\n\n` +
-      `You are about to REJECT the Arrear bills for ${selectedEmps.size} selected employee(s) in ${monthYear}.\n\n` +
+      `You are about to REJECT the Arrear bills for ${selectedEmps.size} selected employee(s) in ${formatMonthYear(monthYear)}.\n\n` +
       `By clicking OK, these bills will be unlocked and returned to the admin for corrections.\n\n` +
       `Proceed with rejection?`;
     
@@ -307,7 +318,7 @@ const ArrearBill = (props) => {
               {approvedCount === totalCount ? 'ALL ARREARS VERIFIED & SEALED' : 'SOME ARREARS VERIFIED & SEALED'}
             </h3>
             <p style={{ fontSize: '0.875rem', color: user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)', margin: '0.25rem 0 0 0' }}>
-              <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> active arrear bills in {monthYear} ({arrearType}) are verified and locked.
+              <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> active arrear bills in {formatMonthYear(monthYear)} ({arrearType}) are verified and locked.
               {user?.role === 'super_admin' && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <button 

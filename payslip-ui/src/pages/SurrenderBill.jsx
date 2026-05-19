@@ -16,6 +16,17 @@ const getFinancialYear = (dateStr) => {
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
+const formatMonthYear = (myStr) => {
+  if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
+  const [year, month] = myStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(month, 10) - 1;
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${year}-${months[monthIdx]}`;
+  }
+  return myStr;
+};
+
 const SurrenderBill = (props) => {
   const { user: contextUser } = useOutletContext() || {};
   const user = props.user || contextUser;
@@ -339,7 +350,7 @@ const SurrenderBill = (props) => {
     }
 
     const confirmMessage = `OFFICIAL CONFIRMATION REQUIRED:\n\n` +
-      `You are about to APPROVE and LOCK the Earned Leave Surrender bills for ${selectedEmpIds.size} selected employee(s) in ${monthYear}.\n\n` +
+      `You are about to APPROVE and LOCK the Earned Leave Surrender bills for ${selectedEmpIds.size} selected employee(s) in ${formatMonthYear(monthYear)}.\n\n` +
       `By clicking OK, you verify that their calculations are correct.\n` +
       `This action will PERMANENTLY LOCK their records.\n\n` +
       `Proceed with approval?`;
@@ -374,7 +385,7 @@ const SurrenderBill = (props) => {
     }
 
     const confirmMessage = `CONFIRM REJECTION:\n\n` +
-      `You are about to REJECT the Earned Leave Surrender bills for ${selectedEmpIds.size} selected employee(s) in ${monthYear}.\n\n` +
+      `You are about to REJECT the Earned Leave Surrender bills for ${selectedEmpIds.size} selected employee(s) in ${formatMonthYear(monthYear)}.\n\n` +
       `By clicking OK, these bills will be unlocked and returned to the admin for corrections.\n\n` +
       `Proceed with rejection?`;
     
@@ -486,7 +497,7 @@ const SurrenderBill = (props) => {
               {approvedCount === totalCount ? 'ALL SURRENDER BILLS SEALED' : 'SOME SURRENDER BILLS SEALED'}
             </h3>
             <p style={{ fontSize: '0.875rem', color: user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)', margin: '0.25rem 0 0 0' }}>
-              <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> surrender bills in {monthYear} are verified and locked.
+              <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> surrender bills in {formatMonthYear(monthYear)} are verified and locked.
               {user?.role === 'super_admin' && (
                 <div style={{ marginTop: '0.75rem' }}>
                   <button 
@@ -736,7 +747,7 @@ const SurrenderBill = (props) => {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.20rem', marginBottom: '0.25rem' }}>Saved Bills for {monthYear}</h2>
+            <h2 style={{ fontSize: '1.20rem', marginBottom: '0.25rem' }}>Saved Bills for {formatMonthYear(monthYear)}</h2>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>
               {filteredBills.length} records found in this month.
             </p>
@@ -928,15 +939,17 @@ const SurrenderBill = (props) => {
                       </td>
                       {(user?.role === 'admin' || user?.role === 'super_admin') && (
                         <td>
-                          <button 
-                            className="btn btn-danger" 
-                            onClick={() => handleDelete(bill.emp_id, bill.bill_date)}
-                            disabled={isRowLocked}
-                            style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
-                            title="Delete Bill"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {bill.is_approved !== 1 && (
+                            <button 
+                              className="btn btn-danger" 
+                              onClick={() => handleDelete(bill.emp_id, bill.bill_date)}
+                              disabled={isRowLocked}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                              title="Delete Bill"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </td>
                       )}
                     </tr>

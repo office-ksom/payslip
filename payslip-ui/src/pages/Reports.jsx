@@ -8,6 +8,17 @@ import { saveAs } from 'file-saver';
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
+const formatMonthYear = (myStr) => {
+  if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
+  const [year, month] = myStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(month, 10) - 1;
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${year}-${months[monthIdx]}`;
+  }
+  return myStr;
+};
+
 const loadImage = (src) => new Promise((resolve, reject) => {
   const img = new Image();
   img.src = src;
@@ -277,7 +288,7 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
-  const fileName = `Payslip_${fullName.replace(/\s+/g, '_')}_${monthYear}.pdf`;
+  const fileName = `Payslip_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -368,7 +379,7 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
-  const fileName = `LeaveSurrender_${fullName.replace(/\s+/g, '_')}_${monthYear}.pdf`;
+  const fileName = `LeaveSurrender_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -450,7 +461,7 @@ const generatePDFArrear = async (employee, monthYear, returnBase64 = false, user
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
-  const fileName = `Arrear_${fullName.replace(/\s+/g, '_')}_${monthYear}.pdf`;
+  const fileName = `Arrear_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -532,7 +543,7 @@ const generatePDFFestival = async (employee, monthYear, returnBase64 = false, us
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
-  const fileName = `FestivalAllowance_${fullName.replace(/\s+/g, '_')}_${monthYear}.pdf`;
+  const fileName = `FestivalAllowance_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -1055,7 +1066,7 @@ const Reports = () => {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `KSoM_LeaveSurrender_${monthYear}.xlsx`);
+    saveAs(new Blob([buffer]), `KSoM_LeaveSurrender_${formatMonthYear(monthYear)}.xlsx`);
   };
 
   const exportArrearExcel = async () => {
@@ -1165,7 +1176,7 @@ const Reports = () => {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `KSoM_ArrearsStatement_${monthYear}.xlsx`);
+    saveAs(new Blob([buffer]), `KSoM_ArrearsStatement_${formatMonthYear(monthYear)}.xlsx`);
   };
 
   const exportFestivalExcel = async () => {
@@ -1265,7 +1276,7 @@ const Reports = () => {
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `KSoM_FestivalAllowances_${monthYear}.xlsx`);
+    saveAs(new Blob([buffer]), `KSoM_FestivalAllowances_${formatMonthYear(monthYear)}.xlsx`);
   };
 
   // Original Regular Paybill Excel Export
@@ -1315,29 +1326,37 @@ const Reports = () => {
       }
       eHeaders.push('Gross Pay');
 
+      const dedHeaders = [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
+      if (dynamicDeduxKeys.length > 0) {
+        dedHeaders.push(...dynamicDeduxKeys);
+      } else {
+        dedHeaders.push('Others');
+      }
+      dedHeaders.push('Total Ded', 'Net Pay');
+
+      const earnColCount = eHeaders.length;
+      const maxColCount = Math.max(earnColCount, dedHeaders.length - 1);
+      const lastColLetter = sheet.getColumn(maxColCount).letter;
+
       const r4 = sheet.getRow(4);
       const r5 = sheet.getRow(5);
       
       for(let i=1; i<=20; i++) r4.getCell(i).value = null;
       r4.getCell(1).value = 'EARNINGS';
 
-      eHeaders.forEach((h, idx) => {
-        const col = idx + 1;
+      for (let col = 1; col <= maxColCount; col++) {
         const cell = r5.getCell(col);
-        cell.value = h;
-        if (!cell.style || Object.keys(cell.style).length === 0 || h === 'Gross Pay' || h.toLowerCase().includes('gross pay')) {
-          cell.style = sheet.getCell('N5').style;
+        if (col <= eHeaders.length) {
+          cell.value = eHeaders[col - 1];
         }
-      });
+        cell.style = sheet.getCell('N5').style;
+      }
       r4.commit();
       r5.commit();
 
-      const earnColCount = eHeaders.length;
-      const lastEarnColLetter = sheet.getColumn(earnColCount).letter;
-      
-      safeMerge(`A4:${lastEarnColLetter}4`);
+      safeMerge(`A4:${lastColLetter}4`);
       sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
-      safeMerge(`A3:${lastEarnColLetter}3`);
+      safeMerge(`A3:${lastColLetter}3`);
       sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
       const dataStyle = sheet.getCell('A6').style;
@@ -1392,23 +1411,25 @@ const Reports = () => {
         }
         values.push(gross);
 
-        values.forEach((val, colIdx) => {
-          if (colIdx > 0) {
-            const cell = row.getCell(colIdx);
-            cell.value = val;
-            if (colIdx === 1) {
-              cell.style = slNoStyle;
-            } else {
-              cell.style = dataStyle;
-              if (colIdx === 2 || colIdx === 3 || colIdx === 4) {
-                cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
-              } else if (colIdx >= 5) {
-                cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+        for (let col = 1; col <= maxColCount; col++) {
+          const cell = row.getCell(col);
+          if (col < values.length) {
+            cell.value = values[col];
+          }
+          if (col === 1) {
+            cell.style = slNoStyle;
+          } else {
+            cell.style = dataStyle;
+            if (col === 2 || col === 3 || col === 4) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            } else if (col >= 5) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+              if (col < values.length && typeof values[col] === 'number') {
                 cell.numFmt = '0.00';
               }
             }
           }
-        });
+        }
         row.commit();
         currentRow++;
       });
@@ -1426,13 +1447,16 @@ const Reports = () => {
       }
       sumsEarn.push(sumGross);
 
-      sumsEarn.forEach((val, idx) => {
-        const cell = totalRow.getCell(5 + idx);
-        cell.value = val;
+      for (let col = 5; col <= maxColCount; col++) {
+        const cell = totalRow.getCell(col);
+        const idx = col - 5;
+        if (idx < sumsEarn.length) {
+          cell.value = sumsEarn[idx];
+        }
         cell.style = totalStyle;
         cell.alignment = { ...totalStyle.alignment, horizontal: 'right' };
-        cell.numFmt = '0.00';
-      });
+        if (idx < sumsEarn.length) cell.numFmt = '0.00';
+      }
       totalRow.commit();
       currentRow++;
 
@@ -1441,20 +1465,12 @@ const Reports = () => {
       const dedTitleRow = sheet.getRow(currentRow);
       dedTitleRow.getCell(1).value = 'DEDUCTIONS';
       dedTitleRow.getCell(1).style = dedTitleStyle;
-      safeMerge(`A${currentRow}:${lastEarnColLetter}${currentRow}`);
+      safeMerge(`A${currentRow}:${lastColLetter}${currentRow}`);
       dedTitleRow.commit();
       currentRow++;
 
-      const dedHeaders = [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
-      if (dynamicDeduxKeys.length > 0) {
-        dedHeaders.push(...dynamicDeduxKeys);
-      } else {
-        dedHeaders.push('Others');
-      }
-      dedHeaders.push('Total Ded', 'Net Pay');
-
       const dedHeaderRow = sheet.getRow(currentRow);
-      for (let c = 1; c <= earnColCount; c++) {
+      for (let c = 1; c <= maxColCount; c++) {
         const cell = dedHeaderRow.getCell(c);
         if (c < dedHeaders.length) {
           cell.value = dedHeaders[c];
@@ -1500,7 +1516,7 @@ const Reports = () => {
         }
         values.push(dedux, net);
 
-        for (let c = 1; c <= earnColCount; c++) {
+        for (let c = 1; c <= maxColCount; c++) {
           const cell = row.getCell(c);
           if (c < values.length) {
             cell.value = values[c];
@@ -1536,7 +1552,7 @@ const Reports = () => {
       }
       sumsDedux.push(sumTotDed, sumNet);
 
-      for (let c = 5; c <= earnColCount; c++) {
+      for (let c = 5; c <= maxColCount; c++) {
         const cell = dedTotalRow.getCell(c);
         if (c - 5 < sumsDedux.length) {
           cell.value = sumsDedux[c - 5];
@@ -1598,7 +1614,7 @@ const Reports = () => {
       sigRow.commit();
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer]), `KSoM_Paybill_${monthYear}.xlsx`);
+      saveAs(new Blob([buffer]), `KSoM_Paybill_${formatMonthYear(monthYear)}.xlsx`);
     } catch (err) {
       console.error("Error generating Excel:", err);
       alert("Failed to generate Excel: " + err.message);
@@ -1644,20 +1660,20 @@ const Reports = () => {
 
         if (billType === 'regular') {
           pdfResult = await generatePDFPayslip(emp, monthYear, activeRule, true, usersList);
-          subjectStr = `KSoM Payslip - ${monthYear}`;
-          bodyStr = `Dear ${emp.name},\n\nPlease find attached your salary payslip for ${monthYear}.\n\nRegards,\nKerala School of Mathematics`;
+          subjectStr = `KSoM Payslip - ${formatMonthYear(monthYear)}`;
+          bodyStr = `Dear ${emp.name},\n\nPlease find attached your salary payslip for ${formatMonthYear(monthYear)}.\n\nRegards,\nKerala School of Mathematics`;
         } else if (billType === 'surrender') {
           pdfResult = await generatePDFSurrender(emp, monthYear, true, usersList);
-          subjectStr = `KSoM Leave Surrender Slip - ${emp.financial_year}`;
-          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Earned Leave surrender slip for ${emp.financial_year}.\n\nRegards,\nKerala School of Mathematics`;
+          subjectStr = `KSoM Leave Surrender Slip - ${formatMonthYear(monthYear)}`;
+          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Earned Leave surrender slip for ${formatMonthYear(monthYear)} (Financial Year ${emp.financial_year}).\n\nRegards,\nKerala School of Mathematics`;
         } else if (billType === 'arrears') {
           pdfResult = await generatePDFArrear(emp, monthYear, true, usersList);
-          subjectStr = `KSoM Arrear Payout Statement - ${monthYear}`;
-          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Arrear Payout statement.\n\nRegards,\nKerala School of Mathematics`;
+          subjectStr = `KSoM Arrear Payout Statement - ${formatMonthYear(monthYear)}`;
+          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Arrear Payout statement for ${formatMonthYear(monthYear)}.\n\nRegards,\nKerala School of Mathematics`;
         } else if (billType === 'festival') {
           pdfResult = await generatePDFFestival(emp, monthYear, true, usersList);
-          subjectStr = `KSoM Festival Allowance Slip - ${monthYear}`;
-          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Festival Allowance slip.\n\nRegards,\nKerala School of Mathematics`;
+          subjectStr = `KSoM Festival Allowance Slip - ${formatMonthYear(monthYear)}`;
+          bodyStr = `Dear ${emp.name},\n\nPlease find attached your Festival Allowance slip for ${formatMonthYear(monthYear)}.\n\nRegards,\nKerala School of Mathematics`;
         }
 
         if (pdfResult) {
@@ -1748,7 +1764,7 @@ const Reports = () => {
           <div>
             <h3 style={{ fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <ShieldCheck size={20} style={{ color: 'var(--color-success)' }} />
-              {isViewer ? 'Your Approved Records' : `Approved ${getBillTypeTitle()} — ${monthYear} (${data.length} records)`}
+              {isViewer ? 'Your Approved Records' : `Approved ${getBillTypeTitle()} — ${formatMonthYear(monthYear)} (${data.length} records)`}
             </h3>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.2rem' }}>
               Only finalized and approved records are listed in Reports & Exports.

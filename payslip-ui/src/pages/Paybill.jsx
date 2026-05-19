@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
+const formatMonthYear = (myStr) => {
+  if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
+  const [year, month] = myStr.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIdx = parseInt(month, 10) - 1;
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${year}-${months[monthIdx]}`;
+  }
+  return myStr;
+};
+
 const Paybill = (props) => {
   const { user: contextUser } = useOutletContext() || {};
   const user = props.user || contextUser;
@@ -271,7 +282,7 @@ const Paybill = (props) => {
 
   const handleApprove = async () => {
     const confirmMessage = `OFFICIAL CONFIRMATION REQUIRED:\n\n` +
-      `You are about to APPROVE the paybill for ${monthYear}.\n\n` +
+      `You are about to APPROVE the paybill for ${formatMonthYear(monthYear)}.\n\n` +
       `By clicking OK, you verify that all earnings and deductions for all employees are correct.\n` +
       `This action will PERMANENTLY LOCK the records for this month.\n\n` +
       `Proceed with approval?`;
@@ -298,7 +309,7 @@ const Paybill = (props) => {
 
   const handleSubmit = async () => {
     const confirmMessage = `CONFIRM SUBMISSION:\n\n` +
-      `Are you sure you want to SUBMIT the paybill for ${monthYear} for approval?`;
+      `Are you sure you want to SUBMIT the paybill for ${formatMonthYear(monthYear)} for approval?`;
     if (!window.confirm(confirmMessage)) return;
     
     setSaving(true);
@@ -324,7 +335,7 @@ const Paybill = (props) => {
 
   const handleReject = async () => {
     const confirmMessage = `CONFIRM REJECTION:\n\n` +
-      `You are about to REJECT the paybill for ${monthYear}.\n\n` +
+      `You are about to REJECT the paybill for ${formatMonthYear(monthYear)}.\n\n` +
       `Proceed with rejection?`;
     if (!window.confirm(confirmMessage)) return;
     
@@ -440,7 +451,7 @@ const Paybill = (props) => {
           </p>
           {globalSettingsList.length > 0 && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-primary)', background: 'rgba(59,130,246,0.1)', padding: '0.4rem 0.8rem', borderRadius: '4px', display: 'inline-block' }}>
-              <strong>Active Rules for {monthYear}:</strong> State (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_state_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_state_percentage || 0}%) | UGC/CSIR (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_ugc_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_ugc_percentage || 0}%)
+              <strong>Active Rules for {formatMonthYear(monthYear)}:</strong> State (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_state_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_state_percentage || 0}%) | UGC/CSIR (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_ugc_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_ugc_percentage || 0}%)
             </div>
           )}
         </div>
@@ -517,6 +528,14 @@ const Paybill = (props) => {
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {(user?.role === 'admin' || user?.role === 'super_admin') && (
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowFullPreview(true)}
+              >
+                <Search size={18} /> Preview Full Sheet
+              </button>
+            )}
             {((user?.role === 'admin' && !isApproved) || (user?.role === 'super_admin' && (!isApproved || isOverrideActive))) && (
               <>
                 <button className="btn btn-primary" onClick={handleSave} disabled={saving || (isApproved && !isOverrideActive)}>
@@ -909,7 +928,7 @@ const Paybill = (props) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Monthly Paybill Verification Sheet</h1>
-              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {monthYear} | Status: Pending Approval</p>
+              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {formatMonthYear(monthYear)} | Status: Pending Approval</p>
             </div>
             <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
               <X size={20} /> Close Preview
