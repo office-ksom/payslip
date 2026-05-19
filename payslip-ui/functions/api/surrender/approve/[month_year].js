@@ -38,7 +38,7 @@ export async function onRequestPost(context) {
     if (action === 'reject') {
       updateQuery = `
         UPDATE surrender_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, ${dateLen}) = ?
       `;
       updateParams = [monthYear];

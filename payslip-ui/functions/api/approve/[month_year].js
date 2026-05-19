@@ -37,7 +37,7 @@ export async function onRequestPost(context) {
       approvedOnValue = null;
       approvedByValue = null;
     } else if (action === 'reject') {
-      statusValue = 0;
+      statusValue = 3;
       approvedOnValue = null;
       approvedByValue = null;
     }

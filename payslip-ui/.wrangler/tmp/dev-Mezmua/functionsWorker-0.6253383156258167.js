@@ -88,7 +88,7 @@ async function onRequestPost(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE arrear_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, 7) = ?
       `;
       updateParams = [monthYear];
@@ -173,7 +173,7 @@ async function onRequestPost2(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE festival_allowance_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, 7) = ?
       `;
       updateParams = [monthYear];
@@ -248,7 +248,7 @@ async function onRequestPost3(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE surrender_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, ${dateLen}) = ?
       `;
       updateParams = [monthYear];
@@ -789,7 +789,7 @@ async function onRequestPost10(context) {
       approvedOnValue = null;
       approvedByValue = null;
     } else if (action === "reject") {
-      statusValue = 0;
+      statusValue = 3;
       approvedOnValue = null;
       approvedByValue = null;
     }

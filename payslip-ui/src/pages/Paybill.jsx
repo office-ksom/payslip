@@ -33,6 +33,7 @@ const Paybill = (props) => {
   // Approval state
   const [isApproved, setIsApproved] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isRejected, setIsRejected] = useState(false);
   const [approvalInfo, setApprovalInfo] = useState(null);
   const [approving, setApproving] = useState(false);
   const [usersList, setUsersList] = useState([]);
@@ -90,16 +91,19 @@ const Paybill = (props) => {
           const approvalData = await approvalRes.json();
           setIsApproved(approvalData.is_approved === 1);
           setIsSubmitted(approvalData.is_approved === 2);
+          setIsRejected(approvalData.is_approved === 3);
           setApprovalInfo(approvalData.is_approved === 1 ? approvalData : null);
         } else {
           setIsApproved(false);
           setIsSubmitted(false);
+          setIsRejected(false);
           setApprovalInfo(null);
         }
       } catch (e) {
         console.error("Approval status fetch failed", e);
         setIsApproved(false);
         setIsSubmitted(false);
+        setIsRejected(false);
         setApprovalInfo(null);
       }
 
@@ -458,6 +462,24 @@ const Paybill = (props) => {
         <input type="month" className="form-control" value={monthYear}
           onChange={(e) => setMonthYear(e.target.value)} />
       </div>
+      {isRejected && (
+        <div style={{ 
+          marginBottom: '2rem', padding: '1.5rem', borderRadius: '12px', 
+          backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          display: 'flex', alignItems: 'center', gap: '1rem'
+        }}>
+          <XCircle size={32} style={{ color: '#ef4444' }} />
+          <div>
+            <h3 style={{ fontSize: '1.1rem', color: '#ef4444', margin: 0 }}>
+              REJECTED BY APPROVER
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', margin: '0.25rem 0 0 0' }}>
+              This paybill was rejected by the approver. Please make corrections, save, and submit for approval again.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isApproved && (
         <div style={{ 

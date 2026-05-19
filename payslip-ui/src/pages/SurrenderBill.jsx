@@ -427,7 +427,7 @@ const SurrenderBill = (props) => {
   const approvedCount = existingBills.filter(b => b.is_approved === 1).length;
   const totalCount = existingBills.length;
   const hasApprovedBills = approvedCount > 0;
-  const filteredBills = existingBills.filter(bill => user?.role !== 'approver' || bill.is_approved !== 1);
+  const filteredBills = existingBills.filter(bill => user?.role !== 'approver' || bill.is_approved === 2);
 
   const fyYear = getFinancialYear(billDate);
   const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
@@ -848,8 +848,8 @@ const SurrenderBill = (props) => {
                 {filteredBills.map(bill => {
                   const isRowLocked = bill.is_approved === 1 && (user?.role !== 'super_admin' || !isOverrideActive);
                   const rowBg = 'transparent';
-                  const isPending = bill.is_approved === 2 || bill.is_approved === 0 || bill.is_approved === null;
-                  const rowColor = isPending ? '#d97706' : 'inherit';
+                  const isPending = bill.is_approved === 2 || bill.is_approved === 0 || bill.is_approved === null || bill.is_approved === 3;
+                  const rowColor = bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'inherit');
                   return (
                     <tr key={bill.emp_id} style={{ backgroundColor: rowBg, color: rowColor }}>
                       {user?.role === 'approver' && (
@@ -871,7 +871,7 @@ const SurrenderBill = (props) => {
                       )}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ fontWeight: 600, color: isPending ? '#d97706' : 'var(--color-primary)' }}>
+                          <div style={{ fontWeight: 600, color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-primary)') }}>
                             {bill.title ? `${bill.title} ` : ''}{bill.name}
                           </div>
                           {user?.role === 'approver' && isPending && (
@@ -887,7 +887,7 @@ const SurrenderBill = (props) => {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: isPending ? '#d97706' : 'var(--color-text-secondary)' }}>{bill.emp_id}</div>
+                        <div style={{ fontSize: '0.75rem', color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-text-secondary)') }}>{bill.emp_id}</div>
                       </td>
                       <td>
                         <span className={`badge badge-${bill.category === 'ugc/csir' ? 'ugc' : bill.category}`}>
@@ -900,7 +900,7 @@ const SurrenderBill = (props) => {
                       <td>₹ {fmt(bill.hra)}</td>
                       <td style={{ fontWeight: 'bold', textAlign: 'center' }}>{bill.num_els} days</td>
                       <td>{bill.financial_year}</td>
-                      <td style={{ fontWeight: 'bold', color: isPending ? '#d97706' : (bill.is_approved === 1 ? 'var(--color-success)' : 'inherit') }}>
+                      <td style={{ fontWeight: 'bold', color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : (bill.is_approved === 1 ? 'var(--color-success)' : 'inherit')) }}>
                         ₹ {bill.total_amount?.toLocaleString('en-IN')}
                       </td>
                       <td>
@@ -916,7 +916,19 @@ const SurrenderBill = (props) => {
                           }}>
                             APPROVED
                           </span>
-                        ) : isPending ? (
+                        ) : bill.is_approved === 3 ? (
+                          <span style={{ 
+                            backgroundColor: '#ef4444', 
+                            color: '#fff', 
+                            padding: '4px 8px', 
+                            borderRadius: '4px', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 'bold',
+                            display: 'inline-block'
+                          }}>
+                            Rejected by approver
+                          </span>
+                        ) : bill.is_approved === 2 ? (
                           <span style={{ 
                             backgroundColor: '#f97316', 
                             color: '#fff', 

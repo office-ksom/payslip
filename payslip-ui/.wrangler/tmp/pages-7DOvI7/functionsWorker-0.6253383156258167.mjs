@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-NkR07n/checked-fetch.js
+// ../.wrangler/tmp/bundle-oPEsZn/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -61,7 +61,7 @@ async function onRequestPost(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE arrear_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, 7) = ?
       `;
       updateParams = [monthYear];
@@ -146,7 +146,7 @@ async function onRequestPost2(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE festival_allowance_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, 7) = ?
       `;
       updateParams = [monthYear];
@@ -221,7 +221,7 @@ async function onRequestPost3(context) {
     if (action === "reject") {
       updateQuery = `
         UPDATE surrender_bills 
-        SET is_approved = 0, approved_on = NULL, approved_by = NULL
+        SET is_approved = 3, approved_on = NULL, approved_by = NULL
         WHERE substr(bill_date, 1, ${dateLen}) = ?
       `;
       updateParams = [monthYear];
@@ -766,7 +766,7 @@ async function onRequestPost10(context) {
       approvedOnValue = null;
       approvedByValue = null;
     } else if (action === "reject") {
-      statusValue = 0;
+      statusValue = 3;
       approvedOnValue = null;
       approvedByValue = null;
     }
@@ -2431,7 +2431,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-NkR07n/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-oPEsZn/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -2463,7 +2463,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-NkR07n/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-oPEsZn/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

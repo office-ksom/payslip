@@ -440,7 +440,7 @@ const FestivalAllowanceBill = (props) => {
                   const isRowLocked = isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive);
                   const isRowEditable = !isRowLocked && user?.role !== 'approver';
                   const rowBg = selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent';
-                  const rowColor = emp.is_approved === 2 ? '#d97706' : 'inherit';
+                  const rowColor = emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit');
                   return (
                     <tr key={emp.emp_id} style={{ 
                       backgroundColor: rowBg,
@@ -455,7 +455,7 @@ const FestivalAllowanceBill = (props) => {
                         />
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 600, color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)'), display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {emp.title ? `${emp.title} ` : ''}{emp.name}
                           {isRowApproved && (
                             <span style={{ 
@@ -468,6 +468,20 @@ const FestivalAllowanceBill = (props) => {
                               display: 'inline-block'
                             }}>
                               APPROVED
+                            </span>
+                          )}
+                          {emp.is_approved === 3 && (
+                            <span style={{ 
+                              backgroundColor: '#fee2e2', 
+                              color: '#ef4444', 
+                              border: '1px solid rgba(239, 68, 68, 0.2)',
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '0.65rem', 
+                              fontWeight: 'bold',
+                              display: 'inline-block'
+                            }}>
+                              Rejected by approver
                             </span>
                           )}
                           {emp.is_approved === 2 && (
@@ -496,7 +510,7 @@ const FestivalAllowanceBill = (props) => {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: emp.is_approved === 2 ? '#d97706' : 'var(--color-text-secondary)' }}>{emp.emp_id}</div>
+                        <div style={{ fontSize: '0.75rem', color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
                       </td>
                       <td>
                         <span className={`badge badge-${emp.category === 'ugc/csir' ? 'ugc' : emp.category}`}>
@@ -511,7 +525,7 @@ const FestivalAllowanceBill = (props) => {
                           onChange={(e) => handleInputChange(emp.emp_id, 'amount', parseFloat(e.target.value) || 0)}
                           placeholder="0.00"
                           disabled={!isRowEditable}
-                          style={{ width: '150px', textAlign: 'right', fontWeight: '600', color: emp.is_approved === 2 ? '#d97706' : 'inherit' }}
+                          style={{ width: '150px', textAlign: 'right', fontWeight: '600', color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit') }}
                         />
                       </td>
                       <td>
@@ -521,7 +535,7 @@ const FestivalAllowanceBill = (props) => {
                           value={emp.bill_date} 
                           onChange={(e) => handleInputChange(emp.emp_id, 'bill_date', e.target.value)}
                           disabled={!isRowEditable}
-                          style={{ width: '160px', color: emp.is_approved === 2 ? '#d97706' : 'inherit' }}
+                          style={{ width: '160px', color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit') }}
                         />
                       </td>
                       <td>
@@ -532,7 +546,7 @@ const FestivalAllowanceBill = (props) => {
                           onChange={(e) => handleInputChange(emp.emp_id, 'description', e.target.value)}
                           placeholder="e.g. Onam Festival Allowance"
                           disabled={!isRowEditable}
-                          style={{ color: emp.is_approved === 2 ? '#d97706' : 'inherit' }}
+                          style={{ color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit') }}
                         />
                       </td>
                     </tr>
