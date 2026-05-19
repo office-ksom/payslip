@@ -1,3 +1,5 @@
+import { getAccessToken, buildMimeMessage, base64url } from '../../lib/gmail.js';
+
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
   if (userRole === 'viewer') {
@@ -53,65 +55,4 @@ export async function onRequestPost(context) {
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
-}
-
-async function getAccessToken(clientId, clientSecret, refreshToken) {
-  const url = "https://oauth2.googleapis.com/token";
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Google OAuth error: ${data.error_description || data.error}`);
-  }
-  return data.access_token;
-}
-
-function buildMimeMessage({ from, to, subject, text, attachments }) {
-  const boundary = "boundary_" + Math.random().toString(36).substring(2);
-  let message = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    text,
-    ""
-  ];
-
-  for (const attachment of attachments) {
-    message.push(`--${boundary}`);
-    message.push(`Content-Type: application/pdf; name="${attachment.filename}"`);
-    message.push(`Content-Disposition: attachment; filename="${attachment.filename}"`);
-    message.push("Content-Transfer-Encoding: base64");
-    message.push("");
-    message.push(attachment.content);
-    message.push("");
-  }
-
-  message.push(`--${boundary}--`);
-  return message.join("\r\n");
-}
-
-function base64url(str) {
-  // Use btoa for encoding strings to base64, then make it URL safe for Gmail API
-  return btoa(unescape(encodeURIComponent(str)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }

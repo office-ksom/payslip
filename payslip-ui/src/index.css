@@ -54,6 +54,24 @@ body {
   color: var(--color-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 700px;
+  height: 700px;
+  background-image: url('/logo.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.025; /* Very subtle premium watermark */
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Typography styles */
@@ -142,7 +160,7 @@ a:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: var(--color-bg-primary);
+  background-color: transparent;
   overflow-y: auto;
 }
 

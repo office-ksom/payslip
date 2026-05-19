@@ -14,16 +14,20 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   try {
     const data = await context.request.json();
-    const { email, role, status } = data;
+    const { email, role, status, name, designation } = data;
     
     if (!email || !role) {
       return new Response(JSON.stringify({ error: "Email and role are required." }), { status: 400 });
     }
 
     await context.env.ksom_payslip_db.prepare(
-      `INSERT INTO users (email, role, status) VALUES (?, ?, ?)
-       ON CONFLICT(email) DO UPDATE SET role=excluded.role, status=excluded.status`
-    ).bind(email.toLowerCase(), role, status || 'active').run();
+      `INSERT INTO users (email, role, status, name, designation) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET 
+         role=excluded.role, 
+         status=excluded.status, 
+         name=excluded.name, 
+         designation=excluded.designation`
+    ).bind(email.toLowerCase(), role, status || 'active', name || null, designation || null).run();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }

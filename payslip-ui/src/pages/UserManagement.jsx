@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Shield, User, Trash2, CheckCircle, XCircle, Mail, Key } from 'lucide-react';
+import { UserPlus, Shield, User, Trash2, CheckCircle, XCircle, Mail, Key, Edit } from 'lucide-react';
 
 const UserManagement = (props) => {
   if (props.user && props.user.role === 'viewer') {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
   }
   const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', role: 'viewer', status: 'active' });
+  const [newUser, setNewUser] = useState({ email: '', role: 'viewer', status: 'active', name: '', designation: '' });
   const [status, setStatus] = useState(null);
+  const [passwordModal, setPasswordModal] = useState({ show: false, userId: null, email: '', password: '' });
 
   useEffect(() => {
     fetchUsers();
+    fetchEmployees();
   }, []);
 
   const fetchUsers = async () => {
@@ -27,6 +30,25 @@ const UserManagement = (props) => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch('/api/employees');
+      if (res.ok) setEmployees(await res.json());
+    } catch (err) {
+      console.error('Failed to fetch employees', err);
+    }
+  };
+
+  const handleEmailChange = (emailVal) => {
+    const match = employees.find(emp => emp.email_id && emp.email_id.toLowerCase() === emailVal.toLowerCase());
+    setNewUser(prev => ({
+      ...prev,
+      email: emailVal,
+      name: match ? (match.name || '') : prev.name,
+      designation: match ? (match.designation || '') : prev.designation
+    }));
+  };
+
   const handleAddUser = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -38,7 +60,7 @@ const UserManagement = (props) => {
       });
       if (res.ok) {
         setStatus({ type: 'success', text: 'User added/updated successfully.' });
-        setNewUser({ email: '', role: 'viewer', status: 'active' });
+        setNewUser({ email: '', role: 'viewer', status: 'active', name: '', designation: '' });
         setShowAddForm(false);
         fetchUsers();
       } else {
@@ -67,6 +89,29 @@ const UserManagement = (props) => {
     }
   };
 
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/users/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: passwordModal.userId, newPassword: passwordModal.password })
+      });
+      if (res.ok) {
+        setStatus({ type: 'success', text: `Password updated for ${passwordModal.email}` });
+        setPasswordModal({ show: false, userId: null, email: '', password: '' });
+      } else {
+        const err = await res.json();
+        setStatus({ type: 'error', text: err.error || 'Failed to update password.' });
+      }
+    } catch (err) {
+      setStatus({ type: 'error', text: 'Error communicating with server.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getRoleBadgeStyle = (role) => {
     const base = { padding: '0.25rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' };
     switch (role) {
@@ -84,7 +129,10 @@ const UserManagement = (props) => {
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>User Management</h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>Control who can access the portal and what they can do.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
+        <button className="btn btn-primary" onClick={() => {
+          setNewUser({ email: '', role: 'viewer', status: 'active', name: '', designation: '' });
+          setShowAddForm(!showAddForm);
+        }}>
           <UserPlus size={18} /> Add New User
         </button>
       </div>
@@ -104,8 +152,10 @@ const UserManagement = (props) => {
 
       {showAddForm && (
         <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--color-primary)' }}>
-          <h3 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>Authorize New Email ID</h3>
-          <form onSubmit={handleAddUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '1rem', alignItems: 'flex-end' }}>
+          <h3 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>
+            {users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase()) ? 'Edit User Authorization' : 'Authorize New Email ID'}
+          </h3>
+          <form onSubmit={handleAddUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Institute Email</label>
               <input 
@@ -114,7 +164,27 @@ const UserManagement = (props) => {
                 required 
                 placeholder="user@ksom.res.in"
                 value={newUser.email}
-                onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                onChange={(e) => handleEmailChange(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Full Name</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Enter Name"
+                value={newUser.name}
+                onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Designation</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Enter Designation"
+                value={newUser.designation}
+                onChange={(e) => setNewUser({...newUser, designation: e.target.value})}
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -141,9 +211,12 @@ const UserManagement = (props) => {
                 <option value="inactive">Inactive / Suspended</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', justifyContent: 'flex-end', gridColumn: 'span 2' }}>
               <button type="submit" className="btn btn-primary" disabled={loading}>Save</button>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>Cancel</button>
+              <button type="button" className="btn btn-secondary" onClick={() => {
+                setShowAddForm(false);
+                setNewUser({ email: '', role: 'viewer', status: 'active', name: '', designation: '' });
+              }}>Cancel</button>
             </div>
           </form>
         </div>
@@ -172,7 +245,12 @@ const UserManagement = (props) => {
                       }}>
                         <User size={16} />
                       </div>
-                      <div style={{ fontWeight: 600 }}>{user.email}</div>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{user.name || 'No Name Set'}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
+                          {user.email} {user.designation ? `• ${user.designation}` : ''}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -189,7 +267,32 @@ const UserManagement = (props) => {
                   <td style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.4rem', color: 'var(--color-primary)' }}
+                      title="Edit User Details"
+                      onClick={() => {
+                        setNewUser({
+                          email: user.email,
+                          role: user.role,
+                          status: user.status,
+                          name: user.name || '',
+                          designation: user.designation || ''
+                        });
+                        setShowAddForm(true);
+                      }}
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.4rem', color: 'var(--color-primary)' }}
+                      title="Set/Reset Password"
+                      onClick={() => setPasswordModal({ show: true, userId: user.id, email: user.email, password: '' })}
+                    >
+                      <Key size={16} />
+                    </button>
                     <button 
                       className="btn btn-secondary" 
                       style={{ padding: '0.4rem', color: 'var(--color-danger)' }}
@@ -204,6 +307,39 @@ const UserManagement = (props) => {
           </table>
         </div>
       </div>
+
+      {passwordModal.show && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000
+        }}>
+          <div className="card" style={{ width: '400px', padding: '2rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Set Password for {passwordModal.email}</h3>
+            <form onSubmit={handleSetPassword}>
+              <div className="form-group">
+                <label className="form-label">New Password</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  required 
+                  minLength={6}
+                  value={passwordModal.password}
+                  onChange={(e) => setPasswordModal({...passwordModal, password: e.target.value})}
+                  placeholder="Enter new password"
+                />
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                  Min 6 characters. The user will use this to sign in.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>Update Password</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setPasswordModal({ ...passwordModal, show: false })}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

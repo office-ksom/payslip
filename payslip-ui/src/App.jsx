@@ -1,12 +1,17 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './Layout';
 import Settings from './pages/Settings';
 import Employees from './pages/Employees';
 import Paybill from './pages/Paybill';
+import SurrenderBill from './pages/SurrenderBill';
+import ArrearBill from './pages/ArrearBill';
+import FestivalAllowanceBill from './pages/FestivalAllowanceBill';
 import Reports from './pages/Reports';
 import Backup from './pages/Backup';
 import UserManagement from './pages/UserManagement';
+import ResetPassword from './pages/ResetPassword';
+import ConsolidatedStatement from './pages/ConsolidatedStatement';
 
 import { useState, useEffect } from 'react';
 
@@ -21,6 +26,15 @@ const Overview = ({ user }) => (
           You are signed in with read-only access. You can view and download your payslips from the <strong>Reports & Exports</strong> menu.
         </p>
       )}
+    </div>
+  </div>
+);
+
+const ComingSoon = ({ title }) => (
+  <div>
+    <h1>{title}</h1>
+    <div className="card">
+      <p>This feature is coming soon. Please stay tuned!</p>
     </div>
   </div>
 );
@@ -45,11 +59,18 @@ function App() {
           <Route index element={<Overview user={user} />} />
           <Route path="employees" element={<Employees user={user} />} />
           <Route path="paybill" element={<Paybill user={user} />} />
+          <Route path="surrender-bill" element={<SurrenderBill user={user} />} />
+          <Route path="arrear-bill" element={<ArrearBill user={user} />} />
+          <Route path="festival-bill" element={<FestivalAllowanceBill user={user} />} />
           <Route path="reports" element={<Reports user={user} />} />
+          <Route path="consolidated-statement" element={<ConsolidatedStatement user={user} />} />
           <Route path="settings" element={<Settings user={user} />} />
           <Route path="backup" element={<Backup user={user} />} />
           <Route path="users" element={<UserManagement user={user} />} />
         </Route>
+        <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Catch-all route for unknown paths */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

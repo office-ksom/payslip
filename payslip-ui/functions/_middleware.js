@@ -11,6 +11,20 @@ export async function onRequest(context) {
     email = cookies['payslip_auth'] || cookies['mock_email'] || ( (url.hostname === 'localhost' || url.hostname === '127.0.0.1') ? url.searchParams.get('mock_user') : null );
   }
 
+  // Auto-set cookie for mock development if mock_user is in URL
+  if (url.searchParams.has('mock_user') && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
+    const mockUser = url.searchParams.get('mock_user');
+    const cleanUrl = new URL(request.url);
+    cleanUrl.searchParams.delete('mock_user');
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': cleanUrl.toString(),
+        'Set-Cookie': `mock_email=${mockUser}; Path=/; Max-Age=3600`
+      }
+    });
+  }
+
   // 2. If no email, handle unauthorized response
   if (!email) {
     // Block API but let frontend load the login form
@@ -67,11 +81,21 @@ export async function onRequest(context) {
     return forbiddenResponse();
   }
 
-  if (path.startsWith('/api/settings') && user.role === 'viewer') {
+  if (path.startsWith('/api/settings') && method !== 'GET' && (user.role === 'viewer' || user.role === 'approver')) {
     return forbiddenResponse();
   }
 
-  if (method !== 'GET' && user.role === 'viewer') {
+  if (path.startsWith('/api/settings') && user.role === 'viewer' && method === 'GET') {
+    // Viewers can GET settings, but let's be explicit if needed
+  }
+
+  const isApprovePath = path.startsWith('/api/approve') || path.includes('/approve');
+
+  if (isApprovePath && method !== 'GET' && user.role !== 'approver' && user.role !== 'super_admin' && user.role !== 'admin') {
+    return forbiddenResponse();
+  }
+
+  if (method !== 'GET' && (user.role === 'viewer' || user.role === 'approver') && !isApprovePath) {
     return forbiddenResponse();
   }
 

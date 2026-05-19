@@ -1,10 +1,14 @@
 export async function onRequestGet(context) {
-  const url = new URL(context.request.url);
-  const response = Response.redirect(url.origin, 302);
+  const { request } = context;
+  const url = new URL(request.url);
   
-  // Clear both the new auth cookie and the old mock cookie
-  response.headers.append('Set-Cookie', 'payslip_auth=; Path=/; Max-Age=0');
-  response.headers.append('Set-Cookie', 'mock_email=; Path=/; Max-Age=0');
-  
-  return response;
+  // Response.redirect() returns an immutable response. 
+  // We must create a new one to add headers.
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': url.origin,
+      'Set-Cookie': 'payslip_auth=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+    }
+  });
 }

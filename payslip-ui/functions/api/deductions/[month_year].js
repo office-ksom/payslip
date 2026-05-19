@@ -7,14 +7,14 @@ export async function onRequestGet(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.title, e.sort_order,
              d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
-             d.cpf, d.hra_recovery
+             d.cpf, d.hra_recovery, d.other_deductions_breakdown
       FROM employees e
       LEFT JOIN monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
     `;
     let params = [monthYear];
 
     if (userRole === 'viewer') {
-      query += ` WHERE e.email_id = ?`;
+      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
       params.push(userEmail);
     }
 
@@ -40,13 +40,20 @@ export async function onRequestPost(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
+
+    // Check if month is approved (status is stored in monthly_earnings)
+    const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'This month is approved and locked. Only super_admin can modify it.' }), { status: 403 });
+    }
+
     const statements = [];
     
     for (const record of records) {
       statements.push(
         db.prepare(`
-          INSERT INTO monthly_deductions (emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions, cpf, hra_recovery)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO monthly_deductions (emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions, cpf, hra_recovery, other_deductions_breakdown)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(emp_id, month_year) DO UPDATE SET 
             epf=excluded.epf,
             professional_tax=excluded.professional_tax,
@@ -57,14 +64,16 @@ export async function onRequestPost(context) {
             onam_advance=excluded.onam_advance,
             other_deductions=excluded.other_deductions,
             cpf=excluded.cpf,
-            hra_recovery=excluded.hra_recovery
+            hra_recovery=excluded.hra_recovery,
+            other_deductions_breakdown=excluded.other_deductions_breakdown
         `).bind(
           record.emp_id, monthYear, 
           record.epf || 0, record.professional_tax || 0, 
           record.sli || 0, record.gis || 0, 
           record.lic || 0, record.income_tax || 0, 
           record.onam_advance || 0, record.other_deductions || 0,
-          record.cpf || 0, record.hra_recovery || 0
+          record.cpf || 0, record.hra_recovery || 0,
+          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
         )
       );
     }
