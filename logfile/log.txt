@@ -1,0 +1,16 @@
+[2026-05-20 11:36:14] [nidhin@ksom.res.in] Action: Login - Description: Successfully logged in with role admin
+[2026-05-20 11:36:30] [sreejith@ksom.res.in] Action: Login - Description: Successfully logged in with role super_admin
+[2026-05-20 11:37:31] [nidhin@ksom.res.in] Action: Login - Description: Successfully logged in with role admin
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Delete Festival Allowance - Description: Deleted festival allowance for employee 6302417 on date 2026-05-20
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302403 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302413 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302414 with amount Rs. 2400
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302405 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302407 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302409 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302408 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302411 with amount Rs. 2500
+[2026-05-20 11:38:33] [nidhin@ksom.res.in] Action: Save Festival Allowance - Description: Saved/Updated festival allowance for employee 6302422 with amount Rs. 2500
+[2026-05-20 11:38:40] [nidhin@ksom.res.in] Action: Festival Allowance Bill Action - Description: Verified & Locked festival allowance bill(s) for 2026-05
+[2026-05-20 11:39:43] [sreejith@ksom.res.in] Action: Login - Description: Successfully logged in with role super_admin
+[2026-05-20 11:47:15] [sreejith@ksom.res.in] Action: Save/Update User - Description: Saved/Updated user testlogs@ksom.res.in (Role: viewer, Status: active)

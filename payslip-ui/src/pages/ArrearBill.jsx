@@ -52,6 +52,7 @@ const ArrearBill = (props) => {
 
   // Selected employees for bulk actions
   const [selectedEmps, setSelectedEmps] = useState(new Set());
+  const [requireApproval, setRequireApproval] = useState(true);
 
   // Load employees and arrear data when monthYear, category, or type changes
   useEffect(() => {
@@ -63,6 +64,15 @@ const ArrearBill = (props) => {
   const loadArrearData = async (targetMonth, category) => {
     setLoading(true);
     try {
+      try {
+        const sysRes = await fetch('/api/settings/system');
+        if (sysRes.ok) {
+          const sysData = await sysRes.json();
+          setRequireApproval(sysData.require_approval !== '0');
+        }
+      } catch (e) {
+        console.error("Failed to load system settings", e);
+      }
       const res = await fetch(`/api/arrears/${targetMonth}?type=${arrearType}`);
       const data = await res.json();
  
@@ -476,7 +486,7 @@ const ArrearBill = (props) => {
                 <Save size={18} /> {saving ? 'Saving...' : 'Save Arrear Grid'}
               </button>
             )}
-            {user?.role === 'approver' && filteredEmployees.length > 0 && (
+             {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredEmployees.length > 0 && (
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button 
                   className="btn btn-primary" 
@@ -491,24 +501,26 @@ const ArrearBill = (props) => {
                     boxShadow: 'var(--shadow-lg)'
                   }}
                 >
-                  <ShieldCheck size={18} /> {approving ? 'Finalizing Approval...' : `APPROVE SELECTED (${selectedEmps.size})`}
+                  <ShieldCheck size={18} /> {approving ? 'Finalizing...' : (user?.role === 'approver' ? `APPROVE SELECTED (${selectedEmps.size})` : `Verify & Lock (${selectedEmps.size})`)}
                 </button>
-                <button 
-                  className="btn btn-danger" 
-                  onClick={handleReject} 
-                  disabled={approving || rejecting || selectedEmps.size === 0} 
-                  style={{ 
-                    backgroundColor: 'var(--color-danger)', 
-                    border: 'none',
-                    padding: '0.6rem 1.5rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 800,
-                    boxShadow: 'var(--shadow-lg)',
-                    color: '#fff'
-                  }}
-                >
-                  <XCircle size={18} /> {rejecting ? 'Rejecting...' : `REJECT SELECTED (${selectedEmps.size})`}
-                </button>
+                {user?.role === 'approver' && (
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={handleReject} 
+                    disabled={approving || rejecting || selectedEmps.size === 0} 
+                    style={{ 
+                      backgroundColor: 'var(--color-danger)', 
+                      border: 'none',
+                      padding: '0.6rem 1.5rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 800,
+                      boxShadow: 'var(--shadow-lg)',
+                      color: '#fff'
+                    }}
+                  >
+                    <XCircle size={18} /> {rejecting ? 'Rejecting...' : `REJECT SELECTED (${selectedEmps.size})`}
+                  </button>
+                )}
               </div>
             )}
             {((user?.role === 'approver' && filteredEmployees.length === 0 && approvedCount > 0) || (user?.role !== 'approver' && approvedCount > 0 && approvedCount === totalCount)) && (

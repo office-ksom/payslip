@@ -76,11 +76,7 @@ const addSealAndWatermark = (doc, logoImg, sealImg, margin, pageW, sigY, record,
   if (record.is_approved === 1) {
     const appDate = new Date(record.approved_on);
     const appDateStr = appDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    const approvedUser = Array.isArray(usersList) ? usersList.find(u => u.email && u.email.toLowerCase() === record.approved_by?.toLowerCase()) : null;
-    const userString = approvedUser && approvedUser.name
-      ? (approvedUser.designation ? `${approvedUser.name}, ${approvedUser.designation}, KSoM` : `${approvedUser.name}, KSoM`)
-      : record.approved_by;
-    tsString = `Approved by ${userString} on ${appDateStr}`;
+    tsString = `Verified on ${appDateStr}`;
   } else {
     const now = new Date();
     tsString = `Statement generated at: ${now.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`;

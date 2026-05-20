@@ -73,6 +73,7 @@ const SurrenderBill = (props) => {
   
   // Selected employee IDs for selective approval
   const [selectedEmpIds, setSelectedEmpIds] = useState(new Set());
+  const [requireApproval, setRequireApproval] = useState(true);
 
   // Dropdown search term
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +159,16 @@ const SurrenderBill = (props) => {
   const loadBillsForMonth = async (targetMonth) => {
     setLoadingBills(true);
     try {
+      try {
+        const sysRes = await fetch('/api/settings/system');
+        if (sysRes.ok) {
+          const sysData = await sysRes.json();
+          setRequireApproval(sysData.require_approval !== '0');
+        }
+      } catch (e) {
+        console.error("Failed to load system settings", e);
+      }
+
       const res = await fetch(`/api/surrender/${targetMonth}`);
       const data = await res.json();
       // Filter out only employees that actually have saved surrender bills
@@ -754,7 +765,7 @@ const SurrenderBill = (props) => {
           </div>
 
           <div>
-            {user?.role === 'approver' && filteredBills.length > 0 && (
+            {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredBills.length > 0 && (
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button 
                   className="btn btn-primary" 
@@ -769,27 +780,29 @@ const SurrenderBill = (props) => {
                     boxShadow: 'var(--shadow-lg)'
                   }}
                 >
-                  <ShieldCheck size={18} /> {approving ? 'Finalizing...' : `APPROVE SELECTED (${selectedEmpIds.size})`}
+                  <ShieldCheck size={18} /> {approving ? 'Finalizing...' : (user?.role === 'approver' ? `APPROVE SELECTED (${selectedEmpIds.size})` : `Verify & Lock (${selectedEmpIds.size})`)}
                 </button>
-                <button 
-                  className="btn btn-danger" 
-                  onClick={handleReject} 
-                  disabled={approving || rejecting || selectedEmpIds.size === 0} 
-                  style={{ 
-                    backgroundColor: 'var(--color-danger)', 
-                    border: 'none',
-                    padding: '0.6rem 1.5rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 800,
-                    boxShadow: 'var(--shadow-lg)',
-                    color: '#fff'
-                  }}
-                >
-                  <XCircle size={18} /> {rejecting ? 'Rejecting...' : `REJECT SELECTED (${selectedEmpIds.size})`}
-                </button>
+                {user?.role === 'approver' && (
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={handleReject} 
+                    disabled={approving || rejecting || selectedEmpIds.size === 0} 
+                    style={{ 
+                      backgroundColor: 'var(--color-danger)', 
+                      border: 'none',
+                      padding: '0.6rem 1.5rem',
+                      fontSize: '0.9rem',
+                      fontWeight: 800,
+                      boxShadow: 'var(--shadow-lg)',
+                      color: '#fff'
+                    }}
+                  >
+                    <XCircle size={18} /> {rejecting ? 'Rejecting...' : `REJECT SELECTED (${selectedEmpIds.size})`}
+                  </button>
+                )}
               </div>
             )}
-            {user?.role === 'approver' && filteredBills.length === 0 && (
+            {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredBills.length === 0 && (
               <div style={{ 
                 display: 'flex', alignItems: 'center', gap: '0.5rem', 
                 color: 'var(--color-success)', fontWeight: 800, fontSize: '0.9rem',
@@ -808,7 +821,7 @@ const SurrenderBill = (props) => {
             <table className="table" style={{ fontSize: '0.85rem' }}>
               <thead>
                 <tr>
-                  {user?.role === 'approver' && (
+                  {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && (
                     <th style={{ width: '40px', textAlign: 'center' }}>
                       <input 
                         type="checkbox" 
@@ -852,7 +865,7 @@ const SurrenderBill = (props) => {
                   const rowColor = bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'inherit');
                   return (
                     <tr key={bill.emp_id} style={{ backgroundColor: rowBg, color: rowColor }}>
-                      {user?.role === 'approver' && (
+                      {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && (
                         <td style={{ textAlign: 'center' }}>
                           <input 
                             type="checkbox" 

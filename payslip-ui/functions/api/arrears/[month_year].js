@@ -48,6 +48,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
+  const userEmail = context.request.headers.get('X-User-Email');
   if (userRole === 'viewer') {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
   }
@@ -110,6 +111,13 @@ export async function onRequestPost(context) {
 
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.arrear_amount && record.arrear_amount > 0) {
+          logActivity(db, userEmail, 'Save Arrear Bill', `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
+        } else if (record.bill_date && record.arrear_type) {
+          logActivity(db, userEmail, 'Delete Arrear Bill', `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

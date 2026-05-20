@@ -1,14 +1,22 @@
+import { logActivity } from '../../../lib/logger.js';
+
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
   const userEmail = context.request.headers.get('X-User-Email');
 
-  if (userRole !== 'approver' && userRole !== 'super_admin') {
-    return new Response(JSON.stringify({ error: 'Only approvers can approve bills.' }), { status: 403 });
-  }
-
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
+
+    // Fetch require_approval setting
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first('value');
+    const requireApproval = settingsCheck !== '0';
+
+    const isAllowed = userRole === 'approver' || userRole === 'super_admin' || (!requireApproval && userRole === 'admin');
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: 'Only approvers, super admins (or admins under current settings) can approve bills.' }), { status: 403 });
+    }
+
     const now = new Date().toISOString();
 
     const body = await context.request.json().catch(() => ({}));
@@ -54,6 +62,9 @@ export async function onRequestPost(context) {
     }
 
     await db.prepare(updateQuery).bind(...updateParams).run();
+
+    const actionText = action === 'reject' ? 'Rejected' : 'Verified & Locked';
+    logActivity(db, userEmail, 'Festival Allowance Bill Action', `${actionText} festival allowance bill(s) for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true, approved_on: action === 'reject' ? null : now, approved_by: action === 'reject' ? null : userEmail }), {
       headers: { 'Content-Type': 'application/json' }

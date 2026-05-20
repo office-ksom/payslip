@@ -1,3 +1,5 @@
+import { logActivity } from '../../lib/logger.js';
+
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -6,7 +8,7 @@ export async function onRequestGet(context) {
 
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
-             f.id as bill_id, f.amount, f.bill_date, f.description,
+             f.id as bill_id, f.bill_date, f.amount, f.description,
              f.is_approved, f.approved_on, f.approved_by
       FROM employees e
       LEFT JOIN festival_allowance_bills f ON e.emp_id = f.emp_id AND substr(f.bill_date, 1, 7) = ?
@@ -17,6 +19,7 @@ export async function onRequestGet(context) {
       query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
       params.push(userEmail);
     } else {
+      // In active bill generation page, we want only active employees or those who have bills
       query += ` WHERE e.is_active = 1 OR f.id IS NOT NULL`;
     }
 
@@ -34,6 +37,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
+  const userEmail = context.request.headers.get('X-User-Email');
   if (userRole === 'viewer') {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
   }
@@ -85,6 +89,13 @@ export async function onRequestPost(context) {
 
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.amount && record.amount > 0) {
+          logActivity(db, userEmail, 'Save Festival Allowance', `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
+        } else if (record.bill_date) {
+          logActivity(db, userEmail, 'Delete Festival Allowance', `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

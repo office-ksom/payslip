@@ -1,3 +1,5 @@
+import { logActivity } from '../../lib/logger.js';
+
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -38,6 +40,7 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
+  const userEmail = context.request.headers.get('X-User-Email');
   if (userRole === 'viewer') {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
   }
@@ -105,6 +108,13 @@ export async function onRequestPost(context) {
 
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.num_els && record.num_els > 0) {
+          logActivity(db, userEmail, 'Save Surrender Bill', `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
+        } else if (record.bill_date) {
+          logActivity(db, userEmail, 'Delete Surrender Bill', `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

@@ -37,6 +37,7 @@ const Paybill = (props) => {
   const [isRejected, setIsRejected] = useState(false);
   const [approvalInfo, setApprovalInfo] = useState(null);
   const [approving, setApproving] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(true);
   const [usersList, setUsersList] = useState([]);
 
   // Modal state
@@ -65,6 +66,16 @@ const Paybill = (props) => {
   const loadDataForMonth = async (targetMonth) => {
     setLoading(true);
     try {
+      try {
+        const sysRes = await fetch('/api/settings/system');
+        if (sysRes.ok) {
+          const sysData = await sysRes.json();
+          setRequireApproval(sysData.require_approval !== '0');
+        }
+      } catch (e) {
+        console.error("Failed to load system settings", e);
+      }
+
       const settingsRes = await fetch('/api/settings');
       if (!settingsRes.ok) {
         const err = await settingsRes.json();
@@ -661,13 +672,13 @@ const Paybill = (props) => {
                 <button className="btn btn-primary" onClick={handleSave} disabled={saving || (isApproved && !isOverrideActive)}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Paybill'}
                 </button>
-                {!isSubmitted && (
+                {!requireApproval ? (
                   <button 
                     className="btn" 
-                    onClick={handleSubmit} 
-                    disabled={saving || (isApproved && !isOverrideActive)}
+                    onClick={handleApprove} 
+                    disabled={saving || approving || (isApproved && !isOverrideActive)}
                     style={{ 
-                      backgroundColor: '#f97316', 
+                      backgroundColor: 'var(--color-success)', 
                       color: '#fff', 
                       border: 'none',
                       padding: '0.6rem 1.2rem',
@@ -678,12 +689,33 @@ const Paybill = (props) => {
                       gap: '0.5rem'
                     }}
                   >
-                    <ShieldCheck size={18} /> Submit for Approval
+                    <ShieldCheck size={18} /> {approving ? 'Locking...' : 'Verify & Lock'}
                   </button>
+                ) : (
+                  !isSubmitted && (
+                    <button 
+                      className="btn" 
+                      onClick={handleSubmit} 
+                      disabled={saving || (isApproved && !isOverrideActive)}
+                      style={{ 
+                        backgroundColor: '#f97316', 
+                        color: '#fff', 
+                        border: 'none',
+                        padding: '0.6rem 1.2rem',
+                        fontWeight: 'bold',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <ShieldCheck size={18} /> Submit for Approval
+                    </button>
+                  )
                 )}
               </>
             )}
-            {isSubmitted && !isApproved && (
+            {isSubmitted && !isApproved && requireApproval && (
               <div style={{ 
                 display: 'flex', alignItems: 'center', gap: '0.5rem', 
                 color: '#f97316', fontWeight: 800, fontSize: '0.9rem',

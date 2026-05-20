@@ -1,4 +1,5 @@
 import { verifyPassword } from '../../lib/auth.js';
+import { logActivity } from '../../lib/logger.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -53,6 +54,9 @@ export async function onRequestPost(context) {
     });
     
     response.headers.append('Set-Cookie', `payslip_auth=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
+    
+    // Log login activity
+    logActivity(env.ksom_payslip_db, user.email, 'Login', `Successfully logged in with role ${user.role}`);
     
     return response;
 

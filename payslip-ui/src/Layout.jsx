@@ -285,7 +285,7 @@ const Layout = () => {
                 </NavLink>
                 <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                   <Settings size={20} />
-                  <span>Allowances Settings</span>
+                  <span>Settings</span>
                 </NavLink>
               </>
             )}

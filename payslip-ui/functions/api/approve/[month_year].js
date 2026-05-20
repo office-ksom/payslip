@@ -1,3 +1,5 @@
+import { logActivity } from '../../lib/logger.js';
+
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
   const userEmail = context.request.headers.get('X-User-Email');
@@ -10,13 +12,18 @@ export async function onRequestPost(context) {
     const body = await context.request.json().catch(() => ({}));
     const action = body.action || 'approve'; // 'submit', 'reject', 'approve'
 
+    // Fetch the require_approval system setting
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first('value');
+    const requireApproval = settingsCheck !== '0';
+
     if (action === 'submit') {
       if (userRole !== 'admin' && userRole !== 'super_admin') {
         return new Response(JSON.stringify({ error: 'Only admins or super admins can submit paybills.' }), { status: 403 });
       }
     } else if (action === 'approve' || action === 'reject') {
-      if (userRole !== 'approver' && userRole !== 'super_admin') {
-        return new Response(JSON.stringify({ error: 'Only approvers or super admins can approve/reject paybills.' }), { status: 403 });
+      const isAllowed = userRole === 'approver' || userRole === 'super_admin' || (!requireApproval && userRole === 'admin');
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: 'Only approvers, super admins (or admins under current settings) can approve/reject paybills.' }), { status: 403 });
       }
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action.' }), { status: 400 });
@@ -47,6 +54,9 @@ export async function onRequestPost(context) {
       SET is_approved = ?, approved_on = ?, approved_by = ?
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
+
+    const actionMap = { 'submit': 'Submitted', 'reject': 'Rejected', 'approve': 'Verified & Locked' };
+    logActivity(db, userEmail, 'Paybill Action', `${actionMap[action] || action} paybill for ${monthYear}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
