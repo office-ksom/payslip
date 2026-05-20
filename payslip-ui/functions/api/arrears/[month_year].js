@@ -113,9 +113,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.arrear_amount && record.arrear_amount > 0) {
-          logActivity(db, userEmail, 'Save Arrear Bill', `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
+          await logActivity(db, userEmail, 'Save Arrear Bill', `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
         } else if (record.bill_date && record.arrear_type) {
-          logActivity(db, userEmail, 'Delete Arrear Bill', `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Delete Arrear Bill', `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }

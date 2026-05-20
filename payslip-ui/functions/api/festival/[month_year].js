@@ -91,9 +91,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.amount && record.amount > 0) {
-          logActivity(db, userEmail, 'Save Festival Allowance', `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
+          await logActivity(db, userEmail, 'Save Festival Allowance', `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
         } else if (record.bill_date) {
-          logActivity(db, userEmail, 'Delete Festival Allowance', `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Delete Festival Allowance', `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }

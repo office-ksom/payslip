@@ -42,7 +42,7 @@ export async function onRequestPost(context) {
     // Log the change
     if ('require_approval' in data) {
       const mode = data.require_approval === '1' ? 'Enabled (Approval Required)' : 'Disabled (Direct Lock Allowed)';
-      logActivity(db, userEmail, 'Update System Settings', `Changed approval requirement to ${mode}`);
+      await logActivity(db, userEmail, 'Update System Settings', `Changed approval requirement to ${mode}`);
     }
 
     return new Response(JSON.stringify({ success: true }), {

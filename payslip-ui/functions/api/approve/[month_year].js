@@ -56,7 +56,7 @@ export async function onRequestPost(context) {
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
 
     const actionMap = { 'submit': 'Submitted', 'reject': 'Rejected', 'approve': 'Verified & Locked' };
-    logActivity(db, userEmail, 'Paybill Action', `${actionMap[action] || action} paybill for ${monthYear}`);
+    await logActivity(db, userEmail, 'Paybill Action', `${actionMap[action] || action} paybill for ${monthYear}`);
 
     return new Response(JSON.stringify({ 
       success: true, 

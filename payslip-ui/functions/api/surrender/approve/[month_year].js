@@ -67,7 +67,7 @@ export async function onRequestPost(context) {
     await db.prepare(updateQuery).bind(...updateParams).run();
 
     const actionText = action === 'reject' ? 'Rejected' : 'Verified & Locked';
-    logActivity(db, userEmail, 'Surrender Bill Action', `${actionText} surrender bill(s) for ${monthYear}`);
+    await logActivity(db, userEmail, 'Surrender Bill Action', `${actionText} surrender bill(s) for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true, approved_on: action === 'reject' ? null : now, approved_by: action === 'reject' ? null : userEmail }), {
       headers: { 'Content-Type': 'application/json' }

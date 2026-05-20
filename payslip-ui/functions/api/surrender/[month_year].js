@@ -110,9 +110,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.num_els && record.num_els > 0) {
-          logActivity(db, userEmail, 'Save Surrender Bill', `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
+          await logActivity(db, userEmail, 'Save Surrender Bill', `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
         } else if (record.bill_date) {
-          logActivity(db, userEmail, 'Delete Surrender Bill', `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Delete Surrender Bill', `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }

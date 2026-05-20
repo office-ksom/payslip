@@ -138,7 +138,7 @@ export async function onRequestPost(context) {
 
     if (statements.length > 0) {
       await db.batch(statements);
-      logActivity(db, userEmail, 'Update Paybill', `Updated paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, 'Update Paybill', `Updated paybill records for ${monthYear}`);
     }
 
     return new Response(JSON.stringify({ success: true }), {
@@ -180,7 +180,7 @@ export async function onRequestDelete(context) {
 
     await db.batch([deleteEarnings, deleteDeductions]);
 
-    logActivity(db, userEmail, 'Delete Paybill Record', `Deleted paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, 'Delete Paybill Record', `Deleted paybill record for employee ${empId} for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

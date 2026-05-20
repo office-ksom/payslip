@@ -36,7 +36,7 @@ export async function onRequestPost(context) {
         hra_ugc_percentage=excluded.hra_ugc_percentage`
     ).bind(effective_from, da_state_percentage || 0, da_ugc_percentage || 0, hra_state_percentage || 0, hra_ugc_percentage || 0).run();
 
-    logActivity(context.env.ksom_payslip_db, userEmail, 'Update Allowance Settings', `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, 'Update Allowance Settings', `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

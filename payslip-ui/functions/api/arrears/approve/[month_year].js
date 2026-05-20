@@ -74,7 +74,7 @@ export async function onRequestPost(context) {
 
     const actionText = action === 'reject' ? 'Rejected' : 'Verified & Locked';
     const typeText = arrearType ? ` (${arrearType})` : '';
-    logActivity(db, userEmail, 'Arrear Bill Action', `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
+    await logActivity(db, userEmail, 'Arrear Bill Action', `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true, approved_on: action === 'reject' ? null : now, approved_by: action === 'reject' ? null : userEmail }), {
       headers: { 'Content-Type': 'application/json' }

@@ -32,7 +32,7 @@ export async function onRequestPost(context) {
          designation=excluded.designation`
     ).bind(email.toLowerCase(), role, status || 'active', name || null, designation || null).run();
 
-    logActivity(context.env.ksom_payslip_db, userEmail, 'Save/Update User', `Saved/Updated user ${email} (Role: ${role}, Status: ${status || 'active'})`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, 'Save/Update User', `Saved/Updated user ${email} (Role: ${role}, Status: ${status || 'active'})`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
@@ -57,7 +57,7 @@ export async function onRequestDelete(context) {
     // For now, simple delete
     await context.env.ksom_payslip_db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
 
-    logActivity(context.env.ksom_payslip_db, userEmail, 'Delete User', `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ''}`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, 'Delete User', `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ''}`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' }
