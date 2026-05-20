@@ -6,7 +6,7 @@ CREATE TABLE backup_settings (
     is_enabled INTEGER DEFAULT 0,
     last_backup_at TIMESTAMP
 );
-INSERT INTO "backup_settings" VALUES(1,'sreejith@ksom.res.in','daily',1,NULL);
+INSERT INTO "backup_settings" VALUES(1,NULL,'daily',0,NULL);
 CREATE TABLE employees (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL, designation TEXT, date_of_birth TEXT, date_of_joining TEXT, scale_of_pay TEXT, category TEXT, title TEXT, sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, email_id TEXT, mob_no TEXT, epf_uan TEXT);
 INSERT INTO "employees" VALUES(1,'6302407','Sreejith Kurungott','System Analyst-Gr.III','1973-11-18','2010-10-28','77200-140500','state','Mr.',6,1,'sreejith@ksom.res.in','9495363959','101432734610');
 INSERT INTO "employees" VALUES(3,'6302417','Ratnakumar P K','Director','','','PB 118500-218200(L 14)','ugc/csir','Prof.',1,1,NULL,NULL,NULL);

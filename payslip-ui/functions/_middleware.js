@@ -1,3 +1,5 @@
+import { checkAndRunScheduledBackup } from './lib/backup_helper.js';
+
 export async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
@@ -35,6 +37,9 @@ export async function onRequest(context) {
     }
     return next();
   }
+
+  // Trigger scheduled backup check in background
+  context.waitUntil(checkAndRunScheduledBackup(env, context.waitUntil));
 
   // 3. Local development logout mock
   if (url.pathname === '/api/logout' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {

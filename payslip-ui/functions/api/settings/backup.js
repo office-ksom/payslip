@@ -1,9 +1,16 @@
 export async function onRequestGet(context) {
   try {
+    const userEmail = context.request.headers.get('X-User-Email');
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
     ).all();
-    return new Response(JSON.stringify(results[0] || {}), {
+    
+    const settings = results[0] || {};
+    if (!settings.backup_email && userEmail) {
+      settings.backup_email = userEmail;
+    }
+
+    return new Response(JSON.stringify(settings), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {

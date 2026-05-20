@@ -17,7 +17,16 @@ const Backup = (props) => {
   const fetchSettings = async () => {
     try {
       const res = await fetch('/api/settings/backup');
-      if (res.ok) setSettings(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.backup_email && props.user && props.user.email) {
+          data.backup_email = props.user.email;
+        }
+        if (data.is_enabled === undefined || data.is_enabled === null) {
+          data.is_enabled = 0;
+        }
+        setSettings(data);
+      }
     } catch (err) {
       console.error('Failed to fetch backup settings', err);
     }

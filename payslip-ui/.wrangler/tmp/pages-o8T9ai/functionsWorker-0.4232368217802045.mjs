@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-oPEsZn/checked-fetch.js
+// ../.wrangler/tmp/bundle-Dr7SqL/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,16 +27,42 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
+// lib/logger.js
+async function logActivity2(db, userEmail, action, description) {
+  const now = /* @__PURE__ */ new Date();
+  const pad = /* @__PURE__ */ __name((n) => String(n).padStart(2, "0"), "pad");
+  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const logLine = `[${timestamp}] [${userEmail || "system"}] Action: ${action} - Description: ${description}`;
+  console.log(logLine);
+  fetch("http://127.0.0.1:8089/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logLine })
+  }).catch((err) => {
+  });
+  if (db) {
+    try {
+      await db.prepare("INSERT INTO activity_logs (timestamp, email, action, description) VALUES (?, ?, ?, ?)").bind(timestamp, userEmail || "system", action, description).run();
+    } catch (err) {
+      console.error("D1 activity logging failed:", err);
+    }
+  }
+}
+__name(logActivity2, "logActivity");
+
 // api/arrears/approve/[month_year].js
 async function onRequestPost(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
-  if (userRole !== "approver" && userRole !== "super_admin") {
-    return new Response(JSON.stringify({ error: "Only approvers can approve bills." }), { status: 403 });
-  }
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first("value");
+    const requireApproval = settingsCheck !== "0";
+    const isAllowed = userRole === "approver" || userRole === "super_admin" || !requireApproval && userRole === "admin";
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: "Only approvers, super admins (or admins under current settings) can approve bills." }), { status: 403 });
+    }
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const body = await context.request.json().catch(() => ({}));
     const empIds = body.emp_ids;
@@ -82,6 +108,9 @@ async function onRequestPost(context) {
       updateParams.push(arrearType);
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
+    const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
+    const typeText = arrearType ? ` (${arrearType})` : "";
+    await logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -121,12 +150,15 @@ __name(onRequestGet, "onRequestGet");
 async function onRequestPost2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
-  if (userRole !== "approver" && userRole !== "super_admin") {
-    return new Response(JSON.stringify({ error: "Only approvers can approve bills." }), { status: 403 });
-  }
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first("value");
+    const requireApproval = settingsCheck !== "0";
+    const isAllowed = userRole === "approver" || userRole === "super_admin" || !requireApproval && userRole === "admin";
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: "Only approvers, super admins (or admins under current settings) can approve bills." }), { status: 403 });
+    }
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const body = await context.request.json().catch(() => ({}));
     const empIds = body.emp_ids;
@@ -163,6 +195,8 @@ async function onRequestPost2(context) {
       updateParams.push(...empIds);
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
+    const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
+    await logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -194,12 +228,15 @@ __name(onRequestGet2, "onRequestGet");
 async function onRequestPost3(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
-  if (userRole !== "approver" && userRole !== "super_admin") {
-    return new Response(JSON.stringify({ error: "Only approvers can approve bills." }), { status: 403 });
-  }
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first("value");
+    const requireApproval = settingsCheck !== "0";
+    const isAllowed = userRole === "approver" || userRole === "super_admin" || !requireApproval && userRole === "admin";
+    if (!isAllowed) {
+      return new Response(JSON.stringify({ error: "Only approvers, super admins (or admins under current settings) can approve bills." }), { status: 403 });
+    }
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const isYearOnly = monthYear.length === 4;
     const dateLen = isYearOnly ? 4 : 7;
@@ -238,6 +275,8 @@ async function onRequestPost3(context) {
       updateParams.push(...empIds);
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
+    const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
+    await logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -391,6 +430,7 @@ async function onRequestPost4(context) {
       headers: { "Content-Type": "application/json" }
     });
     response.headers.append("Set-Cookie", `payslip_auth=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
+    await logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
     return response;
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
@@ -639,10 +679,15 @@ __name(onRequestGet5, "onRequestGet");
 // api/settings/backup.js
 async function onRequestGet6(context) {
   try {
+    const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
     ).all();
-    return new Response(JSON.stringify(results[0] || {}), {
+    const settings = results[0] || {};
+    if (!settings.backup_email && userEmail) {
+      settings.backup_email = userEmail;
+    }
+    return new Response(JSON.stringify(settings), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
@@ -668,8 +713,106 @@ async function onRequestPost8(context) {
 }
 __name(onRequestPost8, "onRequestPost");
 
-// api/surrender/cumulative.js
+// api/settings/logs.js
 async function onRequestGet7(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  if (userRole !== "super_admin") {
+    return new Response(JSON.stringify({ error: "Forbidden. Only super admins can view logs." }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  try {
+    const db = context.env.ksom_payslip_db;
+    const { results } = await db.prepare("SELECT * FROM activity_logs ORDER BY id ASC").all();
+    const dbLogLines = results.map(
+      (row) => `[${row.timestamp}] [${row.email}] Action: ${row.action} - Description: ${row.description}`
+    );
+    const url = new URL(context.request.url);
+    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    let synced = true;
+    let finalLogs = "";
+    if (isLocal) {
+      synced = false;
+      try {
+        const response = await fetch("http://127.0.0.1:8089/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logs: dbLogLines })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          finalLogs = data.logs;
+          synced = true;
+        }
+      } catch (e) {
+      }
+    }
+    if (!finalLogs) {
+      finalLogs = dbLogLines.join("\n");
+    }
+    return new Response(JSON.stringify({ logs: finalLogs || "No logs recorded yet.", synced }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+__name(onRequestGet7, "onRequestGet");
+
+// api/settings/system.js
+async function onRequestGet8(context) {
+  try {
+    const db = context.env.ksom_payslip_db;
+    const settings = await db.prepare("SELECT * FROM system_settings").all();
+    const settingsMap = {};
+    settings.results.forEach((row) => {
+      settingsMap[row.key] = row.value;
+    });
+    return new Response(JSON.stringify(settingsMap), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet8, "onRequestGet");
+async function onRequestPost9(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  if (userRole !== "super_admin") {
+    return new Response(JSON.stringify({ error: "Forbidden. Only super admin can change system settings." }), { status: 403 });
+  }
+  try {
+    const data = await context.request.json();
+    const db = context.env.ksom_payslip_db;
+    const statements = [];
+    for (const [key, value] of Object.entries(data)) {
+      statements.push(
+        db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").bind(key, String(value))
+      );
+    }
+    if (statements.length > 0) {
+      await db.batch(statements);
+    }
+    if ("require_approval" in data) {
+      const mode = data.require_approval === "1" ? "Enabled (Approval Required)" : "Disabled (Direct Lock Allowed)";
+      await logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
+    }
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost9, "onRequestPost");
+
+// api/surrender/cumulative.js
+async function onRequestGet9(context) {
   try {
     const url = new URL(context.request.url);
     const empId = url.searchParams.get("emp_id");
@@ -692,10 +835,10 @@ async function onRequestGet7(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet7, "onRequestGet");
+__name(onRequestGet9, "onRequestGet");
 
 // api/users/password.js
-async function onRequestPost9(context) {
+async function onRequestPost10(context) {
   const { request, env, data } = context;
   if (data.user.role !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden: Super Admin only" }), {
@@ -731,10 +874,10 @@ async function onRequestPost9(context) {
     });
   }
 }
-__name(onRequestPost9, "onRequestPost");
+__name(onRequestPost10, "onRequestPost");
 
 // api/approve/[month_year].js
-async function onRequestPost10(context) {
+async function onRequestPost11(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -743,13 +886,16 @@ async function onRequestPost10(context) {
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const body = await context.request.json().catch(() => ({}));
     const action = body.action || "approve";
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first("value");
+    const requireApproval = settingsCheck !== "0";
     if (action === "submit") {
       if (userRole !== "admin" && userRole !== "super_admin") {
         return new Response(JSON.stringify({ error: "Only admins or super admins can submit paybills." }), { status: 403 });
       }
     } else if (action === "approve" || action === "reject") {
-      if (userRole !== "approver" && userRole !== "super_admin") {
-        return new Response(JSON.stringify({ error: "Only approvers or super admins can approve/reject paybills." }), { status: 403 });
+      const isAllowed = userRole === "approver" || userRole === "super_admin" || !requireApproval && userRole === "admin";
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: "Only approvers, super admins (or admins under current settings) can approve/reject paybills." }), { status: 403 });
       }
     } else {
       return new Response(JSON.stringify({ error: "Invalid action." }), { status: 400 });
@@ -775,6 +921,8 @@ async function onRequestPost10(context) {
       SET is_approved = ?, approved_on = ?, approved_by = ?
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
+    const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
+    await logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -787,8 +935,8 @@ async function onRequestPost10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost10, "onRequestPost");
-async function onRequestGet8(context) {
+__name(onRequestPost11, "onRequestPost");
+async function onRequestGet10(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -806,10 +954,10 @@ async function onRequestGet8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet8, "onRequestGet");
+__name(onRequestGet10, "onRequestGet");
 
 // api/arrears/[month_year].js
-async function onRequestGet9(context) {
+async function onRequestGet11(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -849,9 +997,10 @@ async function onRequestGet9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet9, "onRequestGet");
-async function onRequestPost11(context) {
+__name(onRequestGet11, "onRequestGet");
+async function onRequestPost12(context) {
   const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
@@ -906,6 +1055,13 @@ async function onRequestPost11(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.arrear_amount && record.arrear_amount > 0) {
+          await logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
+        } else if (record.bill_date && record.arrear_type) {
+          await logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -915,10 +1071,10 @@ async function onRequestPost11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost11, "onRequestPost");
+__name(onRequestPost12, "onRequestPost");
 
 // api/deductions/[month_year].js
-async function onRequestGet10(context) {
+async function onRequestGet12(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -944,8 +1100,8 @@ async function onRequestGet10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet10, "onRequestGet");
-async function onRequestPost12(context) {
+__name(onRequestGet12, "onRequestGet");
+async function onRequestPost13(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -1004,10 +1160,10 @@ async function onRequestPost12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost12, "onRequestPost");
+__name(onRequestPost13, "onRequestPost");
 
 // api/earnings/[month_year].js
-async function onRequestGet11(context) {
+async function onRequestGet13(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1015,15 +1171,19 @@ async function onRequestGet11(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
              m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
-             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown,
-             m.is_approved, m.approved_on, m.approved_by
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
+             d.id as deductions_id, d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
+             d.cpf, d.hra_recovery, d.other_deductions_breakdown
       FROM employees e
       LEFT JOIN monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
+      LEFT JOIN monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
     `;
-    let params = [monthYear];
-    if (userRole === "viewer") {
+    let params = [monthYear, monthYear];
+    if (userRole === "viewer" && userEmail) {
       query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
       params.push(userEmail);
+    } else {
+      query += ` WHERE e.is_active = 1 OR m.id IS NOT NULL`;
     }
     query += ` ORDER BY e.sort_order ASC, e.name ASC`;
     const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
@@ -1034,9 +1194,10 @@ async function onRequestGet11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet11, "onRequestGet");
-async function onRequestPost13(context) {
+__name(onRequestGet13, "onRequestGet");
+async function onRequestPost14(context) {
   const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
@@ -1052,22 +1213,24 @@ async function onRequestPost13(context) {
     for (const record of records) {
       statements.push(
         db.prepare(`
-          INSERT INTO monthly_earnings (emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings, spl_pay, tr_allow, spl_allow, fest_allow, other_earnings_breakdown)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET 
-            basic_pay=excluded.basic_pay,
-            dp_gp=excluded.dp_gp,
-            da_state=excluded.da_state,
-            da_ugc=excluded.da_ugc,
-            hra_state=excluded.hra_state,
-            hra_ugc=excluded.hra_ugc,
-            cca=excluded.cca,
-            other_earnings=excluded.other_earnings,
-            spl_pay=excluded.spl_pay,
-            tr_allow=excluded.tr_allow,
-            spl_allow=excluded.spl_allow,
-            fest_allow=excluded.fest_allow,
-            other_earnings_breakdown=excluded.other_earnings_breakdown
+          INSERT INTO monthly_earnings (
+            emp_id, month_year, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings,
+            spl_pay, tr_allow, spl_allow, fest_allow, other_earnings_breakdown
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(emp_id, month_year) DO UPDATE SET
+            basic_pay = excluded.basic_pay,
+            dp_gp = excluded.dp_gp,
+            da_state = excluded.da_state,
+            da_ugc = excluded.da_ugc,
+            hra_state = excluded.hra_state,
+            hra_ugc = excluded.hra_ugc,
+            cca = excluded.cca,
+            other_earnings = excluded.other_earnings,
+            spl_pay = excluded.spl_pay,
+            tr_allow = excluded.tr_allow,
+            spl_allow = excluded.spl_allow,
+            fest_allow = excluded.fest_allow,
+            other_earnings_breakdown = excluded.other_earnings_breakdown
         `).bind(
           record.emp_id,
           monthYear,
@@ -1086,9 +1249,44 @@ async function onRequestPost13(context) {
           record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
         )
       );
+      statements.push(
+        db.prepare(`
+          INSERT INTO monthly_deductions (
+            emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
+            cpf, hra_recovery, other_deductions_breakdown
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(emp_id, month_year) DO UPDATE SET
+            epf = excluded.epf,
+            professional_tax = excluded.professional_tax,
+            sli = excluded.sli,
+            gis = excluded.gis,
+            lic = excluded.lic,
+            income_tax = excluded.income_tax,
+            onam_advance = excluded.onam_advance,
+            other_deductions = excluded.other_deductions,
+            cpf = excluded.cpf,
+            hra_recovery = excluded.hra_recovery,
+            other_deductions_breakdown = excluded.other_deductions_breakdown
+        `).bind(
+          record.emp_id,
+          monthYear,
+          record.epf || 0,
+          record.professional_tax || 0,
+          record.sli || 0,
+          record.gis || 0,
+          record.lic || 0,
+          record.income_tax || 0,
+          record.onam_advance || 0,
+          record.other_deductions || 0,
+          record.cpf || 0,
+          record.hra_recovery || 0,
+          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+        )
+      );
     }
     if (statements.length > 0) {
       await db.batch(statements);
+      await logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1098,17 +1296,48 @@ async function onRequestPost13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost13, "onRequestPost");
+__name(onRequestPost14, "onRequestPost");
+async function onRequestDelete(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  if (userRole === "viewer") {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  try {
+    const monthYear = context.params.month_year;
+    const url = new URL(context.request.url);
+    const empId = url.searchParams.get("emp_id");
+    if (!empId) {
+      return new Response(JSON.stringify({ error: "Missing emp_id parameter." }), { status: 400 });
+    }
+    const db = context.env.ksom_payslip_db;
+    const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    }
+    const deleteEarnings = db.prepare("DELETE FROM monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+    const deleteDeductions = db.prepare("DELETE FROM monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+    await db.batch([deleteEarnings, deleteDeductions]);
+    await logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestDelete, "onRequestDelete");
 
 // api/festival/[month_year].js
-async function onRequestGet12(context) {
+async function onRequestGet14(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
     const userEmail = context.request.headers.get("X-User-Email");
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
-             f.id as bill_id, f.amount, f.bill_date, f.description,
+             f.id as bill_id, f.bill_date, f.amount, f.description,
              f.is_approved, f.approved_on, f.approved_by
       FROM employees e
       LEFT JOIN festival_allowance_bills f ON e.emp_id = f.emp_id AND substr(f.bill_date, 1, 7) = ?
@@ -1129,9 +1358,10 @@ async function onRequestGet12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet12, "onRequestGet");
-async function onRequestPost14(context) {
+__name(onRequestGet14, "onRequestGet");
+async function onRequestPost15(context) {
   const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
@@ -1176,6 +1406,13 @@ async function onRequestPost14(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.amount && record.amount > 0) {
+          await logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
+        } else if (record.bill_date) {
+          await logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1185,10 +1422,10 @@ async function onRequestPost14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost14, "onRequestPost");
+__name(onRequestPost15, "onRequestPost");
 
 // api/surrender/[month_year].js
-async function onRequestGet13(context) {
+async function onRequestGet15(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1218,9 +1455,10 @@ async function onRequestGet13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet13, "onRequestGet");
-async function onRequestPost15(context) {
+__name(onRequestGet15, "onRequestGet");
+async function onRequestPost16(context) {
   const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
@@ -1278,6 +1516,13 @@ async function onRequestPost15(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
+      for (const record of records) {
+        if (record.num_els && record.num_els > 0) {
+          await logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
+        } else if (record.bill_date) {
+          await logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+        }
+      }
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1287,48 +1532,133 @@ async function onRequestPost15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost15, "onRequestPost");
+__name(onRequestPost16, "onRequestPost");
 
-// api/backup.js
-async function onRequestGet14(context) {
-  try {
-    const db = context.env.ksom_payslip_db;
-    const tables = ["employees", "allowances_settings", "monthly_earnings", "monthly_deductions"];
-    let sqlDump = `-- KSoM Payslip Portal Backup
+// lib/backup_helper.js
+async function generateBackupSql(db) {
+  const { results: tables } = await db.prepare(
+    "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+  ).all();
+  let sqlDump = `-- KSoM Payslip Portal Backup
 -- Generated: ${(/* @__PURE__ */ new Date()).toISOString()}
 
 PRAGMA defer_foreign_keys=TRUE;
 
 `;
-    for (const table of tables) {
-      sqlDump += `DROP TABLE IF EXISTS ${table};
+  for (const table of tables) {
+    sqlDump += `DROP TABLE IF EXISTS ${table.name};
 `;
-      if (table === "employees") {
-        sqlDump += `CREATE TABLE employees (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL, designation TEXT, date_of_birth TEXT, date_of_joining TEXT, scale_of_pay TEXT, category TEXT, title TEXT, sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, email_id TEXT, mob_no TEXT, epf_uan TEXT);
+    sqlDump += `${table.sql};
 `;
-      } else if (table === "allowances_settings") {
-        sqlDump += `CREATE TABLE allowances_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, effective_from TEXT NOT NULL UNIQUE, da_state_percentage REAL DEFAULT 0, da_ugc_percentage REAL DEFAULT 0, hra_state_percentage REAL DEFAULT 0, hra_ugc_percentage REAL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+    const { results } = await db.prepare(`SELECT * FROM ${table.name}`).all();
+    for (const row of results) {
+      const columns = Object.keys(row);
+      const values = Object.values(row).map((val) => {
+        if (val === null) return "NULL";
+        if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+        return val;
+      });
+      sqlDump += `INSERT INTO ${table.name} (${columns.join(", ")}) VALUES (${values.join(", ")});
 `;
-      } else if (table === "monthly_earnings") {
-        sqlDump += `CREATE TABLE monthly_earnings (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, basic_pay REAL DEFAULT 0, dp_gp REAL DEFAULT 0, da_state REAL DEFAULT 0, da_ugc REAL DEFAULT 0, hra_state REAL DEFAULT 0, hra_ugc REAL DEFAULT 0, cca REAL DEFAULT 0, other_earnings REAL DEFAULT 0, spl_pay REAL DEFAULT 0, tr_allow REAL DEFAULT 0, spl_allow REAL DEFAULT 0, fest_allow REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      } else if (table === "monthly_deductions") {
-        sqlDump += `CREATE TABLE monthly_deductions (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, epf REAL DEFAULT 0, professional_tax REAL DEFAULT 0, sli REAL DEFAULT 0, gis REAL DEFAULT 0, lic REAL DEFAULT 0, income_tax REAL DEFAULT 0, onam_advance REAL DEFAULT 0, other_deductions REAL DEFAULT 0, cpf REAL DEFAULT 0, hra_recovery REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      }
-      const { results } = await db.prepare(`SELECT * FROM ${table}`).all();
-      for (const row of results) {
-        const columns = Object.keys(row);
-        const values = Object.values(row).map((val) => {
-          if (val === null) return "NULL";
-          if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-          return val;
-        });
-        sqlDump += `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${values.join(", ")});
-`;
-      }
-      sqlDump += "\n";
     }
+    sqlDump += "\n";
+  }
+  return sqlDump;
+}
+__name(generateBackupSql, "generateBackupSql");
+async function sendBackupEmail(env, toEmail, sql) {
+  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = env;
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    throw new Error("Gmail OAuth2 credentials are not configured.");
+  }
+  const accessToken = await getAccessToken(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN);
+  const rawMessage = buildMimeMessage({
+    from: "KSoM Office <office@ksom.res.in>",
+    to: toEmail,
+    subject: `KSoM Payslip Backup - ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`,
+    text: `Please find attached the SQL backup for the KSoM Payslip Portal generated on ${(/* @__PURE__ */ new Date()).toLocaleString()}.`,
+    attachments: [
+      {
+        filename: `backup_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.sql`,
+        content: btoa(sql)
+      }
+    ]
+  });
+  const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      raw: base64url(rawMessage)
+    })
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error?.message || "Failed to send email via Gmail");
+  }
+  return result.id;
+}
+__name(sendBackupEmail, "sendBackupEmail");
+async function checkAndRunScheduledBackup(env, waitUntil) {
+  try {
+    const settings = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM backup_settings WHERE id = 1"
+    ).first();
+    if (!settings || settings.is_enabled !== 1 || !settings.backup_email) {
+      return;
+    }
+    const now = /* @__PURE__ */ new Date();
+    let isDue = false;
+    if (!settings.last_backup_at) {
+      isDue = true;
+    } else {
+      const lastBackupDate = new Date(settings.last_backup_at);
+      const diffMs = now.getTime() - lastBackupDate.getTime();
+      const diffDays = diffMs / (1e3 * 60 * 60 * 24);
+      if (settings.frequency === "daily" && diffDays >= 1) {
+        isDue = true;
+      } else if (settings.frequency === "weekly" && diffDays >= 7) {
+        isDue = true;
+      } else if (settings.frequency === "monthly" && diffDays >= 30) {
+        isDue = true;
+      }
+    }
+    if (isDue) {
+      const nowStr = now.toISOString();
+      await env.ksom_payslip_db.prepare(
+        "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+      ).bind(nowStr).run();
+      const task = /* @__PURE__ */ __name(async () => {
+        try {
+          const sql = await generateBackupSql(env.ksom_payslip_db);
+          await sendBackupEmail(env, settings.backup_email, sql);
+          console.log(`Scheduled backup email sent successfully to ${settings.backup_email}`);
+        } catch (err) {
+          console.error("Scheduled backup failed in background:", err);
+          await env.ksom_payslip_db.prepare(
+            "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+          ).bind(settings.last_backup_at).run();
+        }
+      }, "task");
+      if (waitUntil) {
+        waitUntil(task());
+      } else {
+        await task();
+      }
+    }
+  } catch (err) {
+    console.error("Failed checking/running scheduled backup:", err);
+  }
+}
+__name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
+
+// api/backup.js
+async function onRequestGet16(context) {
+  try {
+    const db = context.env.ksom_payslip_db;
+    const sqlDump = await generateBackupSql(db);
     return new Response(sqlDump, {
       headers: {
         "Content-Type": "application/sql",
@@ -1339,8 +1669,8 @@ PRAGMA defer_foreign_keys=TRUE;
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet14, "onRequestGet");
-async function onRequestPost16(context) {
+__name(onRequestGet16, "onRequestGet");
+async function onRequestPost17(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const { sql } = await context.request.json();
@@ -1357,10 +1687,10 @@ async function onRequestPost16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost16, "onRequestPost");
+__name(onRequestPost17, "onRequestPost");
 
 // api/email/index.js
-async function onRequestPost17(context) {
+async function onRequestPost18(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -1405,10 +1735,10 @@ async function onRequestPost17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost17, "onRequestPost");
+__name(onRequestPost18, "onRequestPost");
 
 // api/employees/index.js
-async function onRequestGet15(context) {
+async function onRequestGet17(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
@@ -1428,8 +1758,8 @@ async function onRequestGet15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet15, "onRequestGet");
-async function onRequestPost18(context) {
+__name(onRequestGet17, "onRequestGet");
+async function onRequestPost19(context) {
   try {
     const data = await context.request.json();
     const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order } = data;
@@ -1447,7 +1777,7 @@ async function onRequestPost18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost18, "onRequestPost");
+__name(onRequestPost19, "onRequestPost");
 async function onRequestPut(context) {
   try {
     const data = await context.request.json();
@@ -1471,7 +1801,7 @@ async function onRequestPut(context) {
 __name(onRequestPut, "onRequestPut");
 
 // api/settings/index.js
-async function onRequestGet16(context) {
+async function onRequestGet18(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -1483,9 +1813,10 @@ async function onRequestGet16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet16, "onRequestGet");
-async function onRequestPost19(context) {
+__name(onRequestGet18, "onRequestGet");
+async function onRequestPost20(context) {
   const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
@@ -1501,6 +1832,7 @@ async function onRequestPost19(context) {
         hra_state_percentage=excluded.hra_state_percentage,
         hra_ugc_percentage=excluded.hra_ugc_percentage`
     ).bind(effective_from, da_state_percentage || 0, da_ugc_percentage || 0, hra_state_percentage || 0, hra_ugc_percentage || 0).run();
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -1509,10 +1841,10 @@ async function onRequestPost19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost19, "onRequestPost");
+__name(onRequestPost20, "onRequestPost");
 
 // api/users/index.js
-async function onRequestGet17(context) {
+async function onRequestGet19(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -1524,8 +1856,9 @@ async function onRequestGet17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet17, "onRequestGet");
-async function onRequestPost20(context) {
+__name(onRequestGet19, "onRequestGet");
+async function onRequestPost21(context) {
+  const userEmail = context.request.headers.get("X-User-Email");
   try {
     const data = await context.request.json();
     const { email, role, status, name, designation } = data;
@@ -1540,6 +1873,7 @@ async function onRequestPost20(context) {
          name=excluded.name, 
          designation=excluded.designation`
     ).bind(email.toLowerCase(), role, status || "active", name || null, designation || null).run();
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1547,13 +1881,16 @@ async function onRequestPost20(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost20, "onRequestPost");
-async function onRequestDelete(context) {
+__name(onRequestPost21, "onRequestPost");
+async function onRequestDelete2(context) {
+  const userEmail = context.request.headers.get("X-User-Email");
   try {
     const url = new URL(context.request.url);
     const id = url.searchParams.get("id");
     if (!id) return new Response(JSON.stringify({ error: "ID required." }), { status: 400 });
+    const userToDel = await context.env.ksom_payslip_db.prepare("SELECT email FROM users WHERE id = ?").bind(id).first();
     await context.env.ksom_payslip_db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1561,7 +1898,7 @@ async function onRequestDelete(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete, "onRequestDelete");
+__name(onRequestDelete2, "onRequestDelete");
 
 // _middleware.js
 async function onRequest(context) {
@@ -1594,6 +1931,7 @@ async function onRequest(context) {
     }
     return next();
   }
+  context.waitUntil(checkAndRunScheduledBackup(env, context.waitUntil));
   if (url.pathname === "/api/logout" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
     return new Response(null, {
       status: 302,
@@ -1660,7 +1998,7 @@ function forbiddenResponse() {
 }
 __name(forbiddenResponse, "forbiddenResponse");
 
-// ../.wrangler/tmp/pages-7DOvI7/functionsRoutes-0.18417805380043095.mjs
+// ../.wrangler/tmp/pages-o8T9ai/functionsRoutes-0.4956543942356324.mjs
 var routes = [
   {
     routePath: "/api/arrears/approve/:month_year",
@@ -1761,137 +2099,165 @@ var routes = [
     modules: [onRequestPost8]
   },
   {
+    routePath: "/api/settings/logs",
+    mountPath: "/api/settings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet7]
+  },
+  {
+    routePath: "/api/settings/system",
+    mountPath: "/api/settings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet8]
+  },
+  {
+    routePath: "/api/settings/system",
+    mountPath: "/api/settings",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost9]
+  },
+  {
     routePath: "/api/surrender/cumulative",
     mountPath: "/api/surrender",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet7]
+    modules: [onRequestGet9]
   },
   {
     routePath: "/api/users/password",
     mountPath: "/api/users",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost9]
-  },
-  {
-    routePath: "/api/approve/:month_year",
-    mountPath: "/api/approve",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet8]
-  },
-  {
-    routePath: "/api/approve/:month_year",
-    mountPath: "/api/approve",
-    method: "POST",
-    middlewares: [],
     modules: [onRequestPost10]
   },
   {
-    routePath: "/api/arrears/:month_year",
-    mountPath: "/api/arrears",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet9]
-  },
-  {
-    routePath: "/api/arrears/:month_year",
-    mountPath: "/api/arrears",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost11]
-  },
-  {
-    routePath: "/api/deductions/:month_year",
-    mountPath: "/api/deductions",
+    routePath: "/api/approve/:month_year",
+    mountPath: "/api/approve",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet10]
   },
   {
-    routePath: "/api/deductions/:month_year",
-    mountPath: "/api/deductions",
+    routePath: "/api/approve/:month_year",
+    mountPath: "/api/approve",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost12]
+    modules: [onRequestPost11]
   },
   {
-    routePath: "/api/earnings/:month_year",
-    mountPath: "/api/earnings",
+    routePath: "/api/arrears/:month_year",
+    mountPath: "/api/arrears",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet11]
   },
   {
-    routePath: "/api/earnings/:month_year",
-    mountPath: "/api/earnings",
+    routePath: "/api/arrears/:month_year",
+    mountPath: "/api/arrears",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost13]
+    modules: [onRequestPost12]
   },
   {
-    routePath: "/api/festival/:month_year",
-    mountPath: "/api/festival",
+    routePath: "/api/deductions/:month_year",
+    mountPath: "/api/deductions",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet12]
   },
   {
-    routePath: "/api/festival/:month_year",
-    mountPath: "/api/festival",
+    routePath: "/api/deductions/:month_year",
+    mountPath: "/api/deductions",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost14]
+    modules: [onRequestPost13]
   },
   {
-    routePath: "/api/surrender/:month_year",
-    mountPath: "/api/surrender",
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete]
+  },
+  {
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet13]
   },
   {
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost14]
+  },
+  {
+    routePath: "/api/festival/:month_year",
+    mountPath: "/api/festival",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet14]
+  },
+  {
+    routePath: "/api/festival/:month_year",
+    mountPath: "/api/festival",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost15]
+  },
+  {
+    routePath: "/api/surrender/:month_year",
+    mountPath: "/api/surrender",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet15]
+  },
+  {
     routePath: "/api/surrender/:month_year",
     mountPath: "/api/surrender",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost15]
+    modules: [onRequestPost16]
   },
   {
     routePath: "/api/backup",
     mountPath: "/api",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet14]
+    modules: [onRequestGet16]
   },
   {
     routePath: "/api/backup",
     mountPath: "/api",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost16]
+    modules: [onRequestPost17]
   },
   {
     routePath: "/api/email",
     mountPath: "/api/email",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost17]
+    modules: [onRequestPost18]
   },
   {
     routePath: "/api/employees",
     mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet15]
+    modules: [onRequestGet17]
   },
   {
     routePath: "/api/employees",
     mountPath: "/api/employees",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost18]
+    modules: [onRequestPost19]
   },
   {
     routePath: "/api/employees",
@@ -1905,35 +2271,35 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet16]
+    modules: [onRequestGet18]
   },
   {
     routePath: "/api/settings",
     mountPath: "/api/settings",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost19]
+    modules: [onRequestPost20]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "DELETE",
     middlewares: [],
-    modules: [onRequestDelete]
+    modules: [onRequestDelete2]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet17]
+    modules: [onRequestGet19]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost20]
+    modules: [onRequestPost21]
   },
   {
     routePath: "/",
@@ -2431,7 +2797,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-oPEsZn/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-Dr7SqL/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -2463,7 +2829,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-oPEsZn/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-Dr7SqL/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -2563,4 +2929,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.6253383156258167.mjs.map
+//# sourceMappingURL=functionsWorker-0.4232368217802045.mjs.map
