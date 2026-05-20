@@ -524,7 +524,9 @@ const Settings = (props) => {
               alignItems: 'center',
               borderBottom: '1px solid #334155'
             }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 600 }}>logfile/log.txt</span>
+              <span style={{ color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 600 }}>
+                {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'logfile/log.txt' : 'Cloudflare D1 Database'}
+              </span>
               <span style={{ color: '#64748b', fontSize: '0.75rem', fontFamily: 'monospace' }}>
                 {filteredLines.filter(Boolean).length} entries
               </span>

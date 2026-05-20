@@ -16,26 +16,31 @@ export async function onRequestGet(context) {
       `[${row.timestamp}] [${row.email}] Action: ${row.action} - Description: ${row.description}`
     );
 
-    // 2. Try to sync with the local log helper server
-    let synced = false;
+    const url = new URL(context.request.url);
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+    let synced = true;
     let finalLogs = '';
 
-    try {
-      const response = await fetch('http://127.0.0.1:8089/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logs: dbLogLines })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        finalLogs = data.logs;
-        synced = true;
+    if (isLocal) {
+      synced = false;
+      try {
+        const response = await fetch('http://127.0.0.1:8089/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logs: dbLogLines })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          finalLogs = data.logs;
+          synced = true;
+        }
+      } catch (e) {
+        // Local log server not running
       }
-    } catch (e) {
-      // Local log server not running
     }
 
-    if (!synced) {
+    if (!finalLogs) {
       finalLogs = dbLogLines.join('\n');
     }
 
