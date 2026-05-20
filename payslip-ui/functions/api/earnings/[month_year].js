@@ -9,7 +9,7 @@ export async function onRequestGet(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
              m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
-             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown,
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery, d.other_deductions_breakdown
       FROM employees e
