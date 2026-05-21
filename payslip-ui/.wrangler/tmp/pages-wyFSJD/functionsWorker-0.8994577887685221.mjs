@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-7vyT9R/checked-fetch.js
+// ../.wrangler/tmp/bundle-aJDxO2/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,38 +27,13 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-ee7Utm/functionsWorker-0.41280852155542447.mjs
-var __defProp2 = Object.defineProperty;
-var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
-var urls2 = /* @__PURE__ */ new Set();
-function checkURL2(request, init) {
-  const url = request instanceof URL ? request : new URL(
-    (typeof request === "string" ? new Request(request, init) : request).url
-  );
-  if (url.port && url.port !== "443" && url.protocol === "https:") {
-    if (!urls2.has(url.toString())) {
-      urls2.add(url.toString());
-      console.warn(
-        `WARNING: known issue with \`fetch()\` requests to custom HTTPS ports in published Workers:
- - ${url.toString()} - the custom port will be ignored when the Worker is published using the \`wrangler deploy\` command.
-`
-      );
-    }
-  }
-}
-__name(checkURL2, "checkURL");
-__name2(checkURL2, "checkURL");
-globalThis.fetch = new Proxy(globalThis.fetch, {
-  apply(target, thisArg, argArray) {
-    const [request, init] = argArray;
-    checkURL2(request, init);
-    return Reflect.apply(target, thisArg, argArray);
-  }
-});
-function logActivity2(db, userEmail, action, description) {
+// lib/logger.js
+async function logActivity2(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
-  const pad = /* @__PURE__ */ __name2((n) => String(n).padStart(2, "0"), "pad");
-  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const istOffset = 5.5 * 60 * 60 * 1e3;
+  const istDate = new Date(now.getTime() + istOffset);
+  const pad = /* @__PURE__ */ __name((n) => String(n).padStart(2, "0"), "pad");
+  const timestamp = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth() + 1)}-${pad(istDate.getUTCDate())} ${pad(istDate.getUTCHours())}:${pad(istDate.getUTCMinutes())}:${pad(istDate.getUTCSeconds())}`;
   const logLine = `[${timestamp}] [${userEmail || "system"}] Action: ${action} - Description: ${description}`;
   console.log(logLine);
   fetch("http://127.0.0.1:8089/log", {
@@ -68,13 +43,16 @@ function logActivity2(db, userEmail, action, description) {
   }).catch((err) => {
   });
   if (db) {
-    db.prepare("INSERT INTO activity_logs (timestamp, email, action, description) VALUES (?, ?, ?, ?)").bind(timestamp, userEmail || "system", action, description).run().catch((err) => {
+    try {
+      await db.prepare("INSERT INTO activity_logs (timestamp, email, action, description) VALUES (?, ?, ?, ?)").bind(timestamp, userEmail || "system", action, description).run();
+    } catch (err) {
       console.error("D1 activity logging failed:", err);
-    });
+    }
   }
 }
-__name(logActivity2, "logActivity2");
-__name2(logActivity2, "logActivity");
+__name(logActivity2, "logActivity");
+
+// api/arrears/approve/[month_year].js
 async function onRequestPost(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -134,7 +112,7 @@ async function onRequestPost(context) {
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
     const typeText = arrearType ? ` (${arrearType})` : "";
-    logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
+    await logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -143,7 +121,6 @@ async function onRequestPost(context) {
   }
 }
 __name(onRequestPost, "onRequestPost");
-__name2(onRequestPost, "onRequestPost");
 async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -170,7 +147,8 @@ async function onRequestGet(context) {
   }
 }
 __name(onRequestGet, "onRequestGet");
-__name2(onRequestGet, "onRequestGet");
+
+// api/festival/approve/[month_year].js
 async function onRequestPost2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -220,7 +198,7 @@ async function onRequestPost2(context) {
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
-    logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s) for ${monthYear}`);
+    await logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -228,8 +206,7 @@ async function onRequestPost2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost2, "onRequestPost2");
-__name2(onRequestPost2, "onRequestPost");
+__name(onRequestPost2, "onRequestPost");
 async function onRequestGet2(context) {
   try {
     const monthYear = context.params.month_year;
@@ -247,8 +224,9 @@ async function onRequestGet2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet2, "onRequestGet2");
-__name2(onRequestGet2, "onRequestGet");
+__name(onRequestGet2, "onRequestGet");
+
+// api/surrender/approve/[month_year].js
 async function onRequestPost3(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -300,7 +278,7 @@ async function onRequestPost3(context) {
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
-    logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
+    await logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -308,8 +286,7 @@ async function onRequestPost3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost3, "onRequestPost3");
-__name2(onRequestPost3, "onRequestPost");
+__name(onRequestPost3, "onRequestPost");
 async function onRequestGet3(context) {
   try {
     const monthYear = context.params.month_year;
@@ -329,8 +306,9 @@ async function onRequestGet3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet3, "onRequestGet3");
-__name2(onRequestGet3, "onRequestGet");
+__name(onRequestGet3, "onRequestGet");
+
+// lib/auth.js
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -356,7 +334,6 @@ async function hashPassword(password) {
   return `100000.${bufToHex(salt)}.${bufToHex(hashArray)}`;
 }
 __name(hashPassword, "hashPassword");
-__name2(hashPassword, "hashPassword");
 async function verifyPassword(password, storedHash) {
   if (!storedHash) return false;
   try {
@@ -390,12 +367,10 @@ async function verifyPassword(password, storedHash) {
   }
 }
 __name(verifyPassword, "verifyPassword");
-__name2(verifyPassword, "verifyPassword");
 function bufToHex(buf) {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 __name(bufToHex, "bufToHex");
-__name2(bufToHex, "bufToHex");
 function hexToBuf(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
@@ -404,7 +379,6 @@ function hexToBuf(hex) {
   return bytes;
 }
 __name(hexToBuf, "hexToBuf");
-__name2(hexToBuf, "hexToBuf");
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -414,7 +388,8 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 __name(timingSafeEqual, "timingSafeEqual");
-__name2(timingSafeEqual, "timingSafeEqual");
+
+// api/auth/login.js
 async function onRequestPost4(context) {
   const { request, env } = context;
   try {
@@ -457,7 +432,7 @@ async function onRequestPost4(context) {
       headers: { "Content-Type": "application/json" }
     });
     response.headers.append("Set-Cookie", `payslip_auth=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
-    logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
+    await logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
     return response;
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
@@ -466,8 +441,9 @@ async function onRequestPost4(context) {
     });
   }
 }
-__name(onRequestPost4, "onRequestPost4");
-__name2(onRequestPost4, "onRequestPost");
+__name(onRequestPost4, "onRequestPost");
+
+// api/auth/logout.js
 async function onRequestGet4(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -479,8 +455,9 @@ async function onRequestGet4(context) {
     }
   });
 }
-__name(onRequestGet4, "onRequestGet4");
-__name2(onRequestGet4, "onRequestGet");
+__name(onRequestGet4, "onRequestGet");
+
+// api/auth/reset-confirm.js
 async function onRequestPost5(context) {
   const { request, env } = context;
   try {
@@ -503,8 +480,9 @@ async function onRequestPost5(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost5, "onRequestPost5");
-__name2(onRequestPost5, "onRequestPost");
+__name(onRequestPost5, "onRequestPost");
+
+// lib/gmail.js
 async function getAccessToken(clientId, clientSecret, refreshToken) {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -522,9 +500,13 @@ async function getAccessToken(clientId, clientSecret, refreshToken) {
   return data.access_token;
 }
 __name(getAccessToken, "getAccessToken");
-__name2(getAccessToken, "getAccessToken");
-function buildMimeMessage({ from, to, subject, text, attachments = [] }) {
+function buildMimeMessage({ from, to, subject, text = "", attachments = [] }) {
   const boundary = "boundary_" + Math.random().toString(36).substring(2);
+  const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  const linkifiedText = escapedText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1">$1</a>');
+  const htmlBody = linkifiedText.replace(/\n/g, "<br>");
+  const footerHtml = `<br><br><span style="color: blue; font-style: italic;">This is an automatically generated email. Please do not reply to this mail id.</span>`;
+  const htmlContent = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333333;">${htmlBody}${footerHtml}</div>`;
   let message = [
     `From: ${from}`,
     `To: ${to}`,
@@ -533,10 +515,10 @@ function buildMimeMessage({ from, to, subject, text, attachments = [] }) {
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     "",
     `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Type: text/html; charset="UTF-8"',
     "Content-Transfer-Encoding: 7bit",
     "",
-    text,
+    htmlContent,
     ""
   ];
   for (const attachment of attachments) {
@@ -552,12 +534,12 @@ function buildMimeMessage({ from, to, subject, text, attachments = [] }) {
   return message.join("\r\n");
 }
 __name(buildMimeMessage, "buildMimeMessage");
-__name2(buildMimeMessage, "buildMimeMessage");
 function base64url(str) {
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 __name(base64url, "base64url");
-__name2(base64url, "base64url");
+
+// api/auth/reset-request.js
 async function onRequestPost6(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -600,8 +582,9 @@ This link expires in 1 hour.`
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost6, "onRequestPost6");
-__name2(onRequestPost6, "onRequestPost");
+__name(onRequestPost6, "onRequestPost");
+
+// api/me/password.js
 async function onRequestPost7(context) {
   const { request, env, data } = context;
   if (!data.user) {
@@ -632,8 +615,9 @@ async function onRequestPost7(context) {
     });
   }
 }
-__name(onRequestPost7, "onRequestPost7");
-__name2(onRequestPost7, "onRequestPost");
+__name(onRequestPost7, "onRequestPost");
+
+// api/reports/consolidated.js
 async function onRequestGet5(context) {
   try {
     const { request, env } = context;
@@ -697,22 +681,27 @@ async function onRequestGet5(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet5, "onRequestGet5");
-__name2(onRequestGet5, "onRequestGet");
+__name(onRequestGet5, "onRequestGet");
+
+// api/settings/backup.js
 async function onRequestGet6(context) {
   try {
+    const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
     ).all();
-    return new Response(JSON.stringify(results[0] || {}), {
+    const settings = results[0] || {};
+    if (!settings.backup_email && userEmail) {
+      settings.backup_email = userEmail;
+    }
+    return new Response(JSON.stringify(settings), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet6, "onRequestGet6");
-__name2(onRequestGet6, "onRequestGet");
+__name(onRequestGet6, "onRequestGet");
 async function onRequestPost8(context) {
   try {
     const data = await context.request.json();
@@ -729,8 +718,9 @@ async function onRequestPost8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost8, "onRequestPost8");
-__name2(onRequestPost8, "onRequestPost");
+__name(onRequestPost8, "onRequestPost");
+
+// api/settings/logs.js
 async function onRequestGet7(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole !== "super_admin") {
@@ -745,22 +735,27 @@ async function onRequestGet7(context) {
     const dbLogLines = results.map(
       (row) => `[${row.timestamp}] [${row.email}] Action: ${row.action} - Description: ${row.description}`
     );
-    let synced = false;
+    const url = new URL(context.request.url);
+    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    let synced = true;
     let finalLogs = "";
-    try {
-      const response = await fetch("http://127.0.0.1:8089/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logs: dbLogLines })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        finalLogs = data.logs;
-        synced = true;
+    if (isLocal) {
+      synced = false;
+      try {
+        const response = await fetch("http://127.0.0.1:8089/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logs: dbLogLines })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          finalLogs = data.logs;
+          synced = true;
+        }
+      } catch (e) {
       }
-    } catch (e) {
     }
-    if (!synced) {
+    if (!finalLogs) {
       finalLogs = dbLogLines.join("\n");
     }
     return new Response(JSON.stringify({ logs: finalLogs || "No logs recorded yet.", synced }), {
@@ -773,8 +768,9 @@ async function onRequestGet7(context) {
     });
   }
 }
-__name(onRequestGet7, "onRequestGet7");
-__name2(onRequestGet7, "onRequestGet");
+__name(onRequestGet7, "onRequestGet");
+
+// api/settings/system.js
 async function onRequestGet8(context) {
   try {
     const db = context.env.ksom_payslip_db;
@@ -790,8 +786,7 @@ async function onRequestGet8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet8, "onRequestGet8");
-__name2(onRequestGet8, "onRequestGet");
+__name(onRequestGet8, "onRequestGet");
 async function onRequestPost9(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -812,7 +807,7 @@ async function onRequestPost9(context) {
     }
     if ("require_approval" in data) {
       const mode = data.require_approval === "1" ? "Enabled (Approval Required)" : "Disabled (Direct Lock Allowed)";
-      logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
+      await logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
@@ -821,8 +816,9 @@ async function onRequestPost9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost9, "onRequestPost9");
-__name2(onRequestPost9, "onRequestPost");
+__name(onRequestPost9, "onRequestPost");
+
+// api/surrender/cumulative.js
 async function onRequestGet9(context) {
   try {
     const url = new URL(context.request.url);
@@ -846,8 +842,9 @@ async function onRequestGet9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet9, "onRequestGet9");
-__name2(onRequestGet9, "onRequestGet");
+__name(onRequestGet9, "onRequestGet");
+
+// api/users/password.js
 async function onRequestPost10(context) {
   const { request, env, data } = context;
   if (data.user.role !== "super_admin") {
@@ -884,8 +881,9 @@ async function onRequestPost10(context) {
     });
   }
 }
-__name(onRequestPost10, "onRequestPost10");
-__name2(onRequestPost10, "onRequestPost");
+__name(onRequestPost10, "onRequestPost");
+
+// api/approve/[month_year].js
 async function onRequestPost11(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -931,7 +929,7 @@ async function onRequestPost11(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
+    await logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -944,8 +942,7 @@ async function onRequestPost11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost11, "onRequestPost11");
-__name2(onRequestPost11, "onRequestPost");
+__name(onRequestPost11, "onRequestPost");
 async function onRequestGet10(context) {
   try {
     const monthYear = context.params.month_year;
@@ -964,8 +961,9 @@ async function onRequestGet10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet10, "onRequestGet10");
-__name2(onRequestGet10, "onRequestGet");
+__name(onRequestGet10, "onRequestGet");
+
+// api/arrears/[month_year].js
 async function onRequestGet11(context) {
   try {
     const monthYear = context.params.month_year;
@@ -1006,8 +1004,7 @@ async function onRequestGet11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet11, "onRequestGet11");
-__name2(onRequestGet11, "onRequestGet");
+__name(onRequestGet11, "onRequestGet");
 async function onRequestPost12(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1067,9 +1064,9 @@ async function onRequestPost12(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.arrear_amount && record.arrear_amount > 0) {
-          logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
+          await logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
         } else if (record.bill_date && record.arrear_type) {
-          logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1081,8 +1078,9 @@ async function onRequestPost12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost12, "onRequestPost12");
-__name2(onRequestPost12, "onRequestPost");
+__name(onRequestPost12, "onRequestPost");
+
+// api/deductions/[month_year].js
 async function onRequestGet12(context) {
   try {
     const monthYear = context.params.month_year;
@@ -1109,8 +1107,7 @@ async function onRequestGet12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet12, "onRequestGet12");
-__name2(onRequestGet12, "onRequestGet");
+__name(onRequestGet12, "onRequestGet");
 async function onRequestPost13(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -1170,8 +1167,9 @@ async function onRequestPost13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost13, "onRequestPost13");
-__name2(onRequestPost13, "onRequestPost");
+__name(onRequestPost13, "onRequestPost");
+
+// api/earnings/[month_year].js
 async function onRequestGet13(context) {
   try {
     const monthYear = context.params.month_year;
@@ -1180,7 +1178,7 @@ async function onRequestGet13(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
              m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
-             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown,
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery, d.other_deductions_breakdown
       FROM employees e
@@ -1203,8 +1201,7 @@ async function onRequestGet13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet13, "onRequestGet13");
-__name2(onRequestGet13, "onRequestGet");
+__name(onRequestGet13, "onRequestGet");
 async function onRequestPost14(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1296,7 +1293,7 @@ async function onRequestPost14(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
+      await logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1306,8 +1303,7 @@ async function onRequestPost14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost14, "onRequestPost14");
-__name2(onRequestPost14, "onRequestPost");
+__name(onRequestPost14, "onRequestPost");
 async function onRequestDelete(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1329,7 +1325,7 @@ async function onRequestDelete(context) {
     const deleteEarnings = db.prepare("DELETE FROM monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -1339,7 +1335,8 @@ async function onRequestDelete(context) {
   }
 }
 __name(onRequestDelete, "onRequestDelete");
-__name2(onRequestDelete, "onRequestDelete");
+
+// api/festival/[month_year].js
 async function onRequestGet14(context) {
   try {
     const monthYear = context.params.month_year;
@@ -1368,8 +1365,7 @@ async function onRequestGet14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet14, "onRequestGet14");
-__name2(onRequestGet14, "onRequestGet");
+__name(onRequestGet14, "onRequestGet");
 async function onRequestPost15(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1419,9 +1415,9 @@ async function onRequestPost15(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.amount && record.amount > 0) {
-          logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
+          await logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
         } else if (record.bill_date) {
-          logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1433,8 +1429,9 @@ async function onRequestPost15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost15, "onRequestPost15");
-__name2(onRequestPost15, "onRequestPost");
+__name(onRequestPost15, "onRequestPost");
+
+// api/surrender/[month_year].js
 async function onRequestGet15(context) {
   try {
     const monthYear = context.params.month_year;
@@ -1465,8 +1462,7 @@ async function onRequestGet15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet15, "onRequestGet15");
-__name2(onRequestGet15, "onRequestGet");
+__name(onRequestGet15, "onRequestGet");
 async function onRequestPost16(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1529,9 +1525,9 @@ async function onRequestPost16(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.num_els && record.num_els > 0) {
-          logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
+          await logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
         } else if (record.bill_date) {
-          logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1543,47 +1539,133 @@ async function onRequestPost16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost16, "onRequestPost16");
-__name2(onRequestPost16, "onRequestPost");
-async function onRequestGet16(context) {
-  try {
-    const db = context.env.ksom_payslip_db;
-    const tables = ["employees", "allowances_settings", "monthly_earnings", "monthly_deductions"];
-    let sqlDump = `-- KSoM Payslip Portal Backup
+__name(onRequestPost16, "onRequestPost");
+
+// lib/backup_helper.js
+async function generateBackupSql(db) {
+  const { results: tables } = await db.prepare(
+    "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+  ).all();
+  let sqlDump = `-- KSoM Payslip Portal Backup
 -- Generated: ${(/* @__PURE__ */ new Date()).toISOString()}
 
 PRAGMA defer_foreign_keys=TRUE;
 
 `;
-    for (const table of tables) {
-      sqlDump += `DROP TABLE IF EXISTS ${table};
+  for (const table of tables) {
+    sqlDump += `DROP TABLE IF EXISTS ${table.name};
 `;
-      if (table === "employees") {
-        sqlDump += `CREATE TABLE employees (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL, designation TEXT, date_of_birth TEXT, date_of_joining TEXT, scale_of_pay TEXT, category TEXT, title TEXT, sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, email_id TEXT, mob_no TEXT, epf_uan TEXT);
+    sqlDump += `${table.sql};
 `;
-      } else if (table === "allowances_settings") {
-        sqlDump += `CREATE TABLE allowances_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, effective_from TEXT NOT NULL UNIQUE, da_state_percentage REAL DEFAULT 0, da_ugc_percentage REAL DEFAULT 0, hra_state_percentage REAL DEFAULT 0, hra_ugc_percentage REAL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+    const { results } = await db.prepare(`SELECT * FROM ${table.name}`).all();
+    for (const row of results) {
+      const columns = Object.keys(row);
+      const values = Object.values(row).map((val) => {
+        if (val === null) return "NULL";
+        if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+        return val;
+      });
+      sqlDump += `INSERT INTO ${table.name} (${columns.join(", ")}) VALUES (${values.join(", ")});
 `;
-      } else if (table === "monthly_earnings") {
-        sqlDump += `CREATE TABLE monthly_earnings (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, basic_pay REAL DEFAULT 0, dp_gp REAL DEFAULT 0, da_state REAL DEFAULT 0, da_ugc REAL DEFAULT 0, hra_state REAL DEFAULT 0, hra_ugc REAL DEFAULT 0, cca REAL DEFAULT 0, other_earnings REAL DEFAULT 0, spl_pay REAL DEFAULT 0, tr_allow REAL DEFAULT 0, spl_allow REAL DEFAULT 0, fest_allow REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      } else if (table === "monthly_deductions") {
-        sqlDump += `CREATE TABLE monthly_deductions (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, epf REAL DEFAULT 0, professional_tax REAL DEFAULT 0, sli REAL DEFAULT 0, gis REAL DEFAULT 0, lic REAL DEFAULT 0, income_tax REAL DEFAULT 0, onam_advance REAL DEFAULT 0, other_deductions REAL DEFAULT 0, cpf REAL DEFAULT 0, hra_recovery REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      }
-      const { results } = await db.prepare(`SELECT * FROM ${table}`).all();
-      for (const row of results) {
-        const columns = Object.keys(row);
-        const values = Object.values(row).map((val) => {
-          if (val === null) return "NULL";
-          if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-          return val;
-        });
-        sqlDump += `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${values.join(", ")});
-`;
-      }
-      sqlDump += "\n";
     }
+    sqlDump += "\n";
+  }
+  return sqlDump;
+}
+__name(generateBackupSql, "generateBackupSql");
+async function sendBackupEmail(env, toEmail, sql) {
+  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = env;
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    throw new Error("Gmail OAuth2 credentials are not configured.");
+  }
+  const accessToken = await getAccessToken(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN);
+  const rawMessage = buildMimeMessage({
+    from: "KSoM Office <office@ksom.res.in>",
+    to: toEmail,
+    subject: `KSoM Payslip Backup - ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`,
+    text: `Please find attached the SQL backup for the KSoM Payslip Portal generated on ${(/* @__PURE__ */ new Date()).toLocaleString()}.`,
+    attachments: [
+      {
+        filename: `backup_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.sql`,
+        content: btoa(sql)
+      }
+    ]
+  });
+  const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      raw: base64url(rawMessage)
+    })
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error?.message || "Failed to send email via Gmail");
+  }
+  return result.id;
+}
+__name(sendBackupEmail, "sendBackupEmail");
+async function checkAndRunScheduledBackup(env, waitUntil) {
+  try {
+    const settings = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM backup_settings WHERE id = 1"
+    ).first();
+    if (!settings || settings.is_enabled !== 1 || !settings.backup_email) {
+      return;
+    }
+    const now = /* @__PURE__ */ new Date();
+    let isDue = false;
+    if (!settings.last_backup_at) {
+      isDue = true;
+    } else {
+      const lastBackupDate = new Date(settings.last_backup_at);
+      const diffMs = now.getTime() - lastBackupDate.getTime();
+      const diffDays = diffMs / (1e3 * 60 * 60 * 24);
+      if (settings.frequency === "daily" && diffDays >= 1) {
+        isDue = true;
+      } else if (settings.frequency === "weekly" && diffDays >= 7) {
+        isDue = true;
+      } else if (settings.frequency === "monthly" && diffDays >= 30) {
+        isDue = true;
+      }
+    }
+    if (isDue) {
+      const nowStr = now.toISOString();
+      await env.ksom_payslip_db.prepare(
+        "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+      ).bind(nowStr).run();
+      const task = /* @__PURE__ */ __name(async () => {
+        try {
+          const sql = await generateBackupSql(env.ksom_payslip_db);
+          await sendBackupEmail(env, settings.backup_email, sql);
+          console.log(`Scheduled backup email sent successfully to ${settings.backup_email}`);
+        } catch (err) {
+          console.error("Scheduled backup failed in background:", err);
+          await env.ksom_payslip_db.prepare(
+            "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+          ).bind(settings.last_backup_at).run();
+        }
+      }, "task");
+      if (waitUntil) {
+        waitUntil(task());
+      } else {
+        await task();
+      }
+    }
+  } catch (err) {
+    console.error("Failed checking/running scheduled backup:", err);
+  }
+}
+__name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
+
+// api/backup.js
+async function onRequestGet16(context) {
+  try {
+    const db = context.env.ksom_payslip_db;
+    const sqlDump = await generateBackupSql(db);
     return new Response(sqlDump, {
       headers: {
         "Content-Type": "application/sql",
@@ -1594,8 +1676,7 @@ PRAGMA defer_foreign_keys=TRUE;
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet16, "onRequestGet16");
-__name2(onRequestGet16, "onRequestGet");
+__name(onRequestGet16, "onRequestGet");
 async function onRequestPost17(context) {
   try {
     const db = context.env.ksom_payslip_db;
@@ -1613,8 +1694,9 @@ async function onRequestPost17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost17, "onRequestPost17");
-__name2(onRequestPost17, "onRequestPost");
+__name(onRequestPost17, "onRequestPost");
+
+// api/email/index.js
 async function onRequestPost18(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -1660,8 +1742,9 @@ async function onRequestPost18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost18, "onRequestPost18");
-__name2(onRequestPost18, "onRequestPost");
+__name(onRequestPost18, "onRequestPost");
+
+// api/employees/index.js
 async function onRequestGet17(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
@@ -1682,8 +1765,7 @@ async function onRequestGet17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet17, "onRequestGet17");
-__name2(onRequestGet17, "onRequestGet");
+__name(onRequestGet17, "onRequestGet");
 async function onRequestPost19(context) {
   try {
     const data = await context.request.json();
@@ -1702,8 +1784,7 @@ async function onRequestPost19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost19, "onRequestPost19");
-__name2(onRequestPost19, "onRequestPost");
+__name(onRequestPost19, "onRequestPost");
 async function onRequestPut(context) {
   try {
     const data = await context.request.json();
@@ -1725,7 +1806,8 @@ async function onRequestPut(context) {
   }
 }
 __name(onRequestPut, "onRequestPut");
-__name2(onRequestPut, "onRequestPut");
+
+// api/settings/index.js
 async function onRequestGet18(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
@@ -1738,8 +1820,7 @@ async function onRequestGet18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet18, "onRequestGet18");
-__name2(onRequestGet18, "onRequestGet");
+__name(onRequestGet18, "onRequestGet");
 async function onRequestPost20(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1758,7 +1839,7 @@ async function onRequestPost20(context) {
         hra_state_percentage=excluded.hra_state_percentage,
         hra_ugc_percentage=excluded.hra_ugc_percentage`
     ).bind(effective_from, da_state_percentage || 0, da_ugc_percentage || 0, hra_state_percentage || 0, hra_ugc_percentage || 0).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -1767,8 +1848,9 @@ async function onRequestPost20(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost20, "onRequestPost20");
-__name2(onRequestPost20, "onRequestPost");
+__name(onRequestPost20, "onRequestPost");
+
+// api/users/index.js
 async function onRequestGet19(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
@@ -1781,8 +1863,7 @@ async function onRequestGet19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet19, "onRequestGet19");
-__name2(onRequestGet19, "onRequestGet");
+__name(onRequestGet19, "onRequestGet");
 async function onRequestPost21(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -1799,7 +1880,7 @@ async function onRequestPost21(context) {
          name=excluded.name, 
          designation=excluded.designation`
     ).bind(email.toLowerCase(), role, status || "active", name || null, designation || null).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1807,8 +1888,7 @@ async function onRequestPost21(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost21, "onRequestPost21");
-__name2(onRequestPost21, "onRequestPost");
+__name(onRequestPost21, "onRequestPost");
 async function onRequestDelete2(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -1817,7 +1897,7 @@ async function onRequestDelete2(context) {
     if (!id) return new Response(JSON.stringify({ error: "ID required." }), { status: 400 });
     const userToDel = await context.env.ksom_payslip_db.prepare("SELECT email FROM users WHERE id = ?").bind(id).first();
     await context.env.ksom_payslip_db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1825,8 +1905,9 @@ async function onRequestDelete2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete2, "onRequestDelete2");
-__name2(onRequestDelete2, "onRequestDelete");
+__name(onRequestDelete2, "onRequestDelete");
+
+// _middleware.js
 async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
@@ -1857,6 +1938,7 @@ async function onRequest(context) {
     }
     return next();
   }
+  context.waitUntil(checkAndRunScheduledBackup(env, context.waitUntil));
   if (url.pathname === "/api/logout" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
     return new Response(null, {
       status: 302,
@@ -1915,7 +1997,6 @@ async function onRequest(context) {
   return next(modifiedRequest);
 }
 __name(onRequest, "onRequest");
-__name2(onRequest, "onRequest");
 function forbiddenResponse() {
   return new Response(JSON.stringify({ error: "Forbidden" }), {
     status: 403,
@@ -1923,7 +2004,8 @@ function forbiddenResponse() {
   });
 }
 __name(forbiddenResponse, "forbiddenResponse");
-__name2(forbiddenResponse, "forbiddenResponse");
+
+// ../.wrangler/tmp/pages-wyFSJD/functionsRoutes-0.9343535880791956.mjs
 var routes = [
   {
     routePath: "/api/arrears/approve/:month_year",
@@ -2234,6 +2316,8 @@ var routes = [
     modules: []
   }
 ];
+
+// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/path-to-regexp/dist.es2015/index.js
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -2318,7 +2402,6 @@ function lexer(str) {
   return tokens;
 }
 __name(lexer, "lexer");
-__name2(lexer, "lexer");
 function parse(str, options) {
   if (options === void 0) {
     options = {};
@@ -2329,18 +2412,18 @@ function parse(str, options) {
   var key = 0;
   var i = 0;
   var path = "";
-  var tryConsume = /* @__PURE__ */ __name2(function(type) {
+  var tryConsume = /* @__PURE__ */ __name(function(type) {
     if (i < tokens.length && tokens[i].type === type)
       return tokens[i++].value;
   }, "tryConsume");
-  var mustConsume = /* @__PURE__ */ __name2(function(type) {
+  var mustConsume = /* @__PURE__ */ __name(function(type) {
     var value2 = tryConsume(type);
     if (value2 !== void 0)
       return value2;
     var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
     throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
   }, "mustConsume");
-  var consumeText = /* @__PURE__ */ __name2(function() {
+  var consumeText = /* @__PURE__ */ __name(function() {
     var result2 = "";
     var value2;
     while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
@@ -2348,7 +2431,7 @@ function parse(str, options) {
     }
     return result2;
   }, "consumeText");
-  var isSafe = /* @__PURE__ */ __name2(function(value2) {
+  var isSafe = /* @__PURE__ */ __name(function(value2) {
     for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
       var char2 = delimiter_1[_i];
       if (value2.indexOf(char2) > -1)
@@ -2356,7 +2439,7 @@ function parse(str, options) {
     }
     return false;
   }, "isSafe");
-  var safePattern = /* @__PURE__ */ __name2(function(prefix2) {
+  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
     var prev = result[result.length - 1];
     var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
     if (prev && !prevText) {
@@ -2419,14 +2502,12 @@ function parse(str, options) {
   return result;
 }
 __name(parse, "parse");
-__name2(parse, "parse");
 function match(str, options) {
   var keys = [];
   var re = pathToRegexp(str, keys, options);
   return regexpToFunction(re, keys, options);
 }
 __name(match, "match");
-__name2(match, "match");
 function regexpToFunction(re, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2440,7 +2521,7 @@ function regexpToFunction(re, keys, options) {
       return false;
     var path = m[0], index = m.index;
     var params = /* @__PURE__ */ Object.create(null);
-    var _loop_1 = /* @__PURE__ */ __name2(function(i2) {
+    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
       if (m[i2] === void 0)
         return "continue";
       var key = keys[i2 - 1];
@@ -2459,17 +2540,14 @@ function regexpToFunction(re, keys, options) {
   };
 }
 __name(regexpToFunction, "regexpToFunction");
-__name2(regexpToFunction, "regexpToFunction");
 function escapeString(str) {
   return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
 }
 __name(escapeString, "escapeString");
-__name2(escapeString, "escapeString");
 function flags(options) {
   return options && options.sensitive ? "" : "i";
 }
 __name(flags, "flags");
-__name2(flags, "flags");
 function regexpToRegexp(path, keys) {
   if (!keys)
     return path;
@@ -2490,7 +2568,6 @@ function regexpToRegexp(path, keys) {
   return path;
 }
 __name(regexpToRegexp, "regexpToRegexp");
-__name2(regexpToRegexp, "regexpToRegexp");
 function arrayToRegexp(paths, keys, options) {
   var parts = paths.map(function(path) {
     return pathToRegexp(path, keys, options).source;
@@ -2498,12 +2575,10 @@ function arrayToRegexp(paths, keys, options) {
   return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
 }
 __name(arrayToRegexp, "arrayToRegexp");
-__name2(arrayToRegexp, "arrayToRegexp");
 function stringToRegexp(path, keys, options) {
   return tokensToRegexp(parse(path, options), keys, options);
 }
 __name(stringToRegexp, "stringToRegexp");
-__name2(stringToRegexp, "stringToRegexp");
 function tokensToRegexp(tokens, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2559,7 +2634,6 @@ function tokensToRegexp(tokens, keys, options) {
   return new RegExp(route, flags(options));
 }
 __name(tokensToRegexp, "tokensToRegexp");
-__name2(tokensToRegexp, "tokensToRegexp");
 function pathToRegexp(path, keys, options) {
   if (path instanceof RegExp)
     return regexpToRegexp(path, keys);
@@ -2568,7 +2642,8 @@ function pathToRegexp(path, keys, options) {
   return stringToRegexp(path, keys, options);
 }
 __name(pathToRegexp, "pathToRegexp");
-__name2(pathToRegexp, "pathToRegexp");
+
+// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/pages-template-worker.ts
 var escapeRegex = /[.+?^${}()|[\]\\]/g;
 function* executeRequest(request) {
   const requestPath = new URL(request.url).pathname;
@@ -2619,14 +2694,13 @@ function* executeRequest(request) {
   }
 }
 __name(executeRequest, "executeRequest");
-__name2(executeRequest, "executeRequest");
 var pages_template_worker_default = {
   async fetch(originalRequest, env, workerContext) {
     let request = originalRequest;
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name2(async (input, init) => {
+    const next = /* @__PURE__ */ __name(async (input, init) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
@@ -2653,7 +2727,7 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: /* @__PURE__ */ __name2(() => {
+          passThroughOnException: /* @__PURE__ */ __name(() => {
             isFailOpen = true;
           }, "passThroughOnException")
         };
@@ -2681,14 +2755,16 @@ var pages_template_worker_default = {
     }
   }
 };
-var cloneResponse = /* @__PURE__ */ __name2((response) => (
+var cloneResponse = /* @__PURE__ */ __name((response) => (
   // https://fetch.spec.whatwg.org/#null-body-status
   new Response(
     [101, 204, 205, 304].includes(response.status) ? null : response.body,
     response
   )
 ), "cloneResponse");
-var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+
+// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } finally {
@@ -2704,6 +2780,8 @@ var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "drainBody");
 var middleware_ensure_req_body_drained_default = drainBody;
+
+// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
 function reduceError(e) {
   return {
     name: e?.name,
@@ -2713,8 +2791,7 @@ function reduceError(e) {
   };
 }
 __name(reduceError, "reduceError");
-__name2(reduceError, "reduceError");
-var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } catch (e) {
@@ -2726,17 +2803,20 @@ var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
+
+// ../.wrangler/tmp/bundle-aJDxO2/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
 ];
 var middleware_insertion_facade_default = pages_template_worker_default;
+
+// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
 var __facade_middleware__ = [];
 function __facade_register__(...args) {
   __facade_middleware__.push(...args.flat());
 }
 __name(__facade_register__, "__facade_register__");
-__name2(__facade_register__, "__facade_register__");
 function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   const [head, ...tail] = middlewareChain;
   const middlewareCtx = {
@@ -2748,7 +2828,6 @@ function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   return head(request, env, ctx, middlewareCtx);
 }
 __name(__facade_invokeChain__, "__facade_invokeChain__");
-__name2(__facade_invokeChain__, "__facade_invokeChain__");
 function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   return __facade_invokeChain__(request, env, ctx, dispatch, [
     ...__facade_middleware__,
@@ -2756,18 +2835,16 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   ]);
 }
 __name(__facade_invoke__, "__facade_invoke__");
-__name2(__facade_invoke__, "__facade_invoke__");
+
+// ../.wrangler/tmp/bundle-aJDxO2/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
-  static {
-    __name(this, "___Facade_ScheduledController__");
-  }
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
     this.cron = cron;
     this.#noRetry = noRetry;
   }
   static {
-    __name2(this, "__Facade_ScheduledController__");
+    __name(this, "__Facade_ScheduledController__");
   }
   #noRetry;
   noRetry() {
@@ -2784,7 +2861,7 @@ function wrapExportedHandler(worker) {
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name2(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -2793,7 +2870,7 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name2(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
@@ -2809,7 +2886,6 @@ function wrapExportedHandler(worker) {
   };
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
-__name2(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
   if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
     return klass;
@@ -2818,7 +2894,7 @@ function wrapWorkerEntrypoint(klass) {
     __facade_register__(middleware);
   }
   return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name2((request, env, ctx) => {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
       this.env = env;
       this.ctx = ctx;
       if (super.fetch === void 0) {
@@ -2826,7 +2902,7 @@ function wrapWorkerEntrypoint(klass) {
       }
       return super.fetch(request);
     }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name2((type, init) => {
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
       if (type === "scheduled" && super.scheduled !== void 0) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
@@ -2849,7 +2925,6 @@ function wrapWorkerEntrypoint(klass) {
   };
 }
 __name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
-__name2(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
 var WRAPPED_ENTRY;
 if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
@@ -2857,178 +2932,8 @@ if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
 }
 var middleware_loader_entry_default = WRAPPED_ENTRY;
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } finally {
-    try {
-      if (request.body !== null && !request.bodyUsed) {
-        const reader = request.body.getReader();
-        while (!(await reader.read()).done) {
-        }
-      }
-    } catch (e) {
-      console.error("Failed to drain the unused request body.", e);
-    }
-  }
-}, "drainBody");
-var middleware_ensure_req_body_drained_default2 = drainBody2;
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
-function reduceError2(e) {
-  return {
-    name: e?.name,
-    message: e?.message ?? String(e),
-    stack: e?.stack,
-    cause: e?.cause === void 0 ? void 0 : reduceError2(e.cause)
-  };
-}
-__name(reduceError2, "reduceError");
-var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } catch (e) {
-    const error = reduceError2(e);
-    return Response.json(error, {
-      status: 500,
-      headers: { "MF-Experimental-Error-Stack": "true" }
-    });
-  }
-}, "jsonError");
-var middleware_miniflare3_json_error_default2 = jsonError2;
-
-// .wrangler/tmp/bundle-7vyT9R/middleware-insertion-facade.js
-var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
-  middleware_ensure_req_body_drained_default2,
-  middleware_miniflare3_json_error_default2
-];
-var middleware_insertion_facade_default2 = middleware_loader_entry_default;
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
-var __facade_middleware__2 = [];
-function __facade_register__2(...args) {
-  __facade_middleware__2.push(...args.flat());
-}
-__name(__facade_register__2, "__facade_register__");
-function __facade_invokeChain__2(request, env, ctx, dispatch, middlewareChain) {
-  const [head, ...tail] = middlewareChain;
-  const middlewareCtx = {
-    dispatch,
-    next(newRequest, newEnv) {
-      return __facade_invokeChain__2(newRequest, newEnv, ctx, dispatch, tail);
-    }
-  };
-  return head(request, env, ctx, middlewareCtx);
-}
-__name(__facade_invokeChain__2, "__facade_invokeChain__");
-function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
-  return __facade_invokeChain__2(request, env, ctx, dispatch, [
-    ...__facade_middleware__2,
-    finalMiddleware
-  ]);
-}
-__name(__facade_invoke__2, "__facade_invoke__");
-
-// .wrangler/tmp/bundle-7vyT9R/middleware-loader.entry.ts
-var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
-  constructor(scheduledTime, cron, noRetry) {
-    this.scheduledTime = scheduledTime;
-    this.cron = cron;
-    this.#noRetry = noRetry;
-  }
-  static {
-    __name(this, "__Facade_ScheduledController__");
-  }
-  #noRetry;
-  noRetry() {
-    if (!(this instanceof ___Facade_ScheduledController__2)) {
-      throw new TypeError("Illegal invocation");
-    }
-    this.#noRetry();
-  }
-};
-function wrapExportedHandler2(worker) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return worker;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
-    if (worker.fetch === void 0) {
-      throw new Error("Handler does not export a fetch() function.");
-    }
-    return worker.fetch(request, env, ctx);
-  }, "fetchDispatcher");
-  return {
-    ...worker,
-    fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
-        if (type === "scheduled" && worker.scheduled !== void 0) {
-          const controller = new __Facade_ScheduledController__2(
-            Date.now(),
-            init.cron ?? "",
-            () => {
-            }
-          );
-          return worker.scheduled(controller, env, ctx);
-        }
-      }, "dispatcher");
-      return __facade_invoke__2(request, env, ctx, dispatcher, fetchDispatcher);
-    }
-  };
-}
-__name(wrapExportedHandler2, "wrapExportedHandler");
-function wrapWorkerEntrypoint2(klass) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return klass;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
-      this.env = env;
-      this.ctx = ctx;
-      if (super.fetch === void 0) {
-        throw new Error("Entrypoint class does not define a fetch() function.");
-      }
-      return super.fetch(request);
-    }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name((type, init) => {
-      if (type === "scheduled" && super.scheduled !== void 0) {
-        const controller = new __Facade_ScheduledController__2(
-          Date.now(),
-          init.cron ?? "",
-          () => {
-          }
-        );
-        return super.scheduled(controller);
-      }
-    }, "#dispatcher");
-    fetch(request) {
-      return __facade_invoke__2(
-        request,
-        this.env,
-        this.ctx,
-        this.#dispatcher,
-        this.#fetchDispatcher
-      );
-    }
-  };
-}
-__name(wrapWorkerEntrypoint2, "wrapWorkerEntrypoint");
-var WRAPPED_ENTRY2;
-if (typeof middleware_insertion_facade_default2 === "object") {
-  WRAPPED_ENTRY2 = wrapExportedHandler2(middleware_insertion_facade_default2);
-} else if (typeof middleware_insertion_facade_default2 === "function") {
-  WRAPPED_ENTRY2 = wrapWorkerEntrypoint2(middleware_insertion_facade_default2);
-}
-var middleware_loader_entry_default2 = WRAPPED_ENTRY2;
 export {
-  __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
-  middleware_loader_entry_default2 as default
+  __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.41280852155542447.js.map
+//# sourceMappingURL=functionsWorker-0.8994577887685221.mjs.map

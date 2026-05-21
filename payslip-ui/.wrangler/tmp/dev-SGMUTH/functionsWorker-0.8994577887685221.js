@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-vxT1R2/checked-fetch.js
+// .wrangler/tmp/bundle-ww8As4/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-zTm0zB/functionsWorker-0.22369751983767472.mjs
+// .wrangler/tmp/pages-wyFSJD/functionsWorker-0.8994577887685221.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -55,10 +55,12 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
     return Reflect.apply(target, thisArg, argArray);
   }
 });
-function logActivity2(db, userEmail, action, description) {
+async function logActivity2(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
+  const istOffset = 5.5 * 60 * 60 * 1e3;
+  const istDate = new Date(now.getTime() + istOffset);
   const pad = /* @__PURE__ */ __name2((n) => String(n).padStart(2, "0"), "pad");
-  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const timestamp = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth() + 1)}-${pad(istDate.getUTCDate())} ${pad(istDate.getUTCHours())}:${pad(istDate.getUTCMinutes())}:${pad(istDate.getUTCSeconds())}`;
   const logLine = `[${timestamp}] [${userEmail || "system"}] Action: ${action} - Description: ${description}`;
   console.log(logLine);
   fetch("http://127.0.0.1:8089/log", {
@@ -68,9 +70,11 @@ function logActivity2(db, userEmail, action, description) {
   }).catch((err) => {
   });
   if (db) {
-    db.prepare("INSERT INTO activity_logs (timestamp, email, action, description) VALUES (?, ?, ?, ?)").bind(timestamp, userEmail || "system", action, description).run().catch((err) => {
+    try {
+      await db.prepare("INSERT INTO activity_logs (timestamp, email, action, description) VALUES (?, ?, ?, ?)").bind(timestamp, userEmail || "system", action, description).run();
+    } catch (err) {
       console.error("D1 activity logging failed:", err);
-    });
+    }
   }
 }
 __name(logActivity2, "logActivity2");
@@ -134,7 +138,7 @@ async function onRequestPost(context) {
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
     const typeText = arrearType ? ` (${arrearType})` : "";
-    logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
+    await logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -220,7 +224,7 @@ async function onRequestPost2(context) {
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
-    logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s) for ${monthYear}`);
+    await logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -300,7 +304,7 @@ async function onRequestPost3(context) {
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
-    logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
+    await logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -457,7 +461,7 @@ async function onRequestPost4(context) {
       headers: { "Content-Type": "application/json" }
     });
     response.headers.append("Set-Cookie", `payslip_auth=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
-    logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
+    await logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
     return response;
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
@@ -523,8 +527,13 @@ async function getAccessToken(clientId, clientSecret, refreshToken) {
 }
 __name(getAccessToken, "getAccessToken");
 __name2(getAccessToken, "getAccessToken");
-function buildMimeMessage({ from, to, subject, text, attachments = [] }) {
+function buildMimeMessage({ from, to, subject, text = "", attachments = [] }) {
   const boundary = "boundary_" + Math.random().toString(36).substring(2);
+  const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  const linkifiedText = escapedText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1">$1</a>');
+  const htmlBody = linkifiedText.replace(/\n/g, "<br>");
+  const footerHtml = `<br><br><span style="color: blue; font-style: italic;">This is an automatically generated email. Please do not reply to this mail id.</span>`;
+  const htmlContent = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333333;">${htmlBody}${footerHtml}</div>`;
   let message = [
     `From: ${from}`,
     `To: ${to}`,
@@ -533,10 +542,10 @@ function buildMimeMessage({ from, to, subject, text, attachments = [] }) {
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     "",
     `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Type: text/html; charset="UTF-8"',
     "Content-Transfer-Encoding: 7bit",
     "",
-    text,
+    htmlContent,
     ""
   ];
   for (const attachment of attachments) {
@@ -701,10 +710,15 @@ __name(onRequestGet5, "onRequestGet5");
 __name2(onRequestGet5, "onRequestGet");
 async function onRequestGet6(context) {
   try {
+    const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
     ).all();
-    return new Response(JSON.stringify(results[0] || {}), {
+    const settings = results[0] || {};
+    if (!settings.backup_email && userEmail) {
+      settings.backup_email = userEmail;
+    }
+    return new Response(JSON.stringify(settings), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
@@ -745,22 +759,27 @@ async function onRequestGet7(context) {
     const dbLogLines = results.map(
       (row) => `[${row.timestamp}] [${row.email}] Action: ${row.action} - Description: ${row.description}`
     );
-    let synced = false;
+    const url = new URL(context.request.url);
+    const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    let synced = true;
     let finalLogs = "";
-    try {
-      const response = await fetch("http://127.0.0.1:8089/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logs: dbLogLines })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        finalLogs = data.logs;
-        synced = true;
+    if (isLocal) {
+      synced = false;
+      try {
+        const response = await fetch("http://127.0.0.1:8089/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logs: dbLogLines })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          finalLogs = data.logs;
+          synced = true;
+        }
+      } catch (e) {
       }
-    } catch (e) {
     }
-    if (!synced) {
+    if (!finalLogs) {
       finalLogs = dbLogLines.join("\n");
     }
     return new Response(JSON.stringify({ logs: finalLogs || "No logs recorded yet.", synced }), {
@@ -812,7 +831,7 @@ async function onRequestPost9(context) {
     }
     if ("require_approval" in data) {
       const mode = data.require_approval === "1" ? "Enabled (Approval Required)" : "Disabled (Direct Lock Allowed)";
-      logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
+      await logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
@@ -931,7 +950,7 @@ async function onRequestPost11(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
+    await logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -1067,9 +1086,9 @@ async function onRequestPost12(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.arrear_amount && record.arrear_amount > 0) {
-          logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
+          await logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
         } else if (record.bill_date && record.arrear_type) {
-          logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1180,7 +1199,7 @@ async function onRequestGet13(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
              m.id as earnings_id, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
-             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown,
+             m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery, d.other_deductions_breakdown
       FROM employees e
@@ -1296,7 +1315,7 @@ async function onRequestPost14(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
+      await logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1329,7 +1348,7 @@ async function onRequestDelete(context) {
     const deleteEarnings = db.prepare("DELETE FROM monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -1419,9 +1438,9 @@ async function onRequestPost15(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.amount && record.amount > 0) {
-          logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
+          await logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
         } else if (record.bill_date) {
-          logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1529,9 +1548,9 @@ async function onRequestPost16(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.num_els && record.num_els > 0) {
-          logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
+          await logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
         } else if (record.bill_date) {
-          logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
         }
       }
     }
@@ -1545,45 +1564,131 @@ async function onRequestPost16(context) {
 }
 __name(onRequestPost16, "onRequestPost16");
 __name2(onRequestPost16, "onRequestPost");
-async function onRequestGet16(context) {
-  try {
-    const db = context.env.ksom_payslip_db;
-    const tables = ["employees", "allowances_settings", "monthly_earnings", "monthly_deductions"];
-    let sqlDump = `-- KSoM Payslip Portal Backup
+async function generateBackupSql(db) {
+  const { results: tables } = await db.prepare(
+    "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+  ).all();
+  let sqlDump = `-- KSoM Payslip Portal Backup
 -- Generated: ${(/* @__PURE__ */ new Date()).toISOString()}
 
 PRAGMA defer_foreign_keys=TRUE;
 
 `;
-    for (const table of tables) {
-      sqlDump += `DROP TABLE IF EXISTS ${table};
+  for (const table of tables) {
+    sqlDump += `DROP TABLE IF EXISTS ${table.name};
 `;
-      if (table === "employees") {
-        sqlDump += `CREATE TABLE employees (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL, designation TEXT, date_of_birth TEXT, date_of_joining TEXT, scale_of_pay TEXT, category TEXT, title TEXT, sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, email_id TEXT, mob_no TEXT, epf_uan TEXT);
+    sqlDump += `${table.sql};
 `;
-      } else if (table === "allowances_settings") {
-        sqlDump += `CREATE TABLE allowances_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, effective_from TEXT NOT NULL UNIQUE, da_state_percentage REAL DEFAULT 0, da_ugc_percentage REAL DEFAULT 0, hra_state_percentage REAL DEFAULT 0, hra_ugc_percentage REAL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+    const { results } = await db.prepare(`SELECT * FROM ${table.name}`).all();
+    for (const row of results) {
+      const columns = Object.keys(row);
+      const values = Object.values(row).map((val) => {
+        if (val === null) return "NULL";
+        if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+        return val;
+      });
+      sqlDump += `INSERT INTO ${table.name} (${columns.join(", ")}) VALUES (${values.join(", ")});
 `;
-      } else if (table === "monthly_earnings") {
-        sqlDump += `CREATE TABLE monthly_earnings (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, basic_pay REAL DEFAULT 0, dp_gp REAL DEFAULT 0, da_state REAL DEFAULT 0, da_ugc REAL DEFAULT 0, hra_state REAL DEFAULT 0, hra_ugc REAL DEFAULT 0, cca REAL DEFAULT 0, other_earnings REAL DEFAULT 0, spl_pay REAL DEFAULT 0, tr_allow REAL DEFAULT 0, spl_allow REAL DEFAULT 0, fest_allow REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      } else if (table === "monthly_deductions") {
-        sqlDump += `CREATE TABLE monthly_deductions (id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, month_year TEXT NOT NULL, epf REAL DEFAULT 0, professional_tax REAL DEFAULT 0, sli REAL DEFAULT 0, gis REAL DEFAULT 0, lic REAL DEFAULT 0, income_tax REAL DEFAULT 0, onam_advance REAL DEFAULT 0, other_deductions REAL DEFAULT 0, cpf REAL DEFAULT 0, hra_recovery REAL DEFAULT 0, FOREIGN KEY(emp_id) REFERENCES employees(emp_id), UNIQUE(emp_id, month_year));
-`;
-      }
-      const { results } = await db.prepare(`SELECT * FROM ${table}`).all();
-      for (const row of results) {
-        const columns = Object.keys(row);
-        const values = Object.values(row).map((val) => {
-          if (val === null) return "NULL";
-          if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
-          return val;
-        });
-        sqlDump += `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${values.join(", ")});
-`;
-      }
-      sqlDump += "\n";
     }
+    sqlDump += "\n";
+  }
+  return sqlDump;
+}
+__name(generateBackupSql, "generateBackupSql");
+__name2(generateBackupSql, "generateBackupSql");
+async function sendBackupEmail(env, toEmail, sql) {
+  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = env;
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    throw new Error("Gmail OAuth2 credentials are not configured.");
+  }
+  const accessToken = await getAccessToken(GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN);
+  const rawMessage = buildMimeMessage({
+    from: "KSoM Office <office@ksom.res.in>",
+    to: toEmail,
+    subject: `KSoM Payslip Backup - ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`,
+    text: `Please find attached the SQL backup for the KSoM Payslip Portal generated on ${(/* @__PURE__ */ new Date()).toLocaleString()}.`,
+    attachments: [
+      {
+        filename: `backup_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.sql`,
+        content: btoa(sql)
+      }
+    ]
+  });
+  const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      raw: base64url(rawMessage)
+    })
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error?.message || "Failed to send email via Gmail");
+  }
+  return result.id;
+}
+__name(sendBackupEmail, "sendBackupEmail");
+__name2(sendBackupEmail, "sendBackupEmail");
+async function checkAndRunScheduledBackup(env, waitUntil) {
+  try {
+    const settings = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM backup_settings WHERE id = 1"
+    ).first();
+    if (!settings || settings.is_enabled !== 1 || !settings.backup_email) {
+      return;
+    }
+    const now = /* @__PURE__ */ new Date();
+    let isDue = false;
+    if (!settings.last_backup_at) {
+      isDue = true;
+    } else {
+      const lastBackupDate = new Date(settings.last_backup_at);
+      const diffMs = now.getTime() - lastBackupDate.getTime();
+      const diffDays = diffMs / (1e3 * 60 * 60 * 24);
+      if (settings.frequency === "daily" && diffDays >= 1) {
+        isDue = true;
+      } else if (settings.frequency === "weekly" && diffDays >= 7) {
+        isDue = true;
+      } else if (settings.frequency === "monthly" && diffDays >= 30) {
+        isDue = true;
+      }
+    }
+    if (isDue) {
+      const nowStr = now.toISOString();
+      await env.ksom_payslip_db.prepare(
+        "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+      ).bind(nowStr).run();
+      const task = /* @__PURE__ */ __name2(async () => {
+        try {
+          const sql = await generateBackupSql(env.ksom_payslip_db);
+          await sendBackupEmail(env, settings.backup_email, sql);
+          console.log(`Scheduled backup email sent successfully to ${settings.backup_email}`);
+        } catch (err) {
+          console.error("Scheduled backup failed in background:", err);
+          await env.ksom_payslip_db.prepare(
+            "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
+          ).bind(settings.last_backup_at).run();
+        }
+      }, "task");
+      if (waitUntil) {
+        waitUntil(task());
+      } else {
+        await task();
+      }
+    }
+  } catch (err) {
+    console.error("Failed checking/running scheduled backup:", err);
+  }
+}
+__name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
+__name2(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
+async function onRequestGet16(context) {
+  try {
+    const db = context.env.ksom_payslip_db;
+    const sqlDump = await generateBackupSql(db);
     return new Response(sqlDump, {
       headers: {
         "Content-Type": "application/sql",
@@ -1758,7 +1863,7 @@ async function onRequestPost20(context) {
         hra_state_percentage=excluded.hra_state_percentage,
         hra_ugc_percentage=excluded.hra_ugc_percentage`
     ).bind(effective_from, da_state_percentage || 0, da_ugc_percentage || 0, hra_state_percentage || 0, hra_ugc_percentage || 0).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -1799,7 +1904,7 @@ async function onRequestPost21(context) {
          name=excluded.name, 
          designation=excluded.designation`
     ).bind(email.toLowerCase(), role, status || "active", name || null, designation || null).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1817,7 +1922,7 @@ async function onRequestDelete2(context) {
     if (!id) return new Response(JSON.stringify({ error: "ID required." }), { status: 400 });
     const userToDel = await context.env.ksom_payslip_db.prepare("SELECT email FROM users WHERE id = ?").bind(id).first();
     await context.env.ksom_payslip_db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
-    logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
+    await logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1857,6 +1962,7 @@ async function onRequest(context) {
     }
     return next();
   }
+  context.waitUntil(checkAndRunScheduledBackup(env, context.waitUntil));
   if (url.pathname === "/api/logout" && (url.hostname === "localhost" || url.hostname === "127.0.0.1")) {
     return new Response(null, {
       status: 302,
@@ -2899,7 +3005,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-vxT1R2/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-ww8As4/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -2931,7 +3037,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-vxT1R2/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-ww8As4/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -3031,4 +3137,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.22369751983767472.js.map
+//# sourceMappingURL=functionsWorker-0.8994577887685221.js.map
