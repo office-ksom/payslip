@@ -57,8 +57,10 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
 });
 async function logActivity2(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
+  const istOffset = 5.5 * 60 * 60 * 1e3;
+  const istDate = new Date(now.getTime() + istOffset);
   const pad = /* @__PURE__ */ __name2((n) => String(n).padStart(2, "0"), "pad");
-  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const timestamp = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth() + 1)}-${pad(istDate.getUTCDate())} ${pad(istDate.getUTCHours())}:${pad(istDate.getUTCMinutes())}:${pad(istDate.getUTCSeconds())}`;
   const logLine = `[${timestamp}] [${userEmail || "system"}] Action: ${action} - Description: ${description}`;
   console.log(logLine);
   fetch("http://127.0.0.1:8089/log", {
