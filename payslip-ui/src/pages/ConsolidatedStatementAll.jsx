@@ -405,7 +405,7 @@ const ConsolidatedStatementAll = () => {
       `Salary Details for the FY ${fyStart} -${fyStart + 1}`,
       null,
       'net',
-      ' Name /\r\nPayment recived in the month'
+      ' Name /\r\nPayment received in the month'
     );
 
     // Sheet 2: TDS
@@ -487,7 +487,7 @@ const ConsolidatedStatementAll = () => {
           <label className="form-label">Financial Year</label>
           <select className="form-control" value={fy} onChange={(e) => setFy(parseInt(e.target.value))}>
             {fyOptions.map(year => (
-              <option key={year} value={year}>{year}-{ (year + 1).toString().slice(-2) }</option>
+              <option key={year} value={year}>{year}-{(year + 1).toString().slice(-2)}</option>
             ))}
           </select>
         </div>
