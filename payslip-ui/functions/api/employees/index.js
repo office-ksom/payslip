@@ -3,12 +3,26 @@ export async function onRequestGet(context) {
     const userEmail = context.request.headers.get('X-User-Email');
     const userRole = context.request.headers.get('X-User-Role');
 
+    const url = new URL(context.request.url);
+    const fy = url.searchParams.get('fy');
+
     let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
     let params = [];
 
     if (userRole === 'viewer' && userEmail) {
       query = "SELECT * FROM employees WHERE email_id = ? ORDER BY sort_order ASC, name ASC";
       params = [userEmail];
+    } else if (fy) {
+      const startMonth = `${fy}-03`;
+      const endMonth = `${parseInt(fy) + 1}-02`;
+      query = `SELECT * FROM employees 
+               WHERE emp_id IN (
+                 SELECT DISTINCT emp_id 
+                 FROM monthly_earnings 
+                 WHERE month_year >= ? AND month_year <= ?
+               ) 
+               ORDER BY sort_order ASC, name ASC`;
+      params = [startMonth, endMonth];
     }
 
     const { results } = await context.env.ksom_payslip_db.prepare(

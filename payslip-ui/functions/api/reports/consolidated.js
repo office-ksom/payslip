@@ -29,9 +29,9 @@ export async function onRequestGet(context) {
       return new Response(JSON.stringify({ error: "emp_id is required" }), { status: 400 });
     }
 
-    // Months range: April of fy to March of fy+1
-    const startMonth = `${fy}-04`;
-    const endMonth = `${parseInt(fy) + 1}-03`;
+    // Months range: March of fy to February of fy+1 (salary entered)
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
 
     // Fetch employee details
     const employee = await env.ksom_payslip_db.prepare(

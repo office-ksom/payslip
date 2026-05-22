@@ -1,0 +1,2 @@
+526: const inputStyle = { padding: '0.2rem 0.3rem', width: '65px' };
+844: const inp = (field) => (

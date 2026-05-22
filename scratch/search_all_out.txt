@@ -1,0 +1,127 @@
+=== Paybill.jsx ===
+181: const da = Math.round((base * da_pct) / 100);
+182: const hra = Math.round((base * hra_pct) / 100);
+202: const da = Math.round((base * da_pct) / 100);
+203: const hra = Math.round((base * hra_pct) / 100);
+612: })()}</strong> on <strong>{approvalInfo?.approved_on ? new Date(approvalInfo.approved_on).toLocaleString() : 'N/A'}</strong>.
+837: const da = Math.round((emp.da_state || 0) + (emp.da_ugc || 0));
+838: const hra = Math.round((emp.hra_state || 0) + (emp.hra_ugc || 0));
+839: const gross = Math.round((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0));
+840: const dedux = Math.round((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0));
+903: <td>{emp.onam_advance ? inp('onam_advance') : (Math.round(emp.onam_advance||0))}</td>
+1200: {Math.round(getVal(c))}
+1205: {Math.round(getVal(c))}
+1208: <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{Math.round(net)}</td>
+1228: {Math.round(total)}
+1238: {Math.round(total)}
+1243: ₹{Math.round(employees.reduce((sum, emp) => {
+
+=== SurrenderBill.jsx ===
+17: const fmt = (v) => Math.round(parseFloat(v) || 0).toString();
+252: const calculatedDa = Math.round((basicPay * da_pct) / 100);
+256: const total = Math.round((base / 30) * numEls);
+621: value={da ? Math.round(da) : ''}
+715: (₹{fmt(basicPay)} + ₹{fmt(da)} + ₹{fmt(hra)}) / 30 × {numEls} days
+721: ₹ {totalAmount.toLocaleString('en-IN')}
+911: <td>₹ {fmt(bill.basic_pay)}</td>
+912: <td>₹ {fmt(bill.da)}</td>
+913: <td>₹ {fmt(bill.hra)}</td>
+917: ₹ {bill.total_amount?.toLocaleString('en-IN')}
+
+=== ArrearBill.jsx ===
+5: const fmt = (v) => Math.round(parseFloat(v) || 0).toString();
+160: updated.net_amount = Math.round(amt - tax);
+187: net_amount: Math.round(amt - tax),
+672: ₹ {fmt(emp.net_amount)}
+720: ₹ {Math.round(totalArrearsSum).toLocaleString('en-IN')}
+723: ₹ {Math.round(totalITSum).toLocaleString('en-IN')}
+726: ₹ {Math.round(totalNetSum).toLocaleString('en-IN')}
+
+=== FestivalAllowanceBill.jsx ===
+6: const fmt = (v) => Math.round(parseFloat(v) || 0).toString();
+623: ₹ {Math.round(totalAmountSum).toLocaleString('en-IN')}
+
+=== ConsolidatedStatement.jsx ===
+9: const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
+211: cell.numFmt = '0.00';
+224: if (colNumber > 1) cell.numFmt = '0.00';
+304: fmt(basic), fmt(da), fmt(hra), fmt(dpgp), fmt(cca), fmt(spl), fmt(tr), fmt(otherEarn), fmt(arrearAmt), fmt(surrenderAmt), fmt(festivalAmt), fmt(gross),
+305: fmt(epf), fmt(cpf), fmt(it), fmt(pt), fmt(sli), fmt(gis), fmt(lic), fmt(adv), fmt(hrRec), fmt(otherDed), fmt(arrearIT),
+306: fmt(totDed), fmt(net)
+314: body.push([{ content: 'TOTAL', styles: { fontStyle: 'bold' } }, ...totals.map(v => ({ content: fmt(v), styles: { fontStyle: 'bold' } }))]);
+
+=== Reports.jsx ===
+9: const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
+78: const appDateStr = appDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+82: tsString = `Statement generated at: ${now.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`;
+172: otherEarnRows = arr.map(a => [a.desc || 'Other Earnings', fmt(a.amount)]);
+174: otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+177: otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+181: ['Basic Pay', fmt(employee.basic_pay)],
+182: ['DA', fmt(da)],
+183: ['HRA', fmt(hra)],
+184: ['DP / GP', fmt(employee.dp_gp)],
+185: ['CCA', fmt(employee.cca)],
+186: ['Spl. Pay', fmt(employee.spl_pay)],
+187: ['Tr. Allow', fmt(employee.tr_allow)],
+188: ['Spl. Allow.', fmt(employee.spl_allow)],
+189: ['Fest. Allow.', fmt(employee.fest_allow)],
+197: otherDeduxRows = arr.map(a => [a.desc || 'Other Deductions', fmt(a.amount)]);
+199: otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+202: otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+206: ['EPF', fmt(employee.epf)],
+207: ['CPF', fmt(employee.cpf)],
+208: ['Professional Tax', fmt(employee.professional_tax)],
+209: ['SLI', fmt(employee.sli)],
+210: ['GIS', fmt(employee.gis)],
+211: ['LIC', fmt(employee.lic)],
+212: ['Income Tax', fmt(employee.income_tax)],
+213: ['Onam Advance', fmt(employee.onam_advance)],
+214: ['HRA Recovery', fmt(employee.hra_recovery)],
+238: body: [[{ content: 'GROSS PAY', styles: { fontStyle: 'bold' } }, { content: fmt(grossPay), styles: { fontStyle: 'bold', halign: 'right' } }]],
+261: body: [[{ content: 'TOTAL DEDUCTIONS', styles: { fontStyle: 'bold' } }, { content: fmt(totalDeductions), styles: { fontStyle: 'bold', halign: 'right' } }]],
+276: { content: `Rs. ${fmt(netPay)}`, styles: { fontStyle: 'bold', fontSize: 11, halign: 'right' } }
+356: ['Basic Pay', `Base basic pay for calculation`, fmt(employee.basic_pay)],
+357: ['Dearness Allowance (DA)', `Calculated DA`, fmt(employee.da)],
+358: ['HRA Payout', `House Rent Allowance (if applicable)`, fmt(employee.hra)],
+361: { content: `Rs. ${employee.total_amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+446: [`Arrear Payout: ${employee.description || 'Arrears payout'}`, `Rs. ${fmt(employee.arrear_amount)}`, `Rs. ${fmt(employee.income_tax)}`, `Rs. ${fmt(employee.net_amount)}`],
+448: { content: `Rs. ${employee.net_amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+528: [`Festival Allowance: ${employee.description || 'Bonus payout'}`, `Rs. ${fmt(employee.amount)}`],
+530: { content: `Rs. ${employee.amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+648: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(item.val)}</span>
+654: <span>₹ {fmt(emp.gross)}</span>
+663: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(item.val)}</span>
+669: <span>₹ {fmt(emp.dedux)}</span>
+676: <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {fmt(emp.net)}</span>
+720: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(emp.basic_pay)}</span>
+724: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(emp.da)}</span>
+728: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(emp.hra)}</span>
+738: <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {emp.total_amount?.toLocaleString('en-IN')}</span>
+782: <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(emp.arrear_amount)}</span>
+786: <span style={{ fontWeight: 700 }}>- ₹ {fmt(emp.income_tax)}</span>
+798: <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {fmt(emp.net_amount)}</span>
+844: <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {fmt(emp.amount)}</span>
+1033: cell.numFmt = '0';
+1059: cell.numFmt = '#,##0.00';
+1148: cell.numFmt = '#,##0.00';
+1169: cell.numFmt = '#,##0.00';
+1250: cell.numFmt = '#,##0.00';
+1269: cell.numFmt = '#,##0.00';
+1360: slNoStyle.numFmt = '0';
+1424: cell.numFmt = '0.00';
+1454: if (idx < sumsEarn.length) cell.numFmt = '0.00';
+1529: cell.numFmt = '0.00';
+1558: if (c - 5 < sumsDedux.length) cell.numFmt = '0.00';
+1589: r.getCell(4).numFmt = '0.00';
+1840: <td>₹ {fmt(emp.gross)}</td>
+1841: <td>₹ {fmt(emp.dedux)}</td>
+1842: <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+1851: <div style={{ fontSize: '0.85rem' }}>₹ {fmt(emp.basic_pay)} (Basic)</div>
+1852: <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>+ ₹ {fmt(emp.da)} (DA) + ₹ {fmt(emp.hra)} (HRA)</div>
+1855: ₹ {emp.total_amount?.toLocaleString('en-IN')}
+1864: <td>₹ {fmt(emp.arrear_amount)}</td>
+1865: <td style={{ color: 'var(--color-danger)' }}>- ₹ {fmt(emp.income_tax)}</td>
+1866: <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net_amount)}</td>
+1875: <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.amount)}</td>
+

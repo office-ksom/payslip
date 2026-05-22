@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
 const ConsolidatedStatement = () => {
   const { user } = useOutletContext();
@@ -25,18 +25,26 @@ const ConsolidatedStatement = () => {
   const [fetchingEmployees, setFetchingEmployees] = useState(false);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchEmployees();
+    if (isAdmin && fy) {
+      fetchEmployees(fy, selectedEmpId);
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, fy]);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (financialYear, currentSelectedId) => {
     setFetchingEmployees(true);
     try {
-      const res = await fetch('/api/employees');
+      const res = await fetch(`/api/employees?fy=${financialYear}`);
       const data = await res.json();
       setEmployees(data);
-      if (data.length > 0) setSelectedEmpId(data[0].emp_id);
+      if (data.length > 0) {
+        const stillExists = data.some(emp => emp.emp_id === currentSelectedId);
+        if (!stillExists) {
+          setSelectedEmpId(data[0].emp_id);
+        }
+      } else {
+        setSelectedEmpId('');
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -100,10 +108,11 @@ const ConsolidatedStatement = () => {
     sheet.getCell('D5').value = 'Scale of Pay:';
     sheet.getCell('E5').value = employee.scale_of_pay;
 
+    sheet.getColumn(1).width = 24;
     // Table Header
     const superHeaderRow = sheet.getRow(7);
     superHeaderRow.values = [
-      'Month', 'Earnings', '', '', '', '', '', '', '', '', '', '', 'Gross Pay', 'Deductions', '', '', '', '', '', '', '', '', '', '', 'Total Ded', 'Net Pay'
+      'Payment received month', 'Earnings', '', '', '', '', '', '', '', '', '', '', 'Gross Pay', 'Deductions', '', '', '', '', '', '', '', '', '', '', 'Total Ded', 'Net Pay'
     ];
     superHeaderRow.font = { bold: true };
     const rowNum = 7;
@@ -142,9 +151,9 @@ const ConsolidatedStatement = () => {
       }
     }
 
-    // Data Rows
+    // Data Rows (salary entered from March to February)
     const months = [];
-    for(let i=4; i<=15; i++) {
+    for(let i=3; i<=14; i++) {
       const m = i > 12 ? i - 12 : i;
       const y = i > 12 ? fyStart + 1 : fyStart;
       months.push(`${y}-${String(m).padStart(2, '0')}`);
@@ -158,42 +167,46 @@ const ConsolidatedStatement = () => {
       
       // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const arrearAmt = monthArrears.reduce((sum, curr) => sum + (parseFloat(curr.arrear_amount) || 0), 0);
-      const arrearIT = monthArrears.reduce((sum, curr) => sum + (parseFloat(curr.income_tax) || 0), 0);
+      const arrearAmt = monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0);
+      const arrearIT = monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0);
 
       // Find surrender bills for this month
       const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const surrenderAmt = monthSurrender.reduce((sum, curr) => sum + (parseFloat(curr.total_amount) || 0), 0);
+      const surrenderAmt = monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0);
 
       // Find festival allowance bills for this month
       const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const festivalAmt = monthFestival.reduce((sum, curr) => sum + (parseFloat(curr.amount) || 0), 0);
+      const festivalAmt = monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0);
 
-      const basic = parseFloat(e.basic_pay)||0;
-      const da = (parseFloat(e.da_state)||0) + (parseFloat(e.da_ugc)||0);
-      const hra = (parseFloat(e.hra_state)||0) + (parseFloat(e.hra_ugc)||0);
-      const dpgp = parseFloat(e.dp_gp)||0;
-      const cca = parseFloat(e.cca)||0;
-      const spl = (parseFloat(e.spl_pay)||0) + (parseFloat(e.spl_allow)||0);
-      const tr = parseFloat(e.tr_allow)||0;
-      const otherEarn = parseFloat(e.other_earnings)||0;
+      const basic = Math.round(parseFloat(e.basic_pay) || 0);
+      const da = Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0));
+      const hra = Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0));
+      const dpgp = Math.round(parseFloat(e.dp_gp) || 0);
+      const cca = Math.round(parseFloat(e.cca) || 0);
+      const spl = Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0));
+      const tr = Math.round(parseFloat(e.tr_allow) || 0);
+      const otherEarn = Math.round(parseFloat(e.other_earnings) || 0);
       const gross = basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt;
       
-      const epf = parseFloat(d.epf)||0;
-      const cpf = parseFloat(d.cpf)||0;
-      const it = parseFloat(d.income_tax)||0;
-      const pt = parseFloat(d.professional_tax)||0;
-      const sli = parseFloat(d.sli)||0;
-      const gis = parseFloat(d.gis)||0;
-      const lic = parseFloat(d.lic)||0;
-      const adv = parseFloat(d.onam_advance)||0;
-      const hrRec = parseFloat(d.hra_recovery)||0;
-      const otherDed = parseFloat(d.other_deductions)||0;
+      const epf = Math.round(parseFloat(d.epf) || 0);
+      const cpf = Math.round(parseFloat(d.cpf) || 0);
+      const it = Math.round(parseFloat(d.income_tax) || 0);
+      const pt = Math.round(parseFloat(d.professional_tax) || 0);
+      const sli = Math.round(parseFloat(d.sli) || 0);
+      const gis = Math.round(parseFloat(d.gis) || 0);
+      const lic = Math.round(parseFloat(d.lic) || 0);
+      const adv = Math.round(parseFloat(d.onam_advance) || 0);
+      const hrRec = Math.round(parseFloat(d.hra_recovery) || 0);
+      const otherDed = Math.round(parseFloat(d.other_deductions) || 0);
       const totDed = epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT;
       const net = gross - totDed;
 
+      const dDate = new Date(my + '-01');
+      dDate.setMonth(dDate.getMonth() + 1);
+      const displayMonth = dDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+
       const rowValues = [
-        new Date(my + '-01').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+        displayMonth,
         basic, da, hra, dpgp, cca, spl, tr, otherEarn, arrearAmt, surrenderAmt, festivalAmt, gross,
         epf, cpf, it, pt, sli, gis, lic, adv, hrRec, otherDed, arrearIT, totDed, net
       ];
@@ -241,7 +254,7 @@ const ConsolidatedStatement = () => {
     doc.text(`Scale of Pay: ${employee.scale_of_pay}`, 100, 37);
 
     const months = [];
-    for(let i=4; i<=15; i++) {
+    for(let i=3; i<=14; i++) {
       const m = i > 12 ? i - 12 : i;
       const y = i > 12 ? fyStart + 1 : fyStart;
       months.push(`${y}-${String(m).padStart(2, '0')}`);
@@ -256,42 +269,46 @@ const ConsolidatedStatement = () => {
       
       // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const arrearAmt = monthArrears.reduce((sum, curr) => sum + (parseFloat(curr.arrear_amount) || 0), 0);
-      const arrearIT = monthArrears.reduce((sum, curr) => sum + (parseFloat(curr.income_tax) || 0), 0);
+      const arrearAmt = monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0);
+      const arrearIT = monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0);
 
       // Find surrender bills for this month
       const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const surrenderAmt = monthSurrender.reduce((sum, curr) => sum + (parseFloat(curr.total_amount) || 0), 0);
+      const surrenderAmt = monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0);
 
       // Find festival allowance bills for this month
       const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const festivalAmt = monthFestival.reduce((sum, curr) => sum + (parseFloat(curr.amount) || 0), 0);
+      const festivalAmt = monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0);
 
-      const basic = parseFloat(e.basic_pay)||0;
-      const da = (parseFloat(e.da_state)||0) + (parseFloat(e.da_ugc)||0);
-      const hra = (parseFloat(e.hra_state)||0) + (parseFloat(e.hra_ugc)||0);
-      const dpgp = parseFloat(e.dp_gp)||0;
-      const cca = parseFloat(e.cca)||0;
-      const spl = (parseFloat(e.spl_pay)||0) + (parseFloat(e.spl_allow)||0);
-      const tr = parseFloat(e.tr_allow)||0;
-      const otherEarn = parseFloat(e.other_earnings)||0;
+      const basic = Math.round(parseFloat(e.basic_pay) || 0);
+      const da = Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0));
+      const hra = Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0));
+      const dpgp = Math.round(parseFloat(e.dp_gp) || 0);
+      const cca = Math.round(parseFloat(e.cca) || 0);
+      const spl = Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0));
+      const tr = Math.round(parseFloat(e.tr_allow) || 0);
+      const otherEarn = Math.round(parseFloat(e.other_earnings) || 0);
       const gross = basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt;
       
-      const epf = parseFloat(d.epf)||0;
-      const cpf = parseFloat(d.cpf)||0;
-      const it = parseFloat(d.income_tax)||0;
-      const pt = parseFloat(d.professional_tax)||0;
-      const sli = parseFloat(d.sli)||0;
-      const gis = parseFloat(d.gis)||0;
-      const lic = parseFloat(d.lic)||0;
-      const adv = parseFloat(d.onam_advance)||0;
-      const hrRec = parseFloat(d.hra_recovery)||0;
-      const otherDed = parseFloat(d.other_deductions)||0;
+      const epf = Math.round(parseFloat(d.epf) || 0);
+      const cpf = Math.round(parseFloat(d.cpf) || 0);
+      const it = Math.round(parseFloat(d.income_tax) || 0);
+      const pt = Math.round(parseFloat(d.professional_tax) || 0);
+      const sli = Math.round(parseFloat(d.sli) || 0);
+      const gis = Math.round(parseFloat(d.gis) || 0);
+      const lic = Math.round(parseFloat(d.lic) || 0);
+      const adv = Math.round(parseFloat(d.onam_advance) || 0);
+      const hrRec = Math.round(parseFloat(d.hra_recovery) || 0);
+      const otherDed = Math.round(parseFloat(d.other_deductions) || 0);
       const totDed = epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT;
       const net = gross - totDed;
 
+      const dDate = new Date(my + '-01');
+      dDate.setMonth(dDate.getMonth() + 1);
+      const displayMonth = dDate.toLocaleDateString('en-GB', { month: 'short' });
+
       const row = [
-        new Date(my + '-01').toLocaleDateString('en-GB', { month: 'short' }),
+        displayMonth,
         fmt(basic), fmt(da), fmt(hra), fmt(dpgp), fmt(cca), fmt(spl), fmt(tr), fmt(otherEarn), fmt(arrearAmt), fmt(surrenderAmt), fmt(festivalAmt), fmt(gross),
         fmt(epf), fmt(cpf), fmt(it), fmt(pt), fmt(sli), fmt(gis), fmt(lic), fmt(adv), fmt(hrRec), fmt(otherDed), fmt(arrearIT),
         fmt(totDed), fmt(net)
@@ -308,7 +325,7 @@ const ConsolidatedStatement = () => {
       startY: 45,
       head: [
         [
-          { content: 'Month', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [176, 190, 197] } },
+          { content: 'Payment received month', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [176, 190, 197] } },
           { content: 'Earnings', colSpan: 11, styles: { halign: 'center', fillColor: [200, 230, 201] } },
           { content: 'Gross', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [187, 222, 251] } },
           { content: 'Deductions', colSpan: 11, styles: { halign: 'center', fillColor: [255, 204, 188] } },
@@ -324,7 +341,7 @@ const ConsolidatedStatement = () => {
       theme: 'grid',
       styles: { fontSize: 5.8, cellPadding: 0.6, overflow: 'linebreak' },
       headStyles: { textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      columnStyles: { 0: { cellWidth: 12 } }
+      columnStyles: { 0: { cellWidth: 20 } }
     });
 
     doc.save(`Consolidated_Statement_${employee.emp_id}_FY${fyDisplay}.pdf`);
@@ -340,7 +357,7 @@ const ConsolidatedStatement = () => {
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Consolidated FY Statement</h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-          Download a consolidated salary summary for the financial year (April to March).
+          Download a consolidated salary summary for the financial year (salary entered from March to February, paid from April to March).
         </p>
       </div>
 
@@ -398,7 +415,7 @@ const ConsolidatedStatement = () => {
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Important Note</h4>
         <ul style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem' }}>
-          <li>The statement covers the period from April to March of the following year.</li>
+          <li>The statement covers the salary entered from March to February (received from April to March).</li>
           <li>Data is aggregated from monthly records. If a month is missing, it will show as zero.</li>
           <li>For official tax purposes, please consult the accounts department.</li>
         </ul>

@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
-const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -358,7 +358,7 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
       ['HRA Payout', `House Rent Allowance (if applicable)`, fmt(employee.hra)],
       ['No. of ELs Surrendered', `${employee.num_els} days`, `${employee.num_els} / 30`],
       [{ content: 'TOTAL LEAVE SURRENDER PAYOUT', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [220, 250, 235] } }, 
-       { content: `Rs. ${employee.total_amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+       { content: `Rs. ${Math.round(employee.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
     ],
     theme: 'grid',
     styles: { fontSize: 9.5, cellPadding: 4, textColor: 20 },
@@ -445,7 +445,7 @@ const generatePDFArrear = async (employee, monthYear, returnBase64 = false, user
     body: [
       [`Arrear Payout: ${employee.description || 'Arrears payout'}`, `Rs. ${fmt(employee.arrear_amount)}`, `Rs. ${fmt(employee.income_tax)}`, `Rs. ${fmt(employee.net_amount)}`],
       [{ content: 'NET ARREAR PAYABLE AMOUNT', colSpan: 3, styles: { fontStyle: 'bold', fillColor: [220, 250, 235] } }, 
-       { content: `Rs. ${employee.net_amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+       { content: `Rs. ${Math.round(employee.net_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
     ],
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: 5, textColor: 20 },
@@ -527,7 +527,7 @@ const generatePDFFestival = async (employee, monthYear, returnBase64 = false, us
     body: [
       [`Festival Allowance: ${employee.description || 'Bonus payout'}`, `Rs. ${fmt(employee.amount)}`],
       [{ content: 'NET PAYABLE ALLOWANCE', styles: { fontStyle: 'bold', fillColor: [220, 250, 235] } }, 
-       { content: `Rs. ${employee.amount?.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
+       { content: `Rs. ${Math.round(employee.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
     ],
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: 5, textColor: 20 },
@@ -735,7 +735,7 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
 
         <div style={{ padding: '1.5rem', background: '#f0fdf4', borderRadius: '10px', border: '2px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: '800', fontSize: '1.25rem', color: '#166534' }}>TOTAL SURRENDER AMOUNT</span>
-          <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {emp.total_amount?.toLocaleString('en-IN')}</span>
+          <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {Math.round(emp.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       </div>
     );
@@ -995,10 +995,15 @@ const Reports = () => {
     let sumBasic = 0, sumDA = 0, sumHRA = 0, sumNet = 0;
 
     data.forEach((emp, i) => {
-      sumBasic += emp.basic_pay || 0;
-      sumDA += emp.da || 0;
-      sumHRA += emp.hra || 0;
-      sumNet += emp.total_amount || 0;
+      const basicPay = Math.round(parseFloat(emp.basic_pay) || 0);
+      const da = Math.round(parseFloat(emp.da) || 0);
+      const hra = Math.round(parseFloat(emp.hra) || 0);
+      const totalAmount = Math.round(parseFloat(emp.total_amount) || 0);
+
+      sumBasic += basicPay;
+      sumDA += da;
+      sumHRA += hra;
+      sumNet += totalAmount;
 
       const row = sheet.addRow({
         sl: i + 1,
@@ -1007,12 +1012,12 @@ const Reports = () => {
         designation: emp.designation,
         category: emp.category?.toUpperCase(),
         bill_date: emp.bill_date,
-        basic_pay: emp.basic_pay,
-        da: emp.da,
-        hra: emp.hra,
+        basic_pay: basicPay,
+        da: da,
+        hra: hra,
         num_els: `${emp.num_els} days`,
         financial_year: emp.financial_year,
-        total_amount: emp.total_amount
+        total_amount: totalAmount
       });
 
       row.height = 20;
@@ -1112,9 +1117,13 @@ const Reports = () => {
     let sumGross = 0, sumIT = 0, sumNet = 0;
 
     data.forEach((emp, i) => {
-      sumGross += emp.arrear_amount || 0;
-      sumIT += emp.income_tax || 0;
-      sumNet += emp.net_amount || 0;
+      const arrearAmount = Math.round(parseFloat(emp.arrear_amount) || 0);
+      const incomeTax = Math.round(parseFloat(emp.income_tax) || 0);
+      const netAmount = Math.round(parseFloat(emp.net_amount) || 0);
+
+      sumGross += arrearAmount;
+      sumIT += incomeTax;
+      sumNet += netAmount;
 
       const row = sheet.addRow({
         sl: i + 1,
@@ -1123,9 +1132,9 @@ const Reports = () => {
         designation: emp.designation,
         category: emp.category?.toUpperCase(),
         arrear_type: emp.arrear_type,
-        arrear_amount: emp.arrear_amount,
-        income_tax: emp.income_tax,
-        net_amount: emp.net_amount,
+        arrear_amount: arrearAmount,
+        income_tax: incomeTax,
+        net_amount: netAmount,
         bill_date: emp.bill_date,
         description: emp.description
       });
@@ -1219,7 +1228,8 @@ const Reports = () => {
     let sumAmt = 0;
 
     data.forEach((emp, i) => {
-      sumAmt += emp.amount || 0;
+      const amount = Math.round(parseFloat(emp.amount) || 0);
+      sumAmt += amount;
 
       const row = sheet.addRow({
         sl: i + 1,
@@ -1227,7 +1237,7 @@ const Reports = () => {
         name: (emp.title ? `${emp.title} ` : '') + emp.name,
         designation: emp.designation,
         category: emp.category?.toUpperCase(),
-        amount: emp.amount,
+        amount: amount,
         bill_date: emp.bill_date,
         description: emp.description
       });
@@ -1374,28 +1384,43 @@ const Reports = () => {
       let sumDynamicE = {};
 
       data.forEach((emp, i) => {
-        const basic = parseFloat(emp.basic_pay) || 0;
-        const gp = parseFloat(emp.dp_gp) || 0;
-        const da = parseFloat(emp.da) || 0;
-        const hra = parseFloat(emp.hra) || 0;
-        const cca = parseFloat(emp.cca) || 0;
-        const spl = (parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0);
-        const tr = parseFloat(emp.tr_allow) || 0;
-        const fest = parseFloat(emp.fest_allow) || 0;
-        const other = parseFloat(emp.other_earnings) || 0;
-        const gross = parseFloat(emp.gross) || 0;
-
-        sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; sumOther += other; sumGross += gross;
+        const basic = Math.round(parseFloat(emp.basic_pay) || 0);
+        const gp = Math.round(parseFloat(emp.dp_gp) || 0);
+        const da = Math.round(parseFloat(emp.da) || 0);
+        const hra = Math.round(parseFloat(emp.hra) || 0);
+        const cca = Math.round(parseFloat(emp.cca) || 0);
+        const spl = Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0));
+        const tr = Math.round(parseFloat(emp.tr_allow) || 0);
+        const fest = Math.round(parseFloat(emp.fest_allow) || 0);
 
         let eArr = [];
         try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
         const dynE = {};
         eArr.forEach(item => {
           if (item.desc) {
-            dynE[item.desc] = parseFloat(item.amount) || 0;
+            dynE[item.desc] = Math.round(parseFloat(item.amount) || 0);
             sumDynamicE[item.desc] = (sumDynamicE[item.desc] || 0) + dynE[item.desc];
           }
         });
+
+        let dynamicEarnSum = 0;
+        if (dynamicEarnKeys.length > 0) {
+          dynamicEarnKeys.forEach(k => {
+            dynamicEarnSum += dynE[k] || 0;
+          });
+        } else {
+          dynamicEarnSum = Math.round(parseFloat(emp.other_earnings) || 0);
+        }
+        const gross = basic + gp + da + hra + cca + spl + tr + fest + dynamicEarnSum;
+        emp.roundedGross = gross;
+
+        sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; 
+        if (dynamicEarnKeys.length > 0) {
+          // Dynamic keys sums are tracked in sumDynamicE
+        } else {
+          sumOther += dynamicEarnSum;
+        }
+        sumGross += gross;
 
         const row = sheet.getRow(currentRow);
         const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
@@ -1403,7 +1428,7 @@ const Reports = () => {
         if (dynamicEarnKeys.length > 0) {
           dynamicEarnKeys.forEach(k => values.push(dynE[k] || 0));
         } else {
-          values.push(other);
+          values.push(dynamicEarnSum);
         }
         values.push(gross);
 
@@ -1479,36 +1504,51 @@ const Reports = () => {
       let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRAOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
       let sumDynamicD = {};
       data.forEach((emp, i) => {
-        const epf = parseFloat(emp.epf) || 0;
-        const cpf = parseFloat(emp.cpf) || 0;
-        const it = parseFloat(emp.income_tax) || 0;
-        const gis = parseFloat(emp.gis) || 0;
-        const sli = parseFloat(emp.sli) || 0;
-        const lic = parseFloat(emp.lic) || 0;
-        const pt = parseFloat(emp.professional_tax) || 0;
-        const hraOnam = (parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0);
-        const otherDed = parseFloat(emp.other_deductions) || 0;
-        const dedux = parseFloat(emp.dedux) || 0;
-        const net = parseFloat(emp.net) || 0;
-
-        sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRAOnam += hraOnam; sumOtherDed += otherDed; sumTotDed += dedux; sumNet += net;
+        const epf = Math.round(parseFloat(emp.epf) || 0);
+        const cpf = Math.round(parseFloat(emp.cpf) || 0);
+        const it = Math.round(parseFloat(emp.income_tax) || 0);
+        const gis = Math.round(parseFloat(emp.gis) || 0);
+        const sli = Math.round(parseFloat(emp.sli) || 0);
+        const lic = Math.round(parseFloat(emp.lic) || 0);
+        const pt = Math.round(parseFloat(emp.professional_tax) || 0);
+        const hraOnam = Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0));
 
         let dArr = [];
         try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
         const dynD = {};
         dArr.forEach(item => {
           if (item.desc) {
-            dynD[item.desc] = parseFloat(item.amount) || 0;
+            dynD[item.desc] = Math.round(parseFloat(item.amount) || 0);
             sumDynamicD[item.desc] = (sumDynamicD[item.desc] || 0) + dynD[item.desc];
           }
         });
+
+        let dynamicDeduxSum = 0;
+        if (dynamicDeduxKeys.length > 0) {
+          dynamicDeduxKeys.forEach(k => {
+            dynamicDeduxSum += dynD[k] || 0;
+          });
+        } else {
+          dynamicDeduxSum = Math.round(parseFloat(emp.other_deductions) || 0);
+        }
+
+        const dedux = epf + cpf + it + gis + sli + lic + pt + hraOnam + dynamicDeduxSum;
+        const net = (emp.roundedGross || 0) - dedux;
+
+        sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRAOnam += hraOnam;
+        if (dynamicDeduxKeys.length > 0) {
+          // Dynamic keys sums are tracked in sumDynamicD
+        } else {
+          sumOtherDed += dynamicDeduxSum;
+        }
+        sumTotDed += dedux; sumNet += net;
 
         const row = sheet.getRow(currentRow);
         const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', epf, cpf, it, gis, sli, lic, pt, hraOnam];
         if (dynamicDeduxKeys.length > 0) {
           dynamicDeduxKeys.forEach(k => values.push(dynD[k] || 0));
         } else {
-          values.push(otherDed);
+          values.push(dynamicDeduxSum);
         }
         values.push(dedux, net);
 
@@ -1852,7 +1892,7 @@ const Reports = () => {
                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>+ ₹ {fmt(emp.da)} (DA) + ₹ {fmt(emp.hra)} (HRA)</div>
                         </td>
                         <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>
-                          ₹ {emp.total_amount?.toLocaleString('en-IN')}
+                          ₹ {Math.round(emp.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       </>
                     )}

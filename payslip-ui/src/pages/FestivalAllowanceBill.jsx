@@ -3,7 +3,7 @@ import { Save, ShieldCheck, Copy, Calendar, FileText, XCircle, Trash2 } from 'lu
 import { useOutletContext } from 'react-router-dom';
 
 
-const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -620,7 +620,7 @@ const FestivalAllowanceBill = (props) => {
                     <td></td>
                     <td style={{ textAlign: 'right', paddingRight: '1.5rem' }}>TOTAL PAYOUT:</td>
                     <td style={{ color: 'var(--color-success)', padding: '1rem 0.5rem', textAlign: 'right', paddingRight: '1rem', width: '150px' }}>
-                      ₹ {totalAmountSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹ {Math.round(totalAmountSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td></td>
                     <td></td>

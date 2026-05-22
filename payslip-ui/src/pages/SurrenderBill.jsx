@@ -14,7 +14,7 @@ const getFinancialYear = (dateStr) => {
   }
 };
 
-const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -249,7 +249,7 @@ const SurrenderBill = (props) => {
     const isUGC = emp.category === 'ugc/csir';
     const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
 
-    const calculatedDa = (basicPay * da_pct) / 100;
+    const calculatedDa = Math.round((basicPay * da_pct) / 100);
     setDa(calculatedDa);
 
     const base = basicPay + calculatedDa + hra;
@@ -618,7 +618,7 @@ const SurrenderBill = (props) => {
                 <input 
                   type="number" 
                   className="form-control" 
-                  value={da ? parseFloat(da.toFixed(2)) : ''} 
+                  value={da ? Math.round(da).toFixed(2) : ''} 
                   onChange={(e) => setDa(parseFloat(e.target.value) || 0)}
                   disabled={isReadOnly}
                   placeholder="0.00"
@@ -718,7 +718,7 @@ const SurrenderBill = (props) => {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Net Payable Amount</div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-success)' }}>
-                      ₹ {totalAmount.toLocaleString('en-IN')}
+                      ₹ {Math.round(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
@@ -914,7 +914,7 @@ const SurrenderBill = (props) => {
                       <td style={{ fontWeight: 'bold', textAlign: 'center' }}>{bill.num_els} days</td>
                       <td>{bill.financial_year}</td>
                       <td style={{ fontWeight: 'bold', color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : (bill.is_approved === 1 ? 'var(--color-success)' : 'inherit')) }}>
-                        ₹ {bill.total_amount?.toLocaleString('en-IN')}
+                        ₹ {Math.round(bill.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td>
                         {bill.is_approved === 1 ? (

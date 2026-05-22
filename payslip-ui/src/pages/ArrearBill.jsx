@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
-const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -157,7 +157,7 @@ const ArrearBill = (props) => {
         if (field === 'arrear_amount' || field === 'income_tax') {
           const amt = parseFloat(field === 'arrear_amount' ? value : emp.arrear_amount) || 0;
           const tax = parseFloat(field === 'income_tax' ? value : emp.income_tax) || 0;
-          updated.net_amount = amt - tax;
+          updated.net_amount = Math.round(amt - tax);
         }
         return updated;
       }
@@ -184,7 +184,7 @@ const ArrearBill = (props) => {
           ...emp,
           arrear_amount: amt,
           income_tax: tax,
-          net_amount: amt - tax,
+          net_amount: Math.round(amt - tax),
           bill_date: bulkDate || emp.bill_date,
           description: bulkDesc !== '' ? bulkDesc : emp.description
         };
@@ -717,13 +717,13 @@ const ArrearBill = (props) => {
                     <td></td>
                     <td style={{ textAlign: 'right', paddingRight: '1rem' }}>TOTALS:</td>
                     <td style={{ textAlign: 'right', color: 'var(--color-text-primary)', padding: '1rem 0.5rem' }}>
-                      ₹ {totalArrearsSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹ {Math.round(totalArrearsSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td style={{ textAlign: 'right', color: 'var(--color-danger)', padding: '1rem 0.5rem' }}>
-                      ₹ {totalITSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹ {Math.round(totalITSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td style={{ color: 'var(--color-success)', padding: '1rem 1.5rem' }}>
-                      ₹ {totalNetSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹ {Math.round(totalNetSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td></td>
                     <td></td>
