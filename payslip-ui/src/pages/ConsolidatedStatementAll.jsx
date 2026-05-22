@@ -328,6 +328,7 @@ const ConsolidatedStatementAll = () => {
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       }
 
+      const colSums = {};
       let currentRowIndex = dataRowStartIndex;
       employees.forEach((emp, index) => {
         const row = sheet.getRow(currentRowIndex);
@@ -341,6 +342,7 @@ const ConsolidatedStatementAll = () => {
         row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
         row.getCell(2).border = thinBorder;
 
+        let rowSum = 0;
         for (let c = 3; c < cols.length; c++) {
           const colDef = cols[c - 1];
           const stats = getEmployeeMonthlyDetails(emp.emp_id, colDef.monthStr);
@@ -352,17 +354,27 @@ const ConsolidatedStatementAll = () => {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
           cell.border = thinBorder;
           cell.numFmt = '0.00';
+
+          if (cellVal !== null && cellVal !== undefined) {
+            const val = Math.round(parseFloat(cellVal) || 0);
+            rowSum += val;
+            colSums[c] = (colSums[c] || 0) + val;
+          }
         }
 
         const totalCell = row.getCell(cols.length);
         const colStartLetter = getColLetter(3);
         const colEndLetter = getColLetter(cols.length - 1);
-        totalCell.value = { formula: `=SUM(${colStartLetter}${currentRowIndex}:${colEndLetter}${currentRowIndex})` };
+        totalCell.value = {
+          formula: `=SUM(${colStartLetter}${currentRowIndex}:${colEndLetter}${currentRowIndex})`,
+          result: rowSum
+        };
         totalCell.font = { name: 'Book Antiqua', size: 11 };
         totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
         totalCell.border = thinBorder;
         totalCell.numFmt = '0.00';
 
+        colSums[cols.length] = (colSums[cols.length] || 0) + rowSum;
         currentRowIndex++;
       });
 
@@ -376,7 +388,10 @@ const ConsolidatedStatementAll = () => {
       for (let c = 3; c <= cols.length; c++) {
         const cell = totalRow.getCell(c);
         const colLetter = getColLetter(c);
-        cell.value = { formula: `=SUM(${colLetter}${dataRowStartIndex}:${colLetter}${currentRowIndex - 1})` };
+        cell.value = {
+          formula: `=SUM(${colLetter}${dataRowStartIndex}:${colLetter}${currentRowIndex - 1})`,
+          result: colSums[c] || 0
+        };
         cell.font = { name: 'Book Antiqua', size: 12, bold: true, italic: true };
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
         cell.border = thinBorder;

@@ -320,6 +320,7 @@ async function testGeneration() {
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     }
 
+    const colSums = {};
     let currentRowIndex = dataRowStartIndex;
     employees.forEach((emp, index) => {
       const row = sheet.getRow(currentRowIndex);
@@ -333,6 +334,7 @@ async function testGeneration() {
       row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
       row.getCell(2).border = thinBorder;
 
+      let rowSum = 0;
       for (let c = 3; c < cols.length; c++) {
         const colDef = cols[c - 1];
         const stats = getEmployeeMonthlyDetails(emp.emp_id, colDef.monthStr);
@@ -344,17 +346,27 @@ async function testGeneration() {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = thinBorder;
         cell.numFmt = '0.00';
+
+        if (cellVal !== null && cellVal !== undefined) {
+          const val = Math.round(parseFloat(cellVal) || 0);
+          rowSum += val;
+          colSums[c] = (colSums[c] || 0) + val;
+        }
       }
 
       const totalCell = row.getCell(cols.length);
       const colStartLetter = getColLetter(3);
       const colEndLetter = getColLetter(cols.length - 1);
-      totalCell.value = { formula: `=SUM(${colStartLetter}${currentRowIndex}:${colEndLetter}${currentRowIndex})` };
+      totalCell.value = {
+        formula: `=SUM(${colStartLetter}${currentRowIndex}:${colEndLetter}${currentRowIndex})`,
+        result: rowSum
+      };
       totalCell.font = { name: 'Book Antiqua', size: 11 };
       totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
       totalCell.border = thinBorder;
       totalCell.numFmt = '0.00';
 
+      colSums[cols.length] = (colSums[cols.length] || 0) + rowSum;
       currentRowIndex++;
     });
 
@@ -368,7 +380,10 @@ async function testGeneration() {
     for (let c = 3; c <= cols.length; c++) {
       const cell = totalRow.getCell(c);
       const colLetter = getColLetter(c);
-      cell.value = { formula: `=SUM(${colLetter}${dataRowStartIndex}:${colLetter}${currentRowIndex - 1})` };
+      cell.value = {
+        formula: `=SUM(${colLetter}${dataRowStartIndex}:${colLetter}${currentRowIndex - 1})`,
+        result: colSums[c] || 0
+      };
       cell.font = { name: 'Book Antiqua', size: 12, bold: true, italic: true };
       cell.alignment = { horizontal: 'right', vertical: 'middle' };
       cell.border = thinBorder;
@@ -376,12 +391,12 @@ async function testGeneration() {
     }
   };
 
-  generateSheet(`Salary 2026-2027`, `Salary Details for the FY 2026 -2027`, null, 'net', ' Name /\r\nPayment recived in the month');
-  generateSheet('TDS', 'Kerala School of Mathematics', `Tax Deducted for the FY 2026 -2027 `, 'tds', ' Name /\r\nTDS from the salary received in.');
-  generateSheet('EPF', 'Kerala School of Mathematics', `EPF Deducted for the FY 2026 -2027`, 'epf', ' Name /\r\nEPF recovery from the salary received in.');
-  generateSheet('SLI', 'Kerala School of Mathematics', `SLI Deducted for the FY 2026 -2027`, 'sli', ' Name /\r\nSLI deducted from the salary received in.');
-  generateSheet('GIS', 'Kerala School of Mathematics', `GIS Deducted for the FY 2026 -2027`, 'gis', ' Name /\r\nGIS deducted from the salary received in.');
-  generateSheet('GPAIS', 'Kerala School of Mathematics', `GPAIS Deducted for the FY 2026 -2027`, 'gpais', ' Name /\r\nGPAIS deducted from the salary received in.');
+  await generateSheet(`Salary 2026-2027`, `Salary Details for the FY 2026 -2027`, null, 'net', ' Name /\r\nPayment recived in the month');
+  await generateSheet('TDS', 'Kerala School of Mathematics', `Tax Deducted for the FY 2026 -2027 `, 'tds', ' Name /\r\nTDS from the salary received in.');
+  await generateSheet('EPF', 'Kerala School of Mathematics', `EPF Deducted for the FY 2026 -2027`, 'epf', ' Name /\r\nEPF recovery from the salary received in.');
+  await generateSheet('SLI', 'Kerala School of Mathematics', `SLI Deducted for the FY 2026 -2027`, 'sli', ' Name /\r\nSLI deducted from the salary received in.');
+  await generateSheet('GIS', 'Kerala School of Mathematics', `GIS Deducted for the FY 2026 -2027`, 'gis', ' Name /\r\nGIS deducted from the salary received in.');
+  await generateSheet('GPAIS', 'Kerala School of Mathematics', `GPAIS Deducted for the FY 2026 -2027`, 'gpais', ' Name /\r\nGPAIS deducted from the salary received in.');
 
   const outPath = path.join(__dirname, 'test_consolidated_validation.xlsx');
   await workbook.xlsx.writeFile(outPath);
@@ -421,8 +436,19 @@ async function testGeneration() {
   // Rule 4: Row total formula check in R3
   const formulaValue = dataRowTotalCell.value;
   console.log('4. Data row total formula in R3:', formulaValue);
-  const formulaOk = formulaValue && formulaValue.formula === '=SUM(C3:Q3)';
-  console.log('   Data row total formula check (=SUM(C3:Q3)):', formulaOk ? 'PASS' : 'FAIL');
+  // Total sum for Alice net pay should be:
+  // Apr-received regular net (2026-03 salary: 50000+1000+2000+500+500 - 1500-2000-200-100 = 50200)
+  // + Apr-received arrears net (8500) + Apr-received surrender net (15000)
+  // + May-received regular net (2026-04: 50000+1000+2000+500+500 = 54000, no ded)
+  // + Sep-received festival allowance (5000)
+  // = 50200 + 8500 + 15000 + 54000 + 5000 = 132700 ... but Bob also has Apr salary
+  // Actually: Alice has months 2026-03, 2026-04, 2026-08 all approved.
+  // 2026-03 → Apr col: net = 50200, arrears = 8500, surrender = 15000
+  // 2026-04 → May col: net = 54000 (50000+1000+2000+500+500, no ded)
+  // 2026-08 → Sep col: net = 54000, festival = 5000
+  // Row total = 50200 + 8500 + 15000 + 54000 + 54000 + 5000 = 186700
+  const formulaOk = formulaValue && formulaValue.formula === '=SUM(C3:Q3)' && formulaValue.result === 186700;
+  console.log('   Data row total formula check (=SUM(C3:Q3) with result 186700):', formulaOk ? 'PASS' : 'FAIL');
 
   // Rule 5: Column Widths check for dynamic widths
   // Cols are Sl. No. (7.29), Name (25.14), Apr-26 (12.71), Arrears (14), Surrender (14), May-26 (12.71), ..., Total (14)
@@ -484,8 +510,19 @@ async function testGeneration() {
   const dynamicValOk = arrearsVal === 8500 && surrenderVal === 15000 && festivalVal === 5000;
   console.log('    Dynamic values check:', dynamicValOk ? 'PASS' : 'FAIL');
 
+  // Validate pre-calculated bottom column total cell values
+  const bottomTotalCell = salSheet.getCell(totalRowIndex, 3); // April total received column cell
+  const bottomTotalValue = bottomTotalCell.value;
+  console.log('12. Bottom TOTAL cell value in C5:', bottomTotalValue);
+  // Column C = Apr-received (salary of 2026-03).
+  // Alice 2026-03 net = 50200 (approved), Bob 2026-03 net = 60000+1200+2400+600+600 = 64800 (approved, no ded)
+  // Column C total = 50200 + 64800 = 115000
+  // Formula should be =SUM(C3:C4) (rows 3 and 4 are Alice and Bob, data starts at row 3 for Salary sheet which has no subtitle)
+  const bottomTotalOk = bottomTotalValue && bottomTotalValue.formula === '=SUM(C3:C4)' && bottomTotalValue.result === 115000;
+  console.log('    Bottom column total formula and result check:', bottomTotalOk ? 'PASS' : 'FAIL');
+
   // Final status
-  if (sheetsOk && title1Ok && dataRowTotalOk && formulaOk && widthsOk && tdsTitleOk && bordersOk && alignmentOk && gpaisOk && mathOk && dynamicValOk) {
+  if (sheetsOk && title1Ok && dataRowTotalOk && formulaOk && widthsOk && tdsTitleOk && bordersOk && alignmentOk && gpaisOk && mathOk && dynamicValOk && bottomTotalOk) {
     console.log('\n>>> SUCCESS: ALL EXCEL VALIDATION CHECKS PASSED SUCCESSFULLY! <<<');
   } else {
     console.log('\n>>> ERROR: SOME VALIDATION CHECKS FAILED! <<<');
