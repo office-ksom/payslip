@@ -12,6 +12,7 @@ import Backup from './pages/Backup';
 import UserManagement from './pages/UserManagement';
 import ResetPassword from './pages/ResetPassword';
 import ConsolidatedStatement from './pages/ConsolidatedStatement';
+import ConsolidatedStatementAll from './pages/ConsolidatedStatementAll';
 
 import { useState, useEffect } from 'react';
 
@@ -64,6 +65,7 @@ function App() {
           <Route path="festival-bill" element={<FestivalAllowanceBill user={user} />} />
           <Route path="reports" element={<Reports user={user} />} />
           <Route path="consolidated-statement" element={<ConsolidatedStatement user={user} />} />
+          <Route path="consolidated-statement-all" element={<ConsolidatedStatementAll user={user} />} />
           <Route path="settings" element={<Settings user={user} />} />
           <Route path="backup" element={<Backup user={user} />} />
           <Route path="users" element={<UserManagement user={user} />} />

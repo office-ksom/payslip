@@ -267,8 +267,15 @@ const Layout = () => {
 
           <NavLink to="/consolidated-statement" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Table size={20} />
-            <span>Consolidated FY Statement</span>
+            <span>Consolidated FY Statement (individual)</span>
           </NavLink>
+
+          {isAdmin && (
+            <NavLink to="/consolidated-statement-all" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <Table size={20} />
+              <span>Consolidated FY Statements (All Employees)</span>
+            </NavLink>
+          )}
 
           <div style={{ marginTop: 'auto' }}>
             {!isViewer && isSuperAdmin && (

@@ -710,6 +710,60 @@ __name(onRequestGet5, "onRequestGet5");
 __name2(onRequestGet5, "onRequestGet");
 async function onRequestGet6(context) {
   try {
+    const { request, env } = context;
+    const url = new URL(request.url);
+    const fy = url.searchParams.get("fy");
+    const userRole = request.headers.get("X-User-Role");
+    if (!fy) {
+      return new Response(JSON.stringify({ error: "Financial year (fy) is required" }), { status: 400 });
+    }
+    if (userRole !== "admin" && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Access denied. Admins only." }), { status: 403 });
+    }
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
+    const { results: employees } = await env.ksom_payslip_db.prepare(
+      `SELECT * FROM employees 
+       WHERE emp_id IN (
+         SELECT DISTINCT emp_id 
+         FROM monthly_earnings 
+         WHERE month_year >= ? AND month_year <= ?
+       )
+       ORDER BY sort_order ASC, name ASC`
+    ).bind(startMonth, endMonth).all();
+    const { results: earnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM monthly_earnings WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    const { results: deductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM monthly_deductions WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    const { results: arrears } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM arrear_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    const { results: surrender } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM surrender_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    const { results: festival } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM festival_allowance_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    return new Response(JSON.stringify({
+      employees,
+      earnings,
+      deductions,
+      arrears,
+      surrender,
+      festival
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet6, "onRequestGet6");
+__name2(onRequestGet6, "onRequestGet");
+async function onRequestGet7(context) {
+  try {
     const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM backup_settings WHERE id = 1"
@@ -725,8 +779,8 @@ async function onRequestGet6(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet6, "onRequestGet6");
-__name2(onRequestGet6, "onRequestGet");
+__name(onRequestGet7, "onRequestGet7");
+__name2(onRequestGet7, "onRequestGet");
 async function onRequestPost8(context) {
   try {
     const data = await context.request.json();
@@ -756,7 +810,7 @@ async function onRequestPost8(context) {
 }
 __name(onRequestPost8, "onRequestPost8");
 __name2(onRequestPost8, "onRequestPost");
-async function onRequestGet7(context) {
+async function onRequestGet8(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden. Only super admins can view logs." }), {
@@ -803,9 +857,9 @@ async function onRequestGet7(context) {
     });
   }
 }
-__name(onRequestGet7, "onRequestGet7");
-__name2(onRequestGet7, "onRequestGet");
-async function onRequestGet8(context) {
+__name(onRequestGet8, "onRequestGet8");
+__name2(onRequestGet8, "onRequestGet");
+async function onRequestGet9(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const settings = await db.prepare("SELECT * FROM system_settings").all();
@@ -820,8 +874,8 @@ async function onRequestGet8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet8, "onRequestGet8");
-__name2(onRequestGet8, "onRequestGet");
+__name(onRequestGet9, "onRequestGet9");
+__name2(onRequestGet9, "onRequestGet");
 async function onRequestPost9(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -853,7 +907,7 @@ async function onRequestPost9(context) {
 }
 __name(onRequestPost9, "onRequestPost9");
 __name2(onRequestPost9, "onRequestPost");
-async function onRequestGet9(context) {
+async function onRequestGet10(context) {
   try {
     const url = new URL(context.request.url);
     const empId = url.searchParams.get("emp_id");
@@ -876,8 +930,8 @@ async function onRequestGet9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet9, "onRequestGet9");
-__name2(onRequestGet9, "onRequestGet");
+__name(onRequestGet10, "onRequestGet10");
+__name2(onRequestGet10, "onRequestGet");
 async function onRequestPost10(context) {
   const { request, env, data } = context;
   if (data.user.role !== "super_admin") {
@@ -976,7 +1030,7 @@ async function onRequestPost11(context) {
 }
 __name(onRequestPost11, "onRequestPost11");
 __name2(onRequestPost11, "onRequestPost");
-async function onRequestGet10(context) {
+async function onRequestGet11(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -994,9 +1048,9 @@ async function onRequestGet10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet10, "onRequestGet10");
-__name2(onRequestGet10, "onRequestGet");
-async function onRequestGet11(context) {
+__name(onRequestGet11, "onRequestGet11");
+__name2(onRequestGet11, "onRequestGet");
+async function onRequestGet12(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1036,8 +1090,8 @@ async function onRequestGet11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet11, "onRequestGet11");
-__name2(onRequestGet11, "onRequestGet");
+__name(onRequestGet12, "onRequestGet12");
+__name2(onRequestGet12, "onRequestGet");
 async function onRequestPost12(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1113,7 +1167,7 @@ async function onRequestPost12(context) {
 }
 __name(onRequestPost12, "onRequestPost12");
 __name2(onRequestPost12, "onRequestPost");
-async function onRequestGet12(context) {
+async function onRequestGet13(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1139,8 +1193,8 @@ async function onRequestGet12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet12, "onRequestGet12");
-__name2(onRequestGet12, "onRequestGet");
+__name(onRequestGet13, "onRequestGet13");
+__name2(onRequestGet13, "onRequestGet");
 async function onRequestPost13(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -1202,7 +1256,7 @@ async function onRequestPost13(context) {
 }
 __name(onRequestPost13, "onRequestPost13");
 __name2(onRequestPost13, "onRequestPost");
-async function onRequestGet13(context) {
+async function onRequestGet14(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1233,8 +1287,8 @@ async function onRequestGet13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet13, "onRequestGet13");
-__name2(onRequestGet13, "onRequestGet");
+__name(onRequestGet14, "onRequestGet14");
+__name2(onRequestGet14, "onRequestGet");
 async function onRequestPost14(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1370,7 +1424,7 @@ async function onRequestDelete(context) {
 }
 __name(onRequestDelete, "onRequestDelete");
 __name2(onRequestDelete, "onRequestDelete");
-async function onRequestGet14(context) {
+async function onRequestGet15(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1398,8 +1452,8 @@ async function onRequestGet14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet14, "onRequestGet14");
-__name2(onRequestGet14, "onRequestGet");
+__name(onRequestGet15, "onRequestGet15");
+__name2(onRequestGet15, "onRequestGet");
 async function onRequestPost15(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1465,7 +1519,7 @@ async function onRequestPost15(context) {
 }
 __name(onRequestPost15, "onRequestPost15");
 __name2(onRequestPost15, "onRequestPost");
-async function onRequestGet15(context) {
+async function onRequestGet16(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1495,8 +1549,8 @@ async function onRequestGet15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet15, "onRequestGet15");
-__name2(onRequestGet15, "onRequestGet");
+__name(onRequestGet16, "onRequestGet16");
+__name2(onRequestGet16, "onRequestGet");
 async function onRequestPost16(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1696,7 +1750,7 @@ async function checkAndRunScheduledBackup(env, waitUntil) {
 }
 __name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
 __name2(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
-async function onRequestGet16(context) {
+async function onRequestGet17(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const sqlDump = await generateBackupSql(db);
@@ -1710,8 +1764,8 @@ async function onRequestGet16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet16, "onRequestGet16");
-__name2(onRequestGet16, "onRequestGet");
+__name(onRequestGet17, "onRequestGet17");
+__name2(onRequestGet17, "onRequestGet");
 async function onRequestPost17(context) {
   try {
     const db = context.env.ksom_payslip_db;
@@ -1778,7 +1832,7 @@ async function onRequestPost18(context) {
 }
 __name(onRequestPost18, "onRequestPost18");
 __name2(onRequestPost18, "onRequestPost");
-async function onRequestGet17(context) {
+async function onRequestGet18(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
@@ -1811,8 +1865,8 @@ async function onRequestGet17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet17, "onRequestGet17");
-__name2(onRequestGet17, "onRequestGet");
+__name(onRequestGet18, "onRequestGet18");
+__name2(onRequestGet18, "onRequestGet");
 async function onRequestPost19(context) {
   try {
     const data = await context.request.json();
@@ -1855,7 +1909,7 @@ async function onRequestPut(context) {
 }
 __name(onRequestPut, "onRequestPut");
 __name2(onRequestPut, "onRequestPut");
-async function onRequestGet18(context) {
+async function onRequestGet19(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -1867,8 +1921,8 @@ async function onRequestGet18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet18, "onRequestGet18");
-__name2(onRequestGet18, "onRequestGet");
+__name(onRequestGet19, "onRequestGet19");
+__name2(onRequestGet19, "onRequestGet");
 async function onRequestPost20(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1898,7 +1952,7 @@ async function onRequestPost20(context) {
 }
 __name(onRequestPost20, "onRequestPost20");
 __name2(onRequestPost20, "onRequestPost");
-async function onRequestGet19(context) {
+async function onRequestGet20(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -1910,8 +1964,8 @@ async function onRequestGet19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet19, "onRequestGet19");
-__name2(onRequestGet19, "onRequestGet");
+__name(onRequestGet20, "onRequestGet20");
+__name2(onRequestGet20, "onRequestGet");
 async function onRequestPost21(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -2140,11 +2194,18 @@ var routes = [
     modules: [onRequestGet5]
   },
   {
+    routePath: "/api/reports/consolidated-all",
+    mountPath: "/api/reports",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet6]
+  },
+  {
     routePath: "/api/settings/backup",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet6]
+    modules: [onRequestGet7]
   },
   {
     routePath: "/api/settings/backup",
@@ -2158,14 +2219,14 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet7]
+    modules: [onRequestGet8]
   },
   {
     routePath: "/api/settings/system",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet8]
+    modules: [onRequestGet9]
   },
   {
     routePath: "/api/settings/system",
@@ -2179,7 +2240,7 @@ var routes = [
     mountPath: "/api/surrender",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet9]
+    modules: [onRequestGet10]
   },
   {
     routePath: "/api/users/password",
@@ -2193,7 +2254,7 @@ var routes = [
     mountPath: "/api/approve",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet10]
+    modules: [onRequestGet11]
   },
   {
     routePath: "/api/approve/:month_year",
@@ -2207,7 +2268,7 @@ var routes = [
     mountPath: "/api/arrears",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet11]
+    modules: [onRequestGet12]
   },
   {
     routePath: "/api/arrears/:month_year",
@@ -2221,7 +2282,7 @@ var routes = [
     mountPath: "/api/deductions",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet12]
+    modules: [onRequestGet13]
   },
   {
     routePath: "/api/deductions/:month_year",
@@ -2242,7 +2303,7 @@ var routes = [
     mountPath: "/api/earnings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet13]
+    modules: [onRequestGet14]
   },
   {
     routePath: "/api/earnings/:month_year",
@@ -2256,7 +2317,7 @@ var routes = [
     mountPath: "/api/festival",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet14]
+    modules: [onRequestGet15]
   },
   {
     routePath: "/api/festival/:month_year",
@@ -2270,7 +2331,7 @@ var routes = [
     mountPath: "/api/surrender",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet15]
+    modules: [onRequestGet16]
   },
   {
     routePath: "/api/surrender/:month_year",
@@ -2284,7 +2345,7 @@ var routes = [
     mountPath: "/api",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet16]
+    modules: [onRequestGet17]
   },
   {
     routePath: "/api/backup",
@@ -2305,7 +2366,7 @@ var routes = [
     mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet17]
+    modules: [onRequestGet18]
   },
   {
     routePath: "/api/employees",
@@ -2326,7 +2387,7 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet18]
+    modules: [onRequestGet19]
   },
   {
     routePath: "/api/settings",
@@ -2347,7 +2408,7 @@ var routes = [
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet19]
+    modules: [onRequestGet20]
   },
   {
     routePath: "/api/users",

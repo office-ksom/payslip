@@ -10,6 +10,7 @@ import { onRequestPost as __api_auth_reset_confirm_js_onRequestPost } from "D:\\
 import { onRequestPost as __api_auth_reset_request_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\reset-request.js"
 import { onRequestPost as __api_me_password_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\me\\password.js"
 import { onRequestGet as __api_reports_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated.js"
+import { onRequestGet as __api_reports_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated-all.js"
 import { onRequestGet as __api_settings_backup_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\backup.js"
 import { onRequestPost as __api_settings_backup_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\backup.js"
 import { onRequestGet as __api_settings_logs_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\logs.js"
@@ -127,6 +128,13 @@ export const routes = [
       method: "GET",
       middlewares: [],
       modules: [__api_reports_consolidated_js_onRequestGet],
+    },
+  {
+      routePath: "/api/reports/consolidated-all",
+      mountPath: "/api/reports",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_consolidated_all_js_onRequestGet],
     },
   {
       routePath: "/api/settings/backup",

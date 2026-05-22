@@ -1,33 +1,15 @@
 const ExcelJS = require('exceljs');
 
-async function analyze() {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile('D:\\KSOM\\Website\\Web Apps\\Payslip\\pay_bill-format.xlsx');
-  const sheet = workbook.worksheets[0];
+async function checkFormats() {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile('D:\\KSOM\\Website\\Web Apps\\Payslip\\Salary_deductions-format.xlsx');
   
-  console.log("Columns:");
-  for (let i = 1; i <= sheet.columnCount; i++) {
-    const col = sheet.getColumn(i);
-    console.log(`Col ${i}: width=${col.width}`);
-  }
-  
-  console.log("Row 4 (Headers) styles:");
-  const row4 = sheet.getRow(4);
-  console.log("Font:", row4.getCell(1).font);
-  console.log("Alignment:", row4.getCell(1).alignment);
-  console.log("Border:", row4.getCell(1).border);
-
-  console.log("Row 5 (Headers) styles:");
-  const row5 = sheet.getRow(5);
-  console.log("Font:", row5.getCell(1).font);
-  console.log("Alignment:", row5.getCell(1).alignment);
-  console.log("Border:", row5.getCell(1).border);
-
-  console.log("Row 6 (Data) styles:");
-  const row6 = sheet.getRow(6);
-  console.log("Font:", row6.getCell(1).font);
-  console.log("Alignment:", row6.getCell(1).alignment);
-  console.log("Border:", row6.getCell(1).border);
+  const sheet = wb.worksheets[0];
+  console.log("C2 (April header date) numFmt:", sheet.getCell('C2').numFmt);
+  console.log("C3 (April first employee data) numFmt:", sheet.getCell('C3').numFmt);
+  console.log("O3 (Total first employee data) numFmt:", sheet.getCell('O3').numFmt);
+  console.log("C13 (April TOTAL column) numFmt:", sheet.getCell('C13').numFmt);
+  console.log("O13 (TOTAL of TOTALS) numFmt:", sheet.getCell('O13').numFmt);
 }
 
-analyze().catch(console.error);
+checkFormats().catch(console.error);
