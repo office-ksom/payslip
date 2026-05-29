@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Table, Download, Loader2 } from 'lucide-react';
+import { FileText, Table, Download, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -22,14 +22,9 @@ const ConsolidatedStatement = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
   const [fetchingEmployees, setFetchingEmployees] = useState(false);
-
-  useEffect(() => {
-    if (isAdmin && fy) {
-      fetchEmployees(fy, selectedEmpId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, fy]);
 
   const fetchEmployees = async (financialYear, currentSelectedId) => {
     setFetchingEmployees(true);
@@ -50,6 +45,120 @@ const ConsolidatedStatement = () => {
     } finally {
       setFetchingEmployees(false);
     }
+  };
+
+  useEffect(() => {
+    if (isAdmin && fy) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchEmployees(fy, selectedEmpId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, fy]);
+
+  const handlePreview = async () => {
+    if (previewData) {
+      setPreviewData(null);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const url = `/api/reports/consolidated?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      setPreviewData(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load preview: " + err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const getPreviewRows = () => {
+    const { earnings, deductions, arrears, surrender, festival } = previewData;
+
+    const months = [];
+    for (let i = 3; i <= 14; i++) {
+      const m = i > 12 ? i - 12 : i;
+      const y = i > 12 ? fy + 1 : fy;
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+
+    let grandTotals = Array(25).fill(0);
+    const rows = months.map(my => {
+      const e = earnings.find(x => x.month_year === my);
+      const isLocked = e && e.is_approved === 1;
+      const d = deductions.find(x => x.month_year === my) || {};
+      
+      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const arrearAmt = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
+      const arrearIT = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
+
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const surrenderAmt = isLocked ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
+
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const festivalAmt = isLocked ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
+
+      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+      const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : null;
+      const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : null;
+      const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : null;
+      const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : null;
+      const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : null;
+      const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : null;
+      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+      const gross = isLocked ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt) : null;
+      
+      const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
+      const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : null;
+      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+      const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : null;
+      const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : null;
+      const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : null;
+      const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : null;
+      const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : null;
+      const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : null;
+      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+      const totDed = isLocked ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT) : null;
+      const net = isLocked ? (gross - totDed) : null;
+
+      const [yearStr, monthStr] = my.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10);
+      let receivedMonth = month + 1;
+      let receivedYear = year;
+      if (receivedMonth > 12) {
+        receivedMonth = 1;
+        receivedYear = year + 1;
+      }
+      const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
+
+      const values = [
+        basic, da, hra, dpgp, cca, spl, tr, otherEarn, arrearAmt, surrenderAmt, festivalAmt, gross,
+        epf, cpf, it, pt, sli, gis, lic, adv, hrRec, otherDed, arrearIT, totDed, net
+      ];
+
+      values.forEach((v, idx) => {
+        if (v !== null && v !== undefined) {
+          grandTotals[idx] += v;
+        }
+      });
+
+      return {
+        month: displayMonth,
+        values
+      };
+    });
+
+    return { rows, grandTotals };
   };
 
   const handleDownload = async (format) => {
@@ -313,8 +422,7 @@ const ConsolidatedStatement = () => {
       const totDed = isLocked ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT) : null;
       const net = isLocked ? (gross - totDed) : null;
 
-      const [yearStr, monthStr] = my.split('-');
-      const year = parseInt(yearStr, 10);
+      const [, monthStr] = my.split('-');
       const month = parseInt(monthStr, 10);
       let receivedMonth = month + 1;
       if (receivedMonth > 12) {
@@ -406,12 +514,12 @@ const ConsolidatedStatement = () => {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
           <button 
             className="btn btn-primary" 
             onClick={() => handleDownload('pdf')} 
-            disabled={loading || (isAdmin && !selectedEmpId)}
-            style={{ flex: 1 }}
+            disabled={loading || previewLoading || (isAdmin && !selectedEmpId)}
+            style={{ flex: 1, minWidth: '130px' }}
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
             Download PDF
@@ -419,14 +527,124 @@ const ConsolidatedStatement = () => {
           <button 
             className="btn" 
             onClick={() => handleDownload('excel')} 
-            disabled={loading || (isAdmin && !selectedEmpId)}
-            style={{ flex: 1, backgroundColor: 'var(--color-success)', color: '#fff' }}
+            disabled={loading || previewLoading || (isAdmin && !selectedEmpId)}
+            style={{ flex: 1, backgroundColor: 'var(--color-success)', color: '#fff', minWidth: '130px' }}
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Table size={18} />}
             Download Excel
           </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handlePreview} 
+            disabled={loading || previewLoading || (isAdmin && !selectedEmpId)}
+            style={{ flex: 1, minWidth: '130px' }}
+          >
+            {previewLoading && <Loader2 className="animate-spin" size={18} />}
+            {!previewLoading && previewData && <EyeOff size={18} />}
+            {!previewLoading && !previewData && <Eye size={18} />}
+            {previewData ? "Hide Preview" : "Preview Statement"}
+          </button>
         </div>
       </div>
+
+      {/* Preview Section */}
+      {previewData && (() => {
+        const preview = getPreviewRows();
+        if (!preview) return null;
+        return (
+          <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                  Statement Preview: {(previewData.employee.title ? `${previewData.employee.title} ` : '') + previewData.employee.name}
+                </h3>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  FY {fy}-{ (fy + 1).toString().slice(-2) } | Scale of Pay: {previewData.employee.scale_of_pay}
+                </p>
+              </div>
+              <button 
+                className="btn" 
+                onClick={() => setPreviewData(null)} 
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+              >
+                Hide Preview
+              </button>
+            </div>
+
+            <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <table className="table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  {/* Super Headers */}
+                  <tr style={{ background: 'var(--color-bg-primary)' }}>
+                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
+                    <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Earnings</th>
+                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Gross Pay</th>
+                    <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
+                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Total Ded</th>
+                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Net Pay</th>
+                  </tr>
+                  <tr style={{ background: 'var(--color-bg-primary)' }}>
+                    {/* Earnings sub-headers */}
+                    {['Basic', 'DA', 'HRA', 'DP/GP', 'CCA', 'Spl Pay', 'Tr Allow', 'Others', 'Arrears', 'Surr', 'Fest'].map((h, i) => (
+                      <th key={`earn-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                    ))}
+                    {/* Deductions sub-headers */}
+                    {['EPF', 'CPF', 'IT', 'PT', 'SLI', 'GIS', 'LIC', 'Adv', 'Rec', 'Oth', 'ArrIT'].map((h, i) => (
+                      <th key={`ded-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((row, rIdx) => (
+                    <tr key={rIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.5rem', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.month}</td>
+                      {row.values.map((val, vIdx) => {
+                        const isHighlight = vIdx === 11 || vIdx === 23 || vIdx === 24; // Gross, TotDed, Net
+                        return (
+                          <td 
+                            key={vIdx} 
+                            style={{ 
+                              padding: '0.5rem', 
+                              textAlign: 'center', 
+                              fontWeight: isHighlight ? 'bold' : 'normal',
+                              color: isHighlight 
+                                ? (vIdx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                                : (val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)')
+                            }}
+                          >
+                            {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
+                    <td style={{ padding: '0.5rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
+                    {preview.grandTotals.map((tot, idx) => {
+                      const isHighlight = idx === 11 || idx === 23 || idx === 24; // Gross, TotDed, Net
+                      return (
+                        <td 
+                          key={idx} 
+                          style={{ 
+                            padding: '0.5rem', 
+                            textAlign: 'center', 
+                            color: isHighlight 
+                              ? (idx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                              : 'var(--color-text-primary)' 
+                          }}
+                        >
+                          {tot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
       
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Important Note</h4>

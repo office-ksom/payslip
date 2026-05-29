@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-jcimmu/checked-fetch.js
+// .wrangler/tmp/bundle-1qiRYQ/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,12 +27,39 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// lib/logger.js
+// .wrangler/tmp/pages-2PTF9O/functionsWorker-0.7783995634630408.mjs
+var __defProp2 = Object.defineProperty;
+var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+var urls2 = /* @__PURE__ */ new Set();
+function checkURL2(request, init) {
+  const url = request instanceof URL ? request : new URL(
+    (typeof request === "string" ? new Request(request, init) : request).url
+  );
+  if (url.port && url.port !== "443" && url.protocol === "https:") {
+    if (!urls2.has(url.toString())) {
+      urls2.add(url.toString());
+      console.warn(
+        `WARNING: known issue with \`fetch()\` requests to custom HTTPS ports in published Workers:
+ - ${url.toString()} - the custom port will be ignored when the Worker is published using the \`wrangler deploy\` command.
+`
+      );
+    }
+  }
+}
+__name(checkURL2, "checkURL");
+__name2(checkURL2, "checkURL");
+globalThis.fetch = new Proxy(globalThis.fetch, {
+  apply(target, thisArg, argArray) {
+    const [request, init] = argArray;
+    checkURL2(request, init);
+    return Reflect.apply(target, thisArg, argArray);
+  }
+});
 async function logActivity2(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
   const istOffset = 5.5 * 60 * 60 * 1e3;
   const istDate = new Date(now.getTime() + istOffset);
-  const pad = /* @__PURE__ */ __name((n) => String(n).padStart(2, "0"), "pad");
+  const pad = /* @__PURE__ */ __name2((n) => String(n).padStart(2, "0"), "pad");
   const timestamp = `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth() + 1)}-${pad(istDate.getUTCDate())} ${pad(istDate.getUTCHours())}:${pad(istDate.getUTCMinutes())}:${pad(istDate.getUTCSeconds())}`;
   const logLine = `[${timestamp}] [${userEmail || "system"}] Action: ${action} - Description: ${description}`;
   console.log(logLine);
@@ -50,9 +77,8 @@ async function logActivity2(db, userEmail, action, description) {
     }
   }
 }
-__name(logActivity2, "logActivity");
-
-// api/arrears/approve/[month_year].js
+__name(logActivity2, "logActivity2");
+__name2(logActivity2, "logActivity");
 async function onRequestPost(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -121,6 +147,7 @@ async function onRequestPost(context) {
   }
 }
 __name(onRequestPost, "onRequestPost");
+__name2(onRequestPost, "onRequestPost");
 async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -147,8 +174,7 @@ async function onRequestGet(context) {
   }
 }
 __name(onRequestGet, "onRequestGet");
-
-// api/festival/approve/[month_year].js
+__name2(onRequestGet, "onRequestGet");
 async function onRequestPost2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -206,7 +232,8 @@ async function onRequestPost2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost2, "onRequestPost");
+__name(onRequestPost2, "onRequestPost2");
+__name2(onRequestPost2, "onRequestPost");
 async function onRequestGet2(context) {
   try {
     const monthYear = context.params.month_year;
@@ -224,9 +251,8 @@ async function onRequestGet2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet2, "onRequestGet");
-
-// api/surrender/approve/[month_year].js
+__name(onRequestGet2, "onRequestGet2");
+__name2(onRequestGet2, "onRequestGet");
 async function onRequestPost3(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -286,7 +312,8 @@ async function onRequestPost3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost3, "onRequestPost");
+__name(onRequestPost3, "onRequestPost3");
+__name2(onRequestPost3, "onRequestPost");
 async function onRequestGet3(context) {
   try {
     const monthYear = context.params.month_year;
@@ -306,9 +333,8 @@ async function onRequestGet3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet3, "onRequestGet");
-
-// lib/auth.js
+__name(onRequestGet3, "onRequestGet3");
+__name2(onRequestGet3, "onRequestGet");
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -334,6 +360,7 @@ async function hashPassword(password) {
   return `100000.${bufToHex(salt)}.${bufToHex(hashArray)}`;
 }
 __name(hashPassword, "hashPassword");
+__name2(hashPassword, "hashPassword");
 async function verifyPassword(password, storedHash) {
   if (!storedHash) return false;
   try {
@@ -367,10 +394,12 @@ async function verifyPassword(password, storedHash) {
   }
 }
 __name(verifyPassword, "verifyPassword");
+__name2(verifyPassword, "verifyPassword");
 function bufToHex(buf) {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 __name(bufToHex, "bufToHex");
+__name2(bufToHex, "bufToHex");
 function hexToBuf(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
@@ -379,6 +408,7 @@ function hexToBuf(hex) {
   return bytes;
 }
 __name(hexToBuf, "hexToBuf");
+__name2(hexToBuf, "hexToBuf");
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let result = 0;
@@ -388,8 +418,7 @@ function timingSafeEqual(a, b) {
   return result === 0;
 }
 __name(timingSafeEqual, "timingSafeEqual");
-
-// api/auth/login.js
+__name2(timingSafeEqual, "timingSafeEqual");
 async function onRequestPost4(context) {
   const { request, env } = context;
   try {
@@ -441,9 +470,8 @@ async function onRequestPost4(context) {
     });
   }
 }
-__name(onRequestPost4, "onRequestPost");
-
-// api/auth/logout.js
+__name(onRequestPost4, "onRequestPost4");
+__name2(onRequestPost4, "onRequestPost");
 async function onRequestGet4(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -455,9 +483,8 @@ async function onRequestGet4(context) {
     }
   });
 }
-__name(onRequestGet4, "onRequestGet");
-
-// api/auth/reset-confirm.js
+__name(onRequestGet4, "onRequestGet4");
+__name2(onRequestGet4, "onRequestGet");
 async function onRequestPost5(context) {
   const { request, env } = context;
   try {
@@ -480,9 +507,8 @@ async function onRequestPost5(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost5, "onRequestPost");
-
-// lib/gmail.js
+__name(onRequestPost5, "onRequestPost5");
+__name2(onRequestPost5, "onRequestPost");
 async function getAccessToken(clientId, clientSecret, refreshToken) {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -500,6 +526,7 @@ async function getAccessToken(clientId, clientSecret, refreshToken) {
   return data.access_token;
 }
 __name(getAccessToken, "getAccessToken");
+__name2(getAccessToken, "getAccessToken");
 function buildMimeMessage({ from, to, subject, text = "", attachments = [] }) {
   const boundary = "boundary_" + Math.random().toString(36).substring(2);
   const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -534,12 +561,12 @@ function buildMimeMessage({ from, to, subject, text = "", attachments = [] }) {
   return message.join("\r\n");
 }
 __name(buildMimeMessage, "buildMimeMessage");
+__name2(buildMimeMessage, "buildMimeMessage");
 function base64url(str) {
   return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 __name(base64url, "base64url");
-
-// api/auth/reset-request.js
+__name2(base64url, "base64url");
 async function onRequestPost6(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -582,9 +609,8 @@ This link expires in 1 hour.`
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost6, "onRequestPost");
-
-// api/me/password.js
+__name(onRequestPost6, "onRequestPost6");
+__name2(onRequestPost6, "onRequestPost");
 async function onRequestPost7(context) {
   const { request, env, data } = context;
   if (!data.user) {
@@ -615,9 +641,8 @@ async function onRequestPost7(context) {
     });
   }
 }
-__name(onRequestPost7, "onRequestPost");
-
-// api/reports/consolidated.js
+__name(onRequestPost7, "onRequestPost7");
+__name2(onRequestPost7, "onRequestPost");
 async function onRequestGet5(context) {
   try {
     const { request, env } = context;
@@ -640,8 +665,8 @@ async function onRequestGet5(context) {
     } else if (!empId) {
       return new Response(JSON.stringify({ error: "emp_id is required" }), { status: 400 });
     }
-    const startMonth = `${fy}-04`;
-    const endMonth = `${parseInt(fy) + 1}-03`;
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
     const employee = await env.ksom_payslip_db.prepare(
       "SELECT * FROM employees WHERE emp_id = ?"
     ).bind(empId).first();
@@ -681,10 +706,63 @@ async function onRequestGet5(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet5, "onRequestGet");
-
-// api/settings/backup.js
+__name(onRequestGet5, "onRequestGet5");
+__name2(onRequestGet5, "onRequestGet");
 async function onRequestGet6(context) {
+  try {
+    const { request, env } = context;
+    const url = new URL(request.url);
+    const fy = url.searchParams.get("fy");
+    const userRole = request.headers.get("X-User-Role");
+    if (!fy) {
+      return new Response(JSON.stringify({ error: "Financial year (fy) is required" }), { status: 400 });
+    }
+    if (userRole !== "admin" && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Access denied. Admins only." }), { status: 403 });
+    }
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
+    const { results: employees } = await env.ksom_payslip_db.prepare(
+      `SELECT * FROM employees 
+       WHERE emp_id IN (
+         SELECT DISTINCT emp_id 
+         FROM monthly_earnings 
+         WHERE month_year >= ? AND month_year <= ?
+       )
+       ORDER BY sort_order ASC, name ASC`
+    ).bind(startMonth, endMonth).all();
+    const { results: earnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM monthly_earnings WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    const { results: deductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM monthly_deductions WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    const { results: arrears } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM arrear_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    const { results: surrender } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM surrender_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    const { results: festival } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM festival_allowance_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+    return new Response(JSON.stringify({
+      employees,
+      earnings,
+      deductions,
+      arrears,
+      surrender,
+      festival
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet6, "onRequestGet6");
+__name2(onRequestGet6, "onRequestGet");
+async function onRequestGet7(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
@@ -701,7 +779,8 @@ async function onRequestGet6(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet6, "onRequestGet");
+__name(onRequestGet7, "onRequestGet7");
+__name2(onRequestGet7, "onRequestGet");
 async function onRequestPost8(context) {
   try {
     const data = await context.request.json();
@@ -729,10 +808,9 @@ async function onRequestPost8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost8, "onRequestPost");
-
-// api/settings/logs.js
-async function onRequestGet7(context) {
+__name(onRequestPost8, "onRequestPost8");
+__name2(onRequestPost8, "onRequestPost");
+async function onRequestGet8(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden. Only super admins can view logs." }), {
@@ -779,10 +857,9 @@ async function onRequestGet7(context) {
     });
   }
 }
-__name(onRequestGet7, "onRequestGet");
-
-// api/settings/system.js
-async function onRequestGet8(context) {
+__name(onRequestGet8, "onRequestGet8");
+__name2(onRequestGet8, "onRequestGet");
+async function onRequestGet9(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const settings = await db.prepare("SELECT * FROM system_settings").all();
@@ -797,7 +874,8 @@ async function onRequestGet8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet8, "onRequestGet");
+__name(onRequestGet9, "onRequestGet9");
+__name2(onRequestGet9, "onRequestGet");
 async function onRequestPost9(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -827,10 +905,9 @@ async function onRequestPost9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost9, "onRequestPost");
-
-// api/surrender/cumulative.js
-async function onRequestGet9(context) {
+__name(onRequestPost9, "onRequestPost9");
+__name2(onRequestPost9, "onRequestPost");
+async function onRequestGet10(context) {
   try {
     const url = new URL(context.request.url);
     const empId = url.searchParams.get("emp_id");
@@ -853,9 +930,8 @@ async function onRequestGet9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet9, "onRequestGet");
-
-// api/users/password.js
+__name(onRequestGet10, "onRequestGet10");
+__name2(onRequestGet10, "onRequestGet");
 async function onRequestPost10(context) {
   const { request, env, data } = context;
   if (data.user.role !== "super_admin") {
@@ -892,9 +968,8 @@ async function onRequestPost10(context) {
     });
   }
 }
-__name(onRequestPost10, "onRequestPost");
-
-// api/approve/[month_year].js
+__name(onRequestPost10, "onRequestPost10");
+__name2(onRequestPost10, "onRequestPost");
 async function onRequestPost11(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -953,8 +1028,9 @@ async function onRequestPost11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost11, "onRequestPost");
-async function onRequestGet10(context) {
+__name(onRequestPost11, "onRequestPost11");
+__name2(onRequestPost11, "onRequestPost");
+async function onRequestGet11(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -972,10 +1048,9 @@ async function onRequestGet10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet10, "onRequestGet");
-
-// api/arrears/[month_year].js
-async function onRequestGet11(context) {
+__name(onRequestGet11, "onRequestGet11");
+__name2(onRequestGet11, "onRequestGet");
+async function onRequestGet12(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1015,7 +1090,8 @@ async function onRequestGet11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet11, "onRequestGet");
+__name(onRequestGet12, "onRequestGet12");
+__name2(onRequestGet12, "onRequestGet");
 async function onRequestPost12(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1089,10 +1165,9 @@ async function onRequestPost12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost12, "onRequestPost");
-
-// api/deductions/[month_year].js
-async function onRequestGet12(context) {
+__name(onRequestPost12, "onRequestPost12");
+__name2(onRequestPost12, "onRequestPost");
+async function onRequestGet13(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1118,7 +1193,8 @@ async function onRequestGet12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet12, "onRequestGet");
+__name(onRequestGet13, "onRequestGet13");
+__name2(onRequestGet13, "onRequestGet");
 async function onRequestPost13(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -1178,10 +1254,9 @@ async function onRequestPost13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost13, "onRequestPost");
-
-// api/earnings/[month_year].js
-async function onRequestGet13(context) {
+__name(onRequestPost13, "onRequestPost13");
+__name2(onRequestPost13, "onRequestPost");
+async function onRequestGet14(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1212,7 +1287,8 @@ async function onRequestGet13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet13, "onRequestGet");
+__name(onRequestGet14, "onRequestGet14");
+__name2(onRequestGet14, "onRequestGet");
 async function onRequestPost14(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1314,7 +1390,8 @@ async function onRequestPost14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost14, "onRequestPost");
+__name(onRequestPost14, "onRequestPost14");
+__name2(onRequestPost14, "onRequestPost");
 async function onRequestDelete(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1346,9 +1423,8 @@ async function onRequestDelete(context) {
   }
 }
 __name(onRequestDelete, "onRequestDelete");
-
-// api/festival/[month_year].js
-async function onRequestGet14(context) {
+__name2(onRequestDelete, "onRequestDelete");
+async function onRequestGet15(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1376,7 +1452,8 @@ async function onRequestGet14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet14, "onRequestGet");
+__name(onRequestGet15, "onRequestGet15");
+__name2(onRequestGet15, "onRequestGet");
 async function onRequestPost15(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1440,10 +1517,9 @@ async function onRequestPost15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost15, "onRequestPost");
-
-// api/surrender/[month_year].js
-async function onRequestGet15(context) {
+__name(onRequestPost15, "onRequestPost15");
+__name2(onRequestPost15, "onRequestPost");
+async function onRequestGet16(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1473,7 +1549,8 @@ async function onRequestGet15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet15, "onRequestGet");
+__name(onRequestGet16, "onRequestGet16");
+__name2(onRequestGet16, "onRequestGet");
 async function onRequestPost16(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1550,9 +1627,8 @@ async function onRequestPost16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost16, "onRequestPost");
-
-// lib/backup_helper.js
+__name(onRequestPost16, "onRequestPost16");
+__name2(onRequestPost16, "onRequestPost");
 async function generateBackupSql(db) {
   const { results: tables } = await db.prepare(
     "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
@@ -1584,6 +1660,7 @@ PRAGMA defer_foreign_keys=TRUE;
   return sqlDump;
 }
 __name(generateBackupSql, "generateBackupSql");
+__name2(generateBackupSql, "generateBackupSql");
 async function sendBackupEmail(env, toEmail, sql) {
   const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = env;
   if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
@@ -1619,6 +1696,7 @@ async function sendBackupEmail(env, toEmail, sql) {
   return result.id;
 }
 __name(sendBackupEmail, "sendBackupEmail");
+__name2(sendBackupEmail, "sendBackupEmail");
 async function checkAndRunScheduledBackup(env, waitUntil) {
   try {
     const settings = await env.ksom_payslip_db.prepare(
@@ -1648,7 +1726,7 @@ async function checkAndRunScheduledBackup(env, waitUntil) {
       await env.ksom_payslip_db.prepare(
         "UPDATE backup_settings SET last_backup_at = ? WHERE id = 1"
       ).bind(nowStr).run();
-      const task = /* @__PURE__ */ __name(async () => {
+      const task = /* @__PURE__ */ __name2(async () => {
         try {
           const sql = await generateBackupSql(env.ksom_payslip_db);
           await sendBackupEmail(env, settings.backup_email, sql);
@@ -1671,9 +1749,8 @@ async function checkAndRunScheduledBackup(env, waitUntil) {
   }
 }
 __name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
-
-// api/backup.js
-async function onRequestGet16(context) {
+__name2(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
+async function onRequestGet17(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const sqlDump = await generateBackupSql(db);
@@ -1687,7 +1764,8 @@ async function onRequestGet16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet16, "onRequestGet");
+__name(onRequestGet17, "onRequestGet17");
+__name2(onRequestGet17, "onRequestGet");
 async function onRequestPost17(context) {
   try {
     const db = context.env.ksom_payslip_db;
@@ -1705,9 +1783,8 @@ async function onRequestPost17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost17, "onRequestPost");
-
-// api/email/index.js
+__name(onRequestPost17, "onRequestPost17");
+__name2(onRequestPost17, "onRequestPost");
 async function onRequestPost18(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
@@ -1753,18 +1830,30 @@ async function onRequestPost18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost18, "onRequestPost");
-
-// api/employees/index.js
-async function onRequestGet17(context) {
+__name(onRequestPost18, "onRequestPost18");
+__name2(onRequestPost18, "onRequestPost");
+async function onRequestGet18(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
+    const url = new URL(context.request.url);
+    const fy = url.searchParams.get("fy");
     let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
     let params = [];
     if (userRole === "viewer" && userEmail) {
       query = "SELECT * FROM employees WHERE email_id = ? ORDER BY sort_order ASC, name ASC";
       params = [userEmail];
+    } else if (fy) {
+      const startMonth = `${fy}-03`;
+      const endMonth = `${parseInt(fy) + 1}-02`;
+      query = `SELECT * FROM employees 
+               WHERE emp_id IN (
+                 SELECT DISTINCT emp_id 
+                 FROM monthly_earnings 
+                 WHERE month_year >= ? AND month_year <= ?
+               ) 
+               ORDER BY sort_order ASC, name ASC`;
+      params = [startMonth, endMonth];
     }
     const { results } = await context.env.ksom_payslip_db.prepare(
       query
@@ -1776,7 +1865,8 @@ async function onRequestGet17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet17, "onRequestGet");
+__name(onRequestGet18, "onRequestGet18");
+__name2(onRequestGet18, "onRequestGet");
 async function onRequestPost19(context) {
   try {
     const data = await context.request.json();
@@ -1795,7 +1885,8 @@ async function onRequestPost19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost19, "onRequestPost");
+__name(onRequestPost19, "onRequestPost19");
+__name2(onRequestPost19, "onRequestPost");
 async function onRequestPut(context) {
   try {
     const data = await context.request.json();
@@ -1817,9 +1908,8 @@ async function onRequestPut(context) {
   }
 }
 __name(onRequestPut, "onRequestPut");
-
-// api/settings/index.js
-async function onRequestGet18(context) {
+__name2(onRequestPut, "onRequestPut");
+async function onRequestGet19(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -1831,7 +1921,8 @@ async function onRequestGet18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet18, "onRequestGet");
+__name(onRequestGet19, "onRequestGet19");
+__name2(onRequestGet19, "onRequestGet");
 async function onRequestPost20(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -1859,10 +1950,9 @@ async function onRequestPost20(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost20, "onRequestPost");
-
-// api/users/index.js
-async function onRequestGet19(context) {
+__name(onRequestPost20, "onRequestPost20");
+__name2(onRequestPost20, "onRequestPost");
+async function onRequestGet20(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -1874,7 +1964,8 @@ async function onRequestGet19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet19, "onRequestGet");
+__name(onRequestGet20, "onRequestGet20");
+__name2(onRequestGet20, "onRequestGet");
 async function onRequestPost21(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -1899,7 +1990,8 @@ async function onRequestPost21(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost21, "onRequestPost");
+__name(onRequestPost21, "onRequestPost21");
+__name2(onRequestPost21, "onRequestPost");
 async function onRequestDelete2(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -1916,9 +2008,8 @@ async function onRequestDelete2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete2, "onRequestDelete");
-
-// _middleware.js
+__name(onRequestDelete2, "onRequestDelete2");
+__name2(onRequestDelete2, "onRequestDelete");
 async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
@@ -2008,6 +2099,7 @@ async function onRequest(context) {
   return next(modifiedRequest);
 }
 __name(onRequest, "onRequest");
+__name2(onRequest, "onRequest");
 function forbiddenResponse() {
   return new Response(JSON.stringify({ error: "Forbidden" }), {
     status: 403,
@@ -2015,8 +2107,7 @@ function forbiddenResponse() {
   });
 }
 __name(forbiddenResponse, "forbiddenResponse");
-
-// ../.wrangler/tmp/pages-wyFSJD/functionsRoutes-0.9343535880791956.mjs
+__name2(forbiddenResponse, "forbiddenResponse");
 var routes = [
   {
     routePath: "/api/arrears/approve/:month_year",
@@ -2103,11 +2194,18 @@ var routes = [
     modules: [onRequestGet5]
   },
   {
+    routePath: "/api/reports/consolidated-all",
+    mountPath: "/api/reports",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet6]
+  },
+  {
     routePath: "/api/settings/backup",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet6]
+    modules: [onRequestGet7]
   },
   {
     routePath: "/api/settings/backup",
@@ -2121,14 +2219,14 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet7]
+    modules: [onRequestGet8]
   },
   {
     routePath: "/api/settings/system",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet8]
+    modules: [onRequestGet9]
   },
   {
     routePath: "/api/settings/system",
@@ -2142,7 +2240,7 @@ var routes = [
     mountPath: "/api/surrender",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet9]
+    modules: [onRequestGet10]
   },
   {
     routePath: "/api/users/password",
@@ -2156,7 +2254,7 @@ var routes = [
     mountPath: "/api/approve",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet10]
+    modules: [onRequestGet11]
   },
   {
     routePath: "/api/approve/:month_year",
@@ -2170,7 +2268,7 @@ var routes = [
     mountPath: "/api/arrears",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet11]
+    modules: [onRequestGet12]
   },
   {
     routePath: "/api/arrears/:month_year",
@@ -2184,7 +2282,7 @@ var routes = [
     mountPath: "/api/deductions",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet12]
+    modules: [onRequestGet13]
   },
   {
     routePath: "/api/deductions/:month_year",
@@ -2205,7 +2303,7 @@ var routes = [
     mountPath: "/api/earnings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet13]
+    modules: [onRequestGet14]
   },
   {
     routePath: "/api/earnings/:month_year",
@@ -2219,7 +2317,7 @@ var routes = [
     mountPath: "/api/festival",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet14]
+    modules: [onRequestGet15]
   },
   {
     routePath: "/api/festival/:month_year",
@@ -2233,7 +2331,7 @@ var routes = [
     mountPath: "/api/surrender",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet15]
+    modules: [onRequestGet16]
   },
   {
     routePath: "/api/surrender/:month_year",
@@ -2247,7 +2345,7 @@ var routes = [
     mountPath: "/api",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet16]
+    modules: [onRequestGet17]
   },
   {
     routePath: "/api/backup",
@@ -2268,7 +2366,7 @@ var routes = [
     mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet17]
+    modules: [onRequestGet18]
   },
   {
     routePath: "/api/employees",
@@ -2289,7 +2387,7 @@ var routes = [
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet18]
+    modules: [onRequestGet19]
   },
   {
     routePath: "/api/settings",
@@ -2310,7 +2408,7 @@ var routes = [
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet19]
+    modules: [onRequestGet20]
   },
   {
     routePath: "/api/users",
@@ -2327,8 +2425,6 @@ var routes = [
     modules: []
   }
 ];
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/path-to-regexp/dist.es2015/index.js
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -2413,6 +2509,7 @@ function lexer(str) {
   return tokens;
 }
 __name(lexer, "lexer");
+__name2(lexer, "lexer");
 function parse(str, options) {
   if (options === void 0) {
     options = {};
@@ -2423,18 +2520,18 @@ function parse(str, options) {
   var key = 0;
   var i = 0;
   var path = "";
-  var tryConsume = /* @__PURE__ */ __name(function(type) {
+  var tryConsume = /* @__PURE__ */ __name2(function(type) {
     if (i < tokens.length && tokens[i].type === type)
       return tokens[i++].value;
   }, "tryConsume");
-  var mustConsume = /* @__PURE__ */ __name(function(type) {
+  var mustConsume = /* @__PURE__ */ __name2(function(type) {
     var value2 = tryConsume(type);
     if (value2 !== void 0)
       return value2;
     var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
     throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
   }, "mustConsume");
-  var consumeText = /* @__PURE__ */ __name(function() {
+  var consumeText = /* @__PURE__ */ __name2(function() {
     var result2 = "";
     var value2;
     while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
@@ -2442,7 +2539,7 @@ function parse(str, options) {
     }
     return result2;
   }, "consumeText");
-  var isSafe = /* @__PURE__ */ __name(function(value2) {
+  var isSafe = /* @__PURE__ */ __name2(function(value2) {
     for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
       var char2 = delimiter_1[_i];
       if (value2.indexOf(char2) > -1)
@@ -2450,7 +2547,7 @@ function parse(str, options) {
     }
     return false;
   }, "isSafe");
-  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
+  var safePattern = /* @__PURE__ */ __name2(function(prefix2) {
     var prev = result[result.length - 1];
     var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
     if (prev && !prevText) {
@@ -2513,12 +2610,14 @@ function parse(str, options) {
   return result;
 }
 __name(parse, "parse");
+__name2(parse, "parse");
 function match(str, options) {
   var keys = [];
   var re = pathToRegexp(str, keys, options);
   return regexpToFunction(re, keys, options);
 }
 __name(match, "match");
+__name2(match, "match");
 function regexpToFunction(re, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2532,7 +2631,7 @@ function regexpToFunction(re, keys, options) {
       return false;
     var path = m[0], index = m.index;
     var params = /* @__PURE__ */ Object.create(null);
-    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
+    var _loop_1 = /* @__PURE__ */ __name2(function(i2) {
       if (m[i2] === void 0)
         return "continue";
       var key = keys[i2 - 1];
@@ -2551,14 +2650,17 @@ function regexpToFunction(re, keys, options) {
   };
 }
 __name(regexpToFunction, "regexpToFunction");
+__name2(regexpToFunction, "regexpToFunction");
 function escapeString(str) {
   return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
 }
 __name(escapeString, "escapeString");
+__name2(escapeString, "escapeString");
 function flags(options) {
   return options && options.sensitive ? "" : "i";
 }
 __name(flags, "flags");
+__name2(flags, "flags");
 function regexpToRegexp(path, keys) {
   if (!keys)
     return path;
@@ -2579,6 +2681,7 @@ function regexpToRegexp(path, keys) {
   return path;
 }
 __name(regexpToRegexp, "regexpToRegexp");
+__name2(regexpToRegexp, "regexpToRegexp");
 function arrayToRegexp(paths, keys, options) {
   var parts = paths.map(function(path) {
     return pathToRegexp(path, keys, options).source;
@@ -2586,10 +2689,12 @@ function arrayToRegexp(paths, keys, options) {
   return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
 }
 __name(arrayToRegexp, "arrayToRegexp");
+__name2(arrayToRegexp, "arrayToRegexp");
 function stringToRegexp(path, keys, options) {
   return tokensToRegexp(parse(path, options), keys, options);
 }
 __name(stringToRegexp, "stringToRegexp");
+__name2(stringToRegexp, "stringToRegexp");
 function tokensToRegexp(tokens, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2645,6 +2750,7 @@ function tokensToRegexp(tokens, keys, options) {
   return new RegExp(route, flags(options));
 }
 __name(tokensToRegexp, "tokensToRegexp");
+__name2(tokensToRegexp, "tokensToRegexp");
 function pathToRegexp(path, keys, options) {
   if (path instanceof RegExp)
     return regexpToRegexp(path, keys);
@@ -2653,8 +2759,7 @@ function pathToRegexp(path, keys, options) {
   return stringToRegexp(path, keys, options);
 }
 __name(pathToRegexp, "pathToRegexp");
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/pages-template-worker.ts
+__name2(pathToRegexp, "pathToRegexp");
 var escapeRegex = /[.+?^${}()|[\]\\]/g;
 function* executeRequest(request) {
   const requestPath = new URL(request.url).pathname;
@@ -2705,13 +2810,14 @@ function* executeRequest(request) {
   }
 }
 __name(executeRequest, "executeRequest");
+__name2(executeRequest, "executeRequest");
 var pages_template_worker_default = {
   async fetch(originalRequest, env, workerContext) {
     let request = originalRequest;
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name(async (input, init) => {
+    const next = /* @__PURE__ */ __name2(async (input, init) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
@@ -2738,7 +2844,7 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: /* @__PURE__ */ __name(() => {
+          passThroughOnException: /* @__PURE__ */ __name2(() => {
             isFailOpen = true;
           }, "passThroughOnException")
         };
@@ -2766,16 +2872,14 @@ var pages_template_worker_default = {
     }
   }
 };
-var cloneResponse = /* @__PURE__ */ __name((response) => (
+var cloneResponse = /* @__PURE__ */ __name2((response) => (
   // https://fetch.spec.whatwg.org/#null-body-status
   new Response(
     [101, 204, 205, 304].includes(response.status) ? null : response.body,
     response
   )
 ), "cloneResponse");
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } finally {
@@ -2791,8 +2895,6 @@ var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
   }
 }, "drainBody");
 var middleware_ensure_req_body_drained_default = drainBody;
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
 function reduceError(e) {
   return {
     name: e?.name,
@@ -2802,7 +2904,8 @@ function reduceError(e) {
   };
 }
 __name(reduceError, "reduceError");
-var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+__name2(reduceError, "reduceError");
+var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } catch (e) {
@@ -2814,20 +2917,17 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
   }
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
-
-// ../.wrangler/tmp/bundle-jcimmu/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
 ];
 var middleware_insertion_facade_default = pages_template_worker_default;
-
-// C:/Users/DELL/AppData/Local/npm-cache/_npx/32026684e21afda6/node_modules/wrangler/templates/middleware/common.ts
 var __facade_middleware__ = [];
 function __facade_register__(...args) {
   __facade_middleware__.push(...args.flat());
 }
 __name(__facade_register__, "__facade_register__");
+__name2(__facade_register__, "__facade_register__");
 function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   const [head, ...tail] = middlewareChain;
   const middlewareCtx = {
@@ -2839,6 +2939,7 @@ function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   return head(request, env, ctx, middlewareCtx);
 }
 __name(__facade_invokeChain__, "__facade_invokeChain__");
+__name2(__facade_invokeChain__, "__facade_invokeChain__");
 function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   return __facade_invokeChain__(request, env, ctx, dispatch, [
     ...__facade_middleware__,
@@ -2846,16 +2947,18 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   ]);
 }
 __name(__facade_invoke__, "__facade_invoke__");
-
-// ../.wrangler/tmp/bundle-jcimmu/middleware-loader.entry.ts
+__name2(__facade_invoke__, "__facade_invoke__");
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
+  static {
+    __name(this, "___Facade_ScheduledController__");
+  }
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
     this.cron = cron;
     this.#noRetry = noRetry;
   }
   static {
-    __name(this, "__Facade_ScheduledController__");
+    __name2(this, "__Facade_ScheduledController__");
   }
   #noRetry;
   noRetry() {
@@ -2872,7 +2975,7 @@ function wrapExportedHandler(worker) {
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name2(function(request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -2881,7 +2984,7 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name2(function(type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
@@ -2897,6 +3000,7 @@ function wrapExportedHandler(worker) {
   };
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
+__name2(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
   if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
     return klass;
@@ -2905,7 +3009,7 @@ function wrapWorkerEntrypoint(klass) {
     __facade_register__(middleware);
   }
   return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
+    #fetchDispatcher = /* @__PURE__ */ __name2((request, env, ctx) => {
       this.env = env;
       this.ctx = ctx;
       if (super.fetch === void 0) {
@@ -2913,7 +3017,7 @@ function wrapWorkerEntrypoint(klass) {
       }
       return super.fetch(request);
     }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name((type, init) => {
+    #dispatcher = /* @__PURE__ */ __name2((type, init) => {
       if (type === "scheduled" && super.scheduled !== void 0) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
@@ -2936,6 +3040,7 @@ function wrapWorkerEntrypoint(klass) {
   };
 }
 __name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
+__name2(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
 var WRAPPED_ENTRY;
 if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
@@ -2943,8 +3048,178 @@ if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
 }
 var middleware_loader_entry_default = WRAPPED_ENTRY;
-export {
-  __INTERNAL_WRANGLER_MIDDLEWARE__,
-  middleware_loader_entry_default as default
+
+// C:/Users/DELL/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } finally {
+    try {
+      if (request.body !== null && !request.bodyUsed) {
+        const reader = request.body.getReader();
+        while (!(await reader.read()).done) {
+        }
+      }
+    } catch (e) {
+      console.error("Failed to drain the unused request body.", e);
+    }
+  }
+}, "drainBody");
+var middleware_ensure_req_body_drained_default2 = drainBody2;
+
+// C:/Users/DELL/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
+function reduceError2(e) {
+  return {
+    name: e?.name,
+    message: e?.message ?? String(e),
+    stack: e?.stack,
+    cause: e?.cause === void 0 ? void 0 : reduceError2(e.cause)
+  };
+}
+__name(reduceError2, "reduceError");
+var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
+  try {
+    return await middlewareCtx.next(request, env);
+  } catch (e) {
+    const error = reduceError2(e);
+    return Response.json(error, {
+      status: 500,
+      headers: { "MF-Experimental-Error-Stack": "true" }
+    });
+  }
+}, "jsonError");
+var middleware_miniflare3_json_error_default2 = jsonError2;
+
+// .wrangler/tmp/bundle-1qiRYQ/middleware-insertion-facade.js
+var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
+  middleware_ensure_req_body_drained_default2,
+  middleware_miniflare3_json_error_default2
+];
+var middleware_insertion_facade_default2 = middleware_loader_entry_default;
+
+// C:/Users/DELL/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts
+var __facade_middleware__2 = [];
+function __facade_register__2(...args) {
+  __facade_middleware__2.push(...args.flat());
+}
+__name(__facade_register__2, "__facade_register__");
+function __facade_invokeChain__2(request, env, ctx, dispatch, middlewareChain) {
+  const [head, ...tail] = middlewareChain;
+  const middlewareCtx = {
+    dispatch,
+    next(newRequest, newEnv) {
+      return __facade_invokeChain__2(newRequest, newEnv, ctx, dispatch, tail);
+    }
+  };
+  return head(request, env, ctx, middlewareCtx);
+}
+__name(__facade_invokeChain__2, "__facade_invokeChain__");
+function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
+  return __facade_invokeChain__2(request, env, ctx, dispatch, [
+    ...__facade_middleware__2,
+    finalMiddleware
+  ]);
+}
+__name(__facade_invoke__2, "__facade_invoke__");
+
+// .wrangler/tmp/bundle-1qiRYQ/middleware-loader.entry.ts
+var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
+  constructor(scheduledTime, cron, noRetry) {
+    this.scheduledTime = scheduledTime;
+    this.cron = cron;
+    this.#noRetry = noRetry;
+  }
+  static {
+    __name(this, "__Facade_ScheduledController__");
+  }
+  #noRetry;
+  noRetry() {
+    if (!(this instanceof ___Facade_ScheduledController__2)) {
+      throw new TypeError("Illegal invocation");
+    }
+    this.#noRetry();
+  }
 };
-//# sourceMappingURL=functionsWorker-0.8994577887685221.mjs.map
+function wrapExportedHandler2(worker) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
+    return worker;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
+    __facade_register__2(middleware);
+  }
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
+    if (worker.fetch === void 0) {
+      throw new Error("Handler does not export a fetch() function.");
+    }
+    return worker.fetch(request, env, ctx);
+  }, "fetchDispatcher");
+  return {
+    ...worker,
+    fetch(request, env, ctx) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
+        if (type === "scheduled" && worker.scheduled !== void 0) {
+          const controller = new __Facade_ScheduledController__2(
+            Date.now(),
+            init.cron ?? "",
+            () => {
+            }
+          );
+          return worker.scheduled(controller, env, ctx);
+        }
+      }, "dispatcher");
+      return __facade_invoke__2(request, env, ctx, dispatcher, fetchDispatcher);
+    }
+  };
+}
+__name(wrapExportedHandler2, "wrapExportedHandler");
+function wrapWorkerEntrypoint2(klass) {
+  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
+    return klass;
+  }
+  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
+    __facade_register__2(middleware);
+  }
+  return class extends klass {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
+      this.env = env;
+      this.ctx = ctx;
+      if (super.fetch === void 0) {
+        throw new Error("Entrypoint class does not define a fetch() function.");
+      }
+      return super.fetch(request);
+    }, "#fetchDispatcher");
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
+      if (type === "scheduled" && super.scheduled !== void 0) {
+        const controller = new __Facade_ScheduledController__2(
+          Date.now(),
+          init.cron ?? "",
+          () => {
+          }
+        );
+        return super.scheduled(controller);
+      }
+    }, "#dispatcher");
+    fetch(request) {
+      return __facade_invoke__2(
+        request,
+        this.env,
+        this.ctx,
+        this.#dispatcher,
+        this.#fetchDispatcher
+      );
+    }
+  };
+}
+__name(wrapWorkerEntrypoint2, "wrapWorkerEntrypoint");
+var WRAPPED_ENTRY2;
+if (typeof middleware_insertion_facade_default2 === "object") {
+  WRAPPED_ENTRY2 = wrapExportedHandler2(middleware_insertion_facade_default2);
+} else if (typeof middleware_insertion_facade_default2 === "function") {
+  WRAPPED_ENTRY2 = wrapWorkerEntrypoint2(middleware_insertion_facade_default2);
+}
+var middleware_loader_entry_default2 = WRAPPED_ENTRY2;
+export {
+  __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default2 as default
+};
+//# sourceMappingURL=functionsWorker-0.7783995634630408.js.map

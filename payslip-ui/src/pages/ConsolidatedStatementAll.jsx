@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Loader2 } from 'lucide-react';
+import { Table, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -16,6 +16,9 @@ const ConsolidatedStatementAll = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [activeTab, setActiveTab] = useState('gross');
 
   const getGPAIS = (otherDeductionsBreakdown) => {
     if (!otherDeductionsBreakdown) return 0;
@@ -30,9 +33,78 @@ const ConsolidatedStatementAll = () => {
         }
         return sum;
       }, 0);
-    } catch (e) {
+    } catch {
       return 0;
     }
+  };
+
+  const getEmployeeMonthlyDetails = (emp_id, monthYearStr, earnings, deductions, arrears, surrender, festival) => {
+    const e = earnings.find(x => x.emp_id === emp_id && x.month_year === monthYearStr);
+    const isLocked = e && e.is_approved === 1;
+    const d = deductions.find(x => x.emp_id === emp_id && x.month_year === monthYearStr) || {};
+
+    const empArrears = arrears.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const arrearAmt = empArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0);
+    const arrearIT = empArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0);
+
+    const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const surrenderAmt = empSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0);
+
+    const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const festivalAmt = empFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0);
+
+    const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0;
+    const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0;
+    const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0;
+    const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0;
+    const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : 0;
+    const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0;
+    const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0;
+    const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0;
+
+    const gross_regular = basic + dpgp + da + hra + spl + cca + tr + otherEarn;
+
+    const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : 0;
+    const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0;
+    const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0;
+    const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0;
+    const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : 0;
+    const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : 0;
+    const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : 0;
+    const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0;
+    const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0;
+    const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0;
+
+    const totDed_regular = epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed;
+    const net_regular = isLocked ? (gross_regular - totDed_regular) : null;
+    const tds_regular = isLocked ? it : null;
+
+    const gross_regular_val = isLocked ? gross_regular : null;
+    const arrears_gross = isLocked && arrearAmt > 0 ? arrearAmt : null;
+    const arrears_net = isLocked && arrearAmt > 0 ? (arrearAmt - arrearIT) : null;
+    const arrears_it = isLocked && arrearIT > 0 ? arrearIT : null;
+    const surrender_net = isLocked && surrenderAmt > 0 ? surrenderAmt : null;
+    const festival_net = isLocked && festivalAmt > 0 ? festivalAmt : null;
+
+    const epf_val = isLocked ? epf : null;
+    const sli_val = isLocked ? sli : null;
+    const gis_val = isLocked ? gis : null;
+    const gpais_val = isLocked ? getGPAIS(d.other_deductions_breakdown) : null;
+
+    return {
+      gross_regular: gross_regular_val,
+      net_regular,
+      tds_regular,
+      arrears_gross,
+      arrears_net,
+      arrears_it,
+      surrender_net,
+      festival_net,
+      epf: epf_val,
+      sli: sli_val,
+      gis: gis_val,
+      gpais: gpais_val
+    };
   };
 
   const getColLetter = (colIdx) => {
@@ -66,6 +138,154 @@ const ConsolidatedStatementAll = () => {
     }
   };
 
+  const handlePreview = async () => {
+    if (previewData) {
+      setPreviewData(null);
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`/api/reports/consolidated-all?fy=${fy}`);
+      const data = await res.json();
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      setPreviewData(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load preview: " + err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const getPreviewContent = () => {
+    if (!previewData) return null;
+    const { employees, earnings, deductions, arrears, surrender, festival } = previewData;
+
+    const months = [];
+    for (let i = 3; i <= 14; i++) {
+      const m = i > 12 ? i - 12 : i;
+      const y = i > 12 ? fy + 1 : fy;
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+
+    const getFormattedDateString = (i) => {
+      const m = i + 4 > 12 ? i + 4 - 12 : i + 4;
+      const y = i + 4 > 12 ? fy + 1 : fy;
+      const shortMonth = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1];
+      return `${shortMonth}-${String(y).slice(-2)}`;
+    };
+
+    const monthHasArrears = (monthStr) => {
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
+    };
+
+    const monthHasArrearIT = (monthStr) => {
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.income_tax) || 0) > 0);
+    };
+
+    const monthHasSurrender = (monthStr) => {
+      return surrender.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.total_amount) || 0) > 0);
+    };
+
+    const monthHasFestival = (monthStr) => {
+      return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.amount) || 0) > 0);
+    };
+
+    const cols = [];
+    for (let i = 0; i < 12; i++) {
+      const monthStr = months[i];
+      const formattedDate = getFormattedDateString(i);
+
+      if (activeTab === 'gross') {
+        cols.push({
+          header: formattedDate,
+          monthStr,
+          key: 'gross_regular'
+        });
+
+        if (monthHasArrears(monthStr)) {
+          cols.push({
+            header: `Arrears\n(${formattedDate})`,
+            monthStr,
+            key: 'arrears_gross'
+          });
+        }
+
+        if (monthHasSurrender(monthStr)) {
+          cols.push({
+            header: `Surrender\n(${formattedDate})`,
+            monthStr,
+            key: 'surrender_net'
+          });
+        }
+
+        if (monthHasFestival(monthStr)) {
+          cols.push({
+            header: `Festival Allowance\n(${formattedDate})`,
+            monthStr,
+            key: 'festival_net'
+          });
+        }
+      } else if (activeTab === 'tds') {
+        cols.push({
+          header: formattedDate,
+          monthStr,
+          key: 'tds_regular'
+        });
+
+        if (monthHasArrearIT(monthStr)) {
+          cols.push({
+            header: `Arrear IT\n(${formattedDate})`,
+            monthStr,
+            key: 'arrears_it'
+          });
+        }
+      } else {
+        cols.push({
+          header: formattedDate,
+          monthStr,
+          key: activeTab
+        });
+      }
+    }
+
+    const rows = employees.map((emp, index) => {
+      let rowSum = 0;
+      const cellValues = cols.map(col => {
+        const stats = getEmployeeMonthlyDetails(emp.emp_id, col.monthStr, earnings, deductions, arrears, surrender, festival);
+        const cellVal = stats[col.key];
+        const numericVal = cellVal !== null && cellVal !== undefined ? Math.round(parseFloat(cellVal) || 0) : 0;
+        rowSum += numericVal;
+        return cellVal;
+      });
+
+      return {
+        slNo: index + 1,
+        name: (emp.title ? `${emp.title} ` : '') + emp.name,
+        empId: emp.emp_id,
+        cellValues,
+        total: rowSum
+      };
+    });
+
+    const colTotals = cols.map((col, colIdx) => {
+      return rows.reduce((sum, row) => {
+        const cellVal = row.cellValues[colIdx];
+        const val = cellVal !== null && cellVal !== undefined ? Math.round(parseFloat(cellVal) || 0) : 0;
+        return sum + val;
+      }, 0);
+    });
+
+    const grandTotal = colTotals.reduce((sum, val) => sum + val, 0);
+
+    return { cols, rows, colTotals, grandTotal };
+  };
+
   const generateExcelAll = async (reportData, fyStart) => {
     const workbook = new ExcelJS.Workbook();
     const { employees, earnings, deductions, arrears, surrender, festival } = reportData;
@@ -94,7 +314,6 @@ const ConsolidatedStatementAll = () => {
       right: { style: 'thin', color: { indexed: 64 } }
     };
 
-    const valFmt = (v) => Math.round(parseFloat(v) || 0);
 
     const monthHasArrears = (monthStr) => {
       return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
@@ -112,70 +331,6 @@ const ConsolidatedStatementAll = () => {
       return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.amount) || 0) > 0);
     };
 
-    const getEmployeeMonthlyDetails = (emp_id, monthYearStr) => {
-      const e = earnings.find(x => x.emp_id === emp_id && x.month_year === monthYearStr);
-      const isLocked = e && e.is_approved === 1;
-      const d = deductions.find(x => x.emp_id === emp_id && x.month_year === monthYearStr) || {};
-
-      const empArrears = arrears.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
-      const arrearAmt = empArrears.reduce((sum, curr) => sum + valFmt(curr.arrear_amount), 0);
-      const arrearIT = empArrears.reduce((sum, curr) => sum + valFmt(curr.income_tax), 0);
-
-      const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
-      const surrenderAmt = empSurrender.reduce((sum, curr) => sum + valFmt(curr.total_amount), 0);
-
-      const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
-      const festivalAmt = empFestival.reduce((sum, curr) => sum + valFmt(curr.amount), 0);
-
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0;
-      const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0;
-      const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0;
-      const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0;
-      const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : 0;
-      const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0;
-      const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0;
-
-      const gross_regular = basic + dpgp + da + hra + spl + cca + tr + otherEarn;
-
-      const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : 0;
-      const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0;
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0;
-      const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0;
-      const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : 0;
-      const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : 0;
-      const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : 0;
-      const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0;
-      const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0;
-
-      const totDed_regular = epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed;
-      const net_regular = isLocked ? (gross_regular - totDed_regular) : null;
-      const tds_regular = isLocked ? it : null;
-
-      const arrears_net = isLocked && arrearAmt > 0 ? (arrearAmt - arrearIT) : null;
-      const arrears_it = isLocked && arrearIT > 0 ? arrearIT : null;
-      const surrender_net = isLocked && surrenderAmt > 0 ? surrenderAmt : null;
-      const festival_net = isLocked && festivalAmt > 0 ? festivalAmt : null;
-
-      const epf_val = isLocked ? epf : null;
-      const sli_val = isLocked ? sli : null;
-      const gis_val = isLocked ? gis : null;
-      const gpais_val = isLocked ? getGPAIS(d.other_deductions_breakdown) : null;
-
-      return {
-        net_regular,
-        tds_regular,
-        arrears_net,
-        arrears_it,
-        surrender_net,
-        festival_net,
-        epf: epf_val,
-        sli: sli_val,
-        gis: gis_val,
-        gpais: gpais_val
-      };
-    };
 
     const buildSheetColumns = (typeKey, secondColHeader) => {
       const cols = [
@@ -195,14 +350,14 @@ const ConsolidatedStatementAll = () => {
         const displayDate = headerDates[i];
         const formattedDate = getFormattedDateString(i);
 
-        if (typeKey === 'net') {
+        if (typeKey === 'gross') {
           cols.push({
             header: displayDate,
             width: 12.71,
             numFmt: 'mmm-yy',
             isDateHeader: true,
             monthStr,
-            key: 'net_regular'
+            key: 'gross_regular'
           });
 
           if (monthHasArrears(monthStr)) {
@@ -211,7 +366,7 @@ const ConsolidatedStatementAll = () => {
               width: 14,
               isDateHeader: false,
               monthStr,
-              key: 'arrears_net'
+              key: 'arrears_gross'
             });
           }
 
@@ -345,7 +500,15 @@ const ConsolidatedStatementAll = () => {
         let rowSum = 0;
         for (let c = 3; c < cols.length; c++) {
           const colDef = cols[c - 1];
-          const stats = getEmployeeMonthlyDetails(emp.emp_id, colDef.monthStr);
+          const stats = getEmployeeMonthlyDetails(
+            emp.emp_id,
+            colDef.monthStr,
+            earnings,
+            deductions,
+            arrears,
+            surrender,
+            festival
+          );
           const cellVal = stats[colDef.key];
 
           const cell = row.getCell(c);
@@ -380,7 +543,7 @@ const ConsolidatedStatementAll = () => {
 
       const totalRow = sheet.getRow(currentRowIndex);
       totalRow.getCell(2).value = 'TOTAL';
-      totalRow.getCell(2).font = { name: 'Book Antiqua', size: 9 };
+      totalRow.getCell(2).font = { name: 'Book Antiqua', size: 9, bold: true };
       totalRow.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
       totalRow.getCell(2).border = thinBorder;
       totalRow.getCell(1).border = thinBorder;
@@ -399,12 +562,12 @@ const ConsolidatedStatementAll = () => {
       }
     };
 
-    // Sheet 1: Salary [FY]
+    // Sheet 1: Gross Salary [FY]
     generateSheet(
-      `Salary ${fyStart}-${fyStart + 1}`,
-      `Salary Details for the FY ${fyStart} -${fyStart + 1}`,
+      `Gross Salary ${fyStart}-${fyStart + 1}`,
+      `Gross Salary Details for the FY ${fyStart} -${fyStart + 1}`,
       null,
-      'net',
+      'gross',
       ' Name /\r\nPayment received in the month'
     );
 
@@ -496,14 +659,138 @@ const ConsolidatedStatementAll = () => {
           <button
             className="btn btn-primary"
             onClick={handleDownload}
-            disabled={loading}
+            disabled={loading || previewLoading}
             style={{ flex: 1, backgroundColor: 'var(--color-success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Table size={18} />}
             Download Consolidated Excel Workbook
           </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handlePreview}
+            disabled={loading || previewLoading}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+          >
+            {previewLoading && <Loader2 className="animate-spin" size={18} />}
+            {!previewLoading && previewData && <EyeOff size={18} />}
+            {!previewLoading && !previewData && <Eye size={18} />}
+            {previewData ? "Hide Preview" : "Preview Statements"}
+          </button>
         </div>
       </div>
+
+      {/* Preview Section */}
+      {previewData && (() => {
+        const preview = getPreviewContent();
+        if (!preview) return null;
+        return (
+          <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                  Statement Preview (FY {fy}-{ (fy + 1).toString().slice(-2) })
+                </h3>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  Showing calculations for active employees. Select tabs below to switch statements.
+                </p>
+              </div>
+              
+              <button 
+                className="btn" 
+                onClick={() => setPreviewData(null)} 
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+              >
+                Hide Preview
+              </button>
+            </div>
+
+            {/* Tab selector */}
+            <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--color-bg-primary)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', marginBottom: '1.5rem', overflowX: 'auto' }}>
+              {[
+                { key: 'gross', label: 'Gross Salary' },
+                { key: 'tds', label: 'TDS' },
+                { key: 'epf', label: 'EPF' },
+                { key: 'sli', label: 'SLI' },
+                { key: 'gis', label: 'GIS' },
+                { key: 'gpais', label: 'GPAIS' }
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className="btn"
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.8rem',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: activeTab === tab.key ? 'var(--color-accent-primary)' : 'transparent',
+                    color: activeTab === tab.key ? '#fff' : 'var(--color-text-secondary)',
+                    boxShadow: activeTab === tab.key ? '0 2px 4px rgba(59,130,246,0.2)' : 'none',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <table className="table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-primary)' }}>
+                    <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '60px' }}>Sl. No.</th>
+                    <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'left', minWidth: '200px', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>Employee Name</th>
+                    {preview.cols.map((col, idx) => (
+                      <th 
+                        key={idx} 
+                        style={{ 
+                          padding: '0.75rem', 
+                          borderBottom: '2px solid var(--color-border)', 
+                          color: activeTab === 'gross' ? 'var(--color-success)' : 'var(--color-warning)', 
+                          textAlign: 'center', 
+                          minWidth: '100px',
+                          whiteSpace: 'pre-line'
+                        }}
+                      >
+                        {col.header}
+                      </th>
+                    ))}
+                    <th style={{ padding: '0.75rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', minWidth: '120px', fontWeight: 'bold' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((row) => (
+                    <tr key={row.empId} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>{row.slNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: '500', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.name}</td>
+                      {row.cellValues.map((val, cIdx) => (
+                        <td key={cIdx} style={{ padding: '0.75rem', textAlign: 'center', color: val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                        </td>
+                      ))}
+                      <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 'bold', color: 'var(--color-accent-primary)' }}>
+                        {row.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
+                    <td></td>
+                    <td style={{ padding: '0.75rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
+                    {preview.colTotals.map((tot, idx) => (
+                      <td key={idx} style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--color-text-primary)' }}>
+                        {tot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    ))}
+                    <td style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--color-accent-primary)' }}>
+                      {preview.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Export Details</h4>
