@@ -90,22 +90,26 @@ const addSealAndWatermark = (doc, logoImg, sealImg, margin, pageW, sigY, record,
 };
 
 // ── REGULAR PAYSLIP PDF ───────────────────────────────────────────────────
-const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBase64 = false, usersList = []) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
+  const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 15;
   const contentW = pageW - 2 * margin;
 
-  let logoImg = null;
-  let sealImg = null;
-  try { logoImg = await loadImage('/logo.png'); } catch(e){}
-  try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  let logoImg = preloadedLogo;
+  let sealImg = preloadedSeal;
+  if (!logoImg) {
+    try { logoImg = await loadImage('/logo.png'); } catch(e){}
+  }
+  if (!sealImg) {
+    try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  }
 
   addKSoMHeader(doc, logoImg, margin, pageW);
 
   // PAY SLIP INFO TABLE
   const infoY = 38;
-  const infoH = 55;
+  const infoH = 46.5;
   doc.setLineWidth(0.4);
   doc.rect(margin, infoY, contentW, infoH);
 
@@ -131,7 +135,6 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
     ['Name', (employee.title ? `${employee.title} ` : '') + (employee.name || ''), 'Month & Year', monthDisplay],
     ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
     ['Scale of Pay', employee.scale_of_pay || '', 'Category', (employee.category || '').toUpperCase()],
-    ['D.O.B', employee.date_of_birth || '', 'D.O.J', employee.date_of_joining || ''],
     ['EPF UAN', employee.epf_uan || '', '', ''],
   ];
 
@@ -285,6 +288,9 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
   const fileName = `Payslip_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
+  if (pdfDoc) {
+    return { fileName };
+  }
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -293,16 +299,20 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
 };
 
 // ── SURRENDER BILL PDF ────────────────────────────────────────────────────
-const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, usersList = []) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
+  const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 15;
   const contentW = pageW - 2 * margin;
 
-  let logoImg = null;
-  let sealImg = null;
-  try { logoImg = await loadImage('/logo.png'); } catch(e){}
-  try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  let logoImg = preloadedLogo;
+  let sealImg = preloadedSeal;
+  if (!logoImg) {
+    try { logoImg = await loadImage('/logo.png'); } catch(e){}
+  }
+  if (!sealImg) {
+    try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  }
 
   addKSoMHeader(doc, logoImg, margin, pageW);
 
@@ -376,6 +386,9 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
   const fileName = `LeaveSurrender_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
+  if (pdfDoc) {
+    return { fileName };
+  }
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -384,16 +397,20 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
 };
 
 // ── ARREAR STATEMENT PDF ──────────────────────────────────────────────────
-const generatePDFArrear = async (employee, monthYear, returnBase64 = false, usersList = []) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+const generatePDFArrear = async (employee, monthYear, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
+  const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 15;
   const contentW = pageW - 2 * margin;
 
-  let logoImg = null;
-  let sealImg = null;
-  try { logoImg = await loadImage('/logo.png'); } catch(e){}
-  try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  let logoImg = preloadedLogo;
+  let sealImg = preloadedSeal;
+  if (!logoImg) {
+    try { logoImg = await loadImage('/logo.png'); } catch(e){}
+  }
+  if (!sealImg) {
+    try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  }
 
   addKSoMHeader(doc, logoImg, margin, pageW);
 
@@ -458,6 +475,9 @@ const generatePDFArrear = async (employee, monthYear, returnBase64 = false, user
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
   const fileName = `Arrear_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
+  if (pdfDoc) {
+    return { fileName };
+  }
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -466,16 +486,20 @@ const generatePDFArrear = async (employee, monthYear, returnBase64 = false, user
 };
 
 // ── FESTIVAL ALLOWANCE PDF ───────────────────────────────────────────────
-const generatePDFFestival = async (employee, monthYear, returnBase64 = false, usersList = []) => {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+const generatePDFFestival = async (employee, monthYear, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
+  const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 15;
   const contentW = pageW - 2 * margin;
 
-  let logoImg = null;
-  let sealImg = null;
-  try { logoImg = await loadImage('/logo.png'); } catch(e){}
-  try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  let logoImg = preloadedLogo;
+  let sealImg = preloadedSeal;
+  if (!logoImg) {
+    try { logoImg = await loadImage('/logo.png'); } catch(e){}
+  }
+  if (!sealImg) {
+    try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  }
 
   addKSoMHeader(doc, logoImg, margin, pageW);
 
@@ -540,6 +564,9 @@ const generatePDFFestival = async (employee, monthYear, returnBase64 = false, us
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
   const fileName = `FestivalAllowance_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
+  if (pdfDoc) {
+    return { fileName };
+  }
   if (returnBase64) {
     return { fileName, content: doc.output('datauristring').split(',')[1] };
   } else {
@@ -867,6 +894,7 @@ const Reports = () => {
   const [globalSettingsList, setGlobalSettingsList] = useState([]);
   const [selectedEmps, setSelectedEmps] = useState(new Set());
   const [sendingEmails, setSendingEmails] = useState(false);
+  const [downloadingPDFs, setDownloadingPDFs] = useState(false);
   const [usersList, setUsersList] = useState([]);
 
   useEffect(() => {
@@ -1744,10 +1772,10 @@ const Reports = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedEmps.size === data.filter(e => e.email_id).length) {
+    if (selectedEmps.size === data.length) {
       setSelectedEmps(new Set());
     } else {
-      setSelectedEmps(new Set(data.filter(e => e.email_id).map(e => e.emp_id)));
+      setSelectedEmps(new Set(data.map(e => e.emp_id)));
     }
   };
 
@@ -1756,6 +1784,50 @@ const Reports = () => {
     if (newSet.has(emp_id)) newSet.delete(emp_id);
     else newSet.add(emp_id);
     setSelectedEmps(newSet);
+  };
+
+  const handleDownloadAllOrSelectedPDF = async () => {
+    if (data.length === 0) return;
+    setDownloadingPDFs(true);
+    try {
+      const empsToDownload = selectedEmps.size > 0 
+        ? data.filter(e => selectedEmps.has(e.emp_id))
+        : data;
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      
+      let logoImg = null;
+      let sealImg = null;
+      try { logoImg = await loadImage('/logo.png'); } catch(e){}
+      try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+
+      const activeRule = globalSettingsList.find(r => r.effective_from <= monthYear) || {};
+
+      for (let i = 0; i < empsToDownload.length; i++) {
+        if (i > 0) {
+          doc.addPage();
+        }
+        const emp = empsToDownload[i];
+        if (billType === 'regular') {
+          await generatePDFPayslip(emp, monthYear, activeRule, false, usersList, doc, logoImg, sealImg);
+        } else if (billType === 'surrender') {
+          await generatePDFSurrender(emp, monthYear, false, usersList, doc, logoImg, sealImg);
+        } else if (billType === 'arrears') {
+          await generatePDFArrear(emp, monthYear, false, usersList, doc, logoImg, sealImg);
+        } else if (billType === 'festival') {
+          await generatePDFFestival(emp, monthYear, false, usersList, doc, logoImg, sealImg);
+        }
+      }
+
+      const billTypeLabel = getBillTypeTitle().replace(/\s+/g, '_');
+      const fileName = `KSoM_${billTypeLabel}_Combined_${formatMonthYear(monthYear)}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error("Combined PDF download failed:", error);
+      alert("Failed to download combined PDF: " + error.message);
+    } finally {
+      setDownloadingPDFs(false);
+    }
   };
 
   const getBillTypeTitle = () => {
@@ -1813,6 +1885,11 @@ const Reports = () => {
                 className="btn btn-primary">
                 <Mail size={16} /> {sendingEmails ? 'Dispatching...' : `Email Selected (${selectedEmps.size})`}
               </button>
+              <button onClick={handleDownloadAllOrSelectedPDF} disabled={!data.length || downloadingPDFs}
+                style={{ backgroundColor: 'var(--color-accent-secondary)', color: '#fff', border: 'none' }}
+                className="btn">
+                <FileText size={16} /> {downloadingPDFs ? 'Generating...' : selectedEmps.size > 0 ? `Download Selected PDFs (${selectedEmps.size})` : `Download All PDFs (${data.length})`}
+              </button>
               <button onClick={handleExportMaster} disabled={!data.length}
                 style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
                 className="btn">
@@ -1832,9 +1909,9 @@ const Reports = () => {
                   {!isViewer && (
                     <th style={{ width: '40px', textAlign: 'center' }}>
                       <input type="checkbox" 
-                        checked={data.filter(e => e.email_id).length > 0 && selectedEmps.size === data.filter(e => e.email_id).length}
+                        checked={data.length > 0 && selectedEmps.size === data.length}
                         onChange={toggleSelectAll} 
-                        disabled={data.filter(e => e.email_id).length === 0} />
+                        disabled={data.length === 0} />
                     </th>
                   )}
                   <th>Employee</th>
@@ -1863,9 +1940,7 @@ const Reports = () => {
                       <td style={{ textAlign: 'center' }}>
                         <input type="checkbox" 
                           checked={selectedEmps.has(emp.emp_id)}
-                          onChange={() => toggleSelect(emp.emp_id)}
-                          disabled={!emp.email_id}
-                          title={!emp.email_id ? "No email address found" : ""} />
+                          onChange={() => toggleSelect(emp.emp_id)} />
                       </td>
                     )}
                     <td>
