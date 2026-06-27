@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-uzgjP9/checked-fetch.js
+// .wrangler/tmp/bundle-fP64yb/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-IGh0QZ/functionsWorker-0.09549964366865571.mjs
+// .wrangler/tmp/pages-e9YiZu/functionsWorker-0.33384384048760196.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -736,7 +736,7 @@ async function onRequestGet6(context) {
     }
     if (userRole !== "admin" && userRole !== "super_admin") {
       const emp = await env.ksom_payslip_db.prepare(
-        "SELECT emp_id FROM employees WHERE email_id = ?"
+        "SELECT emp_id FROM employees WHERE LOWER(email_id) = LOWER(?)"
       ).bind(userEmail).first();
       if (!emp) {
         return new Response(JSON.stringify({ error: "Employee record not found for your email" }), { status: 404 });
@@ -2110,20 +2110,37 @@ async function onRequestGet20(context) {
     const fy = url.searchParams.get("fy");
     let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
     let params = [];
-    if (userRole === "viewer" && userEmail) {
-      query = "SELECT * FROM employees WHERE email_id = ? ORDER BY sort_order ASC, name ASC";
+    if (userRole !== "admin" && userRole !== "super_admin" && userEmail) {
+      query = "SELECT * FROM employees WHERE LOWER(email_id) = LOWER(?) ORDER BY sort_order ASC, name ASC";
       params = [userEmail];
     } else if (fy) {
       const startMonth = `${fy}-03`;
       const endMonth = `${parseInt(fy) + 1}-02`;
       query = `SELECT * FROM employees 
                WHERE emp_id IN (
-                 SELECT DISTINCT emp_id 
-                 FROM monthly_earnings 
-                 WHERE month_year >= ? AND month_year <= ?
+                 SELECT DISTINCT emp_id FROM monthly_earnings WHERE month_year >= ? AND month_year <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM supplementary_earnings WHERE month_year >= ? AND month_year <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM arrear_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM surrender_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM festival_allowance_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
                ) 
                ORDER BY sort_order ASC, name ASC`;
-      params = [startMonth, endMonth];
+      params = [
+        startMonth,
+        endMonth,
+        startMonth,
+        endMonth,
+        startMonth,
+        endMonth,
+        startMonth,
+        endMonth,
+        startMonth,
+        endMonth
+      ];
     }
     const { results } = await context.env.ksom_payslip_db.prepare(
       query
@@ -3395,7 +3412,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-uzgjP9/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-fP64yb/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -3427,7 +3444,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-uzgjP9/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-fP64yb/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -3527,4 +3544,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.09549964366865571.js.map
+//# sourceMappingURL=functionsWorker-0.33384384048760196.js.map

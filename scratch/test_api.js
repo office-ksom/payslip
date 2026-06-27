@@ -1,18 +1,18 @@
 async function test() {
   let port = 8788;
   
-  console.log("Checking consolidated (individual) as viewer (pranav@ksom.res.in) without emp_id...");
+  console.log("Checking consolidated (individual) as admin (sreejith@ksom.res.in) for emp_id 6302407...");
   try {
-    const res = await fetch(`http://localhost:${port}/api/reports/consolidated?fy=2026`, {
+    const res = await fetch(`http://localhost:${port}/api/reports/consolidated?fy=2026&emp_id=6302407`, {
       headers: {
-        'Cookie': 'mock_email=pranav@ksom.res.in'
+        'Cookie': 'mock_email=sreejith@ksom.res.in'
       }
     });
-    console.log("Status individual (viewer):", res.status);
+    console.log("Status individual (admin):", res.status);
     const data = await res.json();
-    console.log("Response keys individual (viewer):", Object.keys(data));
+    console.log("Response keys individual (admin):", Object.keys(data));
     if (data.error) {
-      console.log("Error individual (viewer):", data.error);
+      console.log("Error individual (admin):", data.error);
     } else {
       console.log("Mapped employee Name:", data.employee ? data.employee.name : null);
     }

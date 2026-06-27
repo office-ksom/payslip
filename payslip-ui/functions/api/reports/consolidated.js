@@ -15,7 +15,7 @@ export async function onRequestGet(context) {
     if (userRole !== 'admin' && userRole !== 'super_admin') {
       // Find own emp_id
       const emp = await env.ksom_payslip_db.prepare(
-        "SELECT emp_id FROM employees WHERE email_id = ?"
+        "SELECT emp_id FROM employees WHERE LOWER(email_id) = LOWER(?)"
       ).bind(userEmail).first();
       
       if (!emp) {

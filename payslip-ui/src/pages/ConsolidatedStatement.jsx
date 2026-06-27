@@ -153,6 +153,7 @@ const ConsolidatedStatement = () => {
 
       const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
       
+      const d = deductions.find(x => x.month_year === my) || {};
       const epf = hasApprovedBill ? (
         (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
         (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
@@ -704,6 +705,115 @@ const ConsolidatedStatement = () => {
     doc.save(`Consolidated_Statement_${employee.emp_id}_FY${fyDisplay}.pdf`);
   };
 
+  const getPreviewContent = () => {
+    if (!previewData) return null;
+    try {
+      const preview = getPreviewRows();
+      if (!preview) return null;
+      return (
+        <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                Statement Preview: {(previewData.employee?.title ? `${previewData.employee.title} ` : '') + (previewData.employee?.name || '')}
+              </h3>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                FY {fy}-{ (fy + 1).toString().slice(-2) } | Scale of Pay: {previewData.employee?.scale_of_pay || ''}
+              </p>
+            </div>
+            <button 
+              className="btn" 
+              onClick={() => setPreviewData(null)} 
+              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            >
+              Hide Preview
+            </button>
+          </div>
+
+          <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+            <table className="table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+              <thead>
+                {/* Super Headers */}
+                <tr style={{ background: 'var(--color-bg-primary)' }}>
+                  <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
+                  <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Earnings</th>
+                  <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Gross Pay</th>
+                  <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
+                  <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Total Ded</th>
+                  <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Net Pay</th>
+                </tr>
+                <tr style={{ background: 'var(--color-bg-primary)' }}>
+                  {/* Earnings sub-headers */}
+                  {['Basic', 'DA', 'HRA', 'DP/GP', 'CCA', 'Spl Pay', 'Tr Allow', 'Others', 'Arrears', 'Surr', 'Fest'].map((h, i) => (
+                    <th key={`earn-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                  ))}
+                  {/* Deductions sub-headers */}
+                  {['EPF', 'CPF', 'IT', 'PT', 'SLI', 'GIS', 'LIC', 'Adv', 'Rec', 'Oth', 'ArrIT'].map((h, i) => (
+                    <th key={`ded-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.map((row, rIdx) => (
+                  <tr key={rIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={{ padding: '0.5rem', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.month}</td>
+                    {row.values.map((val, vIdx) => {
+                      const isHighlight = vIdx === 11 || vIdx === 23 || vIdx === 24; // Gross, TotDed, Net
+                      return (
+                        <td 
+                          key={vIdx} 
+                          style={{ 
+                            padding: '0.5rem', 
+                            textAlign: 'center', 
+                            fontWeight: isHighlight ? 'bold' : 'normal',
+                            color: isHighlight 
+                              ? (vIdx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                              : (val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)')
+                          }}
+                        >
+                          {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                {/* Totals Row */}
+                <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
+                  <td style={{ padding: '0.5rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
+                  {preview.grandTotals.map((tot, idx) => {
+                    const isHighlight = idx === 11 || idx === 23 || idx === 24; // Gross, TotDed, Net
+                    return (
+                      <td 
+                        key={idx} 
+                        style={{ 
+                          padding: '0.5rem', 
+                          textAlign: 'center', 
+                          color: isHighlight 
+                            ? (idx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                            : 'var(--color-text-primary)' 
+                        }}
+                      >
+                        {tot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    } catch (err) {
+      console.error("Preview render failed:", err);
+      return (
+        <div className="alert alert-danger" style={{ marginTop: '2rem' }}>
+          <strong>Preview render failed:</strong> {err.message}
+          <pre style={{ marginTop: '0.5rem', fontSize: '0.75rem', overflowX: 'auto', background: 'rgba(0,0,0,0.05)', padding: '0.5rem', borderRadius: '4px' }}>{err.stack}</pre>
+        </div>
+      );
+    }
+  };
+
   const fyOptions = [];
   for (let year = currentYear; year >= 2020; year--) {
     fyOptions.push(year);
@@ -780,104 +890,7 @@ const ConsolidatedStatement = () => {
         </div>
       </div>
 
-      {/* Preview Section */}
-      {previewData && (() => {
-        const preview = getPreviewRows();
-        if (!preview) return null;
-        return (
-          <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                  Statement Preview: {(previewData.employee.title ? `${previewData.employee.title} ` : '') + previewData.employee.name}
-                </h3>
-                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                  FY {fy}-{ (fy + 1).toString().slice(-2) } | Scale of Pay: {previewData.employee.scale_of_pay}
-                </p>
-              </div>
-              <button 
-                className="btn" 
-                onClick={() => setPreviewData(null)} 
-                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-              >
-                Hide Preview
-              </button>
-            </div>
-
-            <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-              <table className="table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
-                <thead>
-                  {/* Super Headers */}
-                  <tr style={{ background: 'var(--color-bg-primary)' }}>
-                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
-                    <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Earnings</th>
-                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Gross Pay</th>
-                    <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
-                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Total Ded</th>
-                    <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Net Pay</th>
-                  </tr>
-                  <tr style={{ background: 'var(--color-bg-primary)' }}>
-                    {/* Earnings sub-headers */}
-                    {['Basic', 'DA', 'HRA', 'DP/GP', 'CCA', 'Spl Pay', 'Tr Allow', 'Others', 'Arrears', 'Surr', 'Fest'].map((h, i) => (
-                      <th key={`earn-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
-                    ))}
-                    {/* Deductions sub-headers */}
-                    {['EPF', 'CPF', 'IT', 'PT', 'SLI', 'GIS', 'LIC', 'Adv', 'Rec', 'Oth', 'ArrIT'].map((h, i) => (
-                      <th key={`ded-${i}`} style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((row, rIdx) => (
-                    <tr key={rIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.month}</td>
-                      {row.values.map((val, vIdx) => {
-                        const isHighlight = vIdx === 11 || vIdx === 23 || vIdx === 24; // Gross, TotDed, Net
-                        return (
-                          <td 
-                            key={vIdx} 
-                            style={{ 
-                              padding: '0.5rem', 
-                              textAlign: 'center', 
-                              fontWeight: isHighlight ? 'bold' : 'normal',
-                              color: isHighlight 
-                                ? (vIdx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
-                                : (val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)')
-                            }}
-                          >
-                            {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                  {/* Totals Row */}
-                  <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
-                    <td style={{ padding: '0.5rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
-                    {preview.grandTotals.map((tot, idx) => {
-                      const isHighlight = idx === 11 || idx === 23 || idx === 24; // Gross, TotDed, Net
-                      return (
-                        <td 
-                          key={idx} 
-                          style={{ 
-                            padding: '0.5rem', 
-                            textAlign: 'center', 
-                            color: isHighlight 
-                              ? (idx === 23 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
-                              : 'var(--color-text-primary)' 
-                          }}
-                        >
-                          {tot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
+      {getPreviewContent()}
       
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Important Note</h4>

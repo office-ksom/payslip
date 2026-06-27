@@ -9,20 +9,32 @@ export async function onRequestGet(context) {
     let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
     let params = [];
 
-    if (userRole === 'viewer' && userEmail) {
-      query = "SELECT * FROM employees WHERE email_id = ? ORDER BY sort_order ASC, name ASC";
+    if (userRole !== 'admin' && userRole !== 'super_admin' && userEmail) {
+      query = "SELECT * FROM employees WHERE LOWER(email_id) = LOWER(?) ORDER BY sort_order ASC, name ASC";
       params = [userEmail];
     } else if (fy) {
       const startMonth = `${fy}-03`;
       const endMonth = `${parseInt(fy) + 1}-02`;
       query = `SELECT * FROM employees 
                WHERE emp_id IN (
-                 SELECT DISTINCT emp_id 
-                 FROM monthly_earnings 
-                 WHERE month_year >= ? AND month_year <= ?
+                 SELECT DISTINCT emp_id FROM monthly_earnings WHERE month_year >= ? AND month_year <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM supplementary_earnings WHERE month_year >= ? AND month_year <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM arrear_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM surrender_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
+                 UNION
+                 SELECT DISTINCT emp_id FROM festival_allowance_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
                ) 
                ORDER BY sort_order ASC, name ASC`;
-      params = [startMonth, endMonth];
+      params = [
+        startMonth, endMonth,
+        startMonth, endMonth,
+        startMonth, endMonth,
+        startMonth, endMonth,
+        startMonth, endMonth
+      ];
     }
 
     const { results } = await context.env.ksom_payslip_db.prepare(
