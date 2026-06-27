@@ -81,7 +81,7 @@ const ConsolidatedStatement = () => {
   };
 
   const getPreviewRows = () => {
-    const { earnings, deductions, arrears, surrender, festival } = previewData;
+    const { earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = [] } = previewData;
 
     const months = [];
     for (let i = 3; i <= 14; i++) {
@@ -94,40 +94,117 @@ const ConsolidatedStatement = () => {
     const rows = months.map(my => {
       const e = earnings.find(x => x.month_year === my);
       const isLocked = e && e.is_approved === 1;
-      const d = deductions.find(x => x.month_year === my) || {};
       
+      const se = supplementaryEarnings.find(x => x.month_year === my);
+      const isSupApproved = !!se;
+      const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
+      
+      const hasApprovedBill = isLocked || isSupApproved;
+
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const arrearAmt = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
-      const arrearIT = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
+      const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
+      const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
 
       const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const surrenderAmt = isLocked ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
+      const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
 
       const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const festivalAmt = isLocked ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
+      const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
-      const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : null;
-      const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : null;
-      const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : null;
-      const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : null;
-      const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : null;
-      const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : null;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
-      const gross = isLocked ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt) : null;
+      const basic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0)
+      ) : null;
+
+      const da = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.da_state) || 0) + (parseFloat(se.da_ugc) || 0)) : 0)
+      ) : null;
+
+      const hra = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.hra_state) || 0) + (parseFloat(se.hra_ugc) || 0)) : 0)
+      ) : null;
+
+      const dpgp = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.dp_gp) || 0) : 0)
+      ) : null;
+
+      const cca = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.cca) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.cca) || 0) : 0)
+      ) : null;
+
+      const spl = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.spl_pay) || 0) + (parseFloat(se.spl_allow) || 0)) : 0)
+      ) : null;
+
+      const tr = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.tr_allow) || 0) : 0)
+      ) : null;
+
+      const otherEarn = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.other_earnings) || 0) : 0)
+      ) : null;
+
+      const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
       
-      const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
-      const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : null;
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
-      const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : null;
-      const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : null;
-      const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : null;
-      const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : null;
-      const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : null;
-      const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : null;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
-      const totDed = isLocked ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT) : null;
-      const net = isLocked ? (gross - totDed) : null;
+      const epf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
+      ) : null;
+
+      const cpf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.cpf) || 0) : 0)
+      ) : null;
+
+      const it = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.income_tax) || 0) : 0)
+      ) : null;
+
+      const pt = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.professional_tax) || 0) : 0)
+      ) : null;
+
+      const sli = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.sli) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.sli) || 0) : 0)
+      ) : null;
+
+      const gis = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.gis) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.gis) || 0) : 0)
+      ) : null;
+
+      const lic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.lic) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.lic) || 0) : 0)
+      ) : null;
+
+      const adv = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.onam_advance) || 0) : 0)
+      ) : null;
+
+      const hrRec = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.hra_recovery) || 0) : 0)
+      ) : null;
+
+      const otherDed = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.other_deductions) || 0) : 0)
+      ) : null;
+
+      const totDed = hasApprovedBill ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + (arrearIT || 0)) : null;
+      const net = hasApprovedBill ? (gross - totDed) : null;
 
       const [yearStr, monthStr] = my.split('-');
       const year = parseInt(yearStr, 10);
@@ -189,7 +266,7 @@ const ConsolidatedStatement = () => {
   const generateExcel = async (reportData, fyStart) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Consolidated Statement');
-    const { employee, earnings, deductions, arrears, surrender, festival } = reportData;
+    const { employee, earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = [] } = reportData;
 
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
     const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
@@ -273,43 +350,121 @@ const ConsolidatedStatement = () => {
     months.forEach(my => {
       const e = earnings.find(x => x.month_year === my);
       const isLocked = e && e.is_approved === 1;
-      const d = deductions.find(x => x.month_year === my) || {};
       
+      const se = supplementaryEarnings.find(x => x.month_year === my);
+      const isSupApproved = !!se;
+      const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
+      
+      const hasApprovedBill = isLocked || isSupApproved;
+
       // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const arrearAmt = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
-      const arrearIT = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
+      const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
+      const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
 
       // Find surrender bills for this month
       const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const surrenderAmt = isLocked ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
+      const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
 
       // Find festival allowance bills for this month
       const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const festivalAmt = isLocked ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
+      const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
-      const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : null;
-      const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : null;
-      const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : null;
-      const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : null;
-      const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : null;
-      const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : null;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
-      const gross = isLocked ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt) : null;
+      const basic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0)
+      ) : null;
+
+      const da = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.da_state) || 0) + (parseFloat(se.da_ugc) || 0)) : 0)
+      ) : null;
+
+      const hra = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.hra_state) || 0) + (parseFloat(se.hra_ugc) || 0)) : 0)
+      ) : null;
+
+      const dpgp = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.dp_gp) || 0) : 0)
+      ) : null;
+
+      const cca = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.cca) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.cca) || 0) : 0)
+      ) : null;
+
+      const spl = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.spl_pay) || 0) + (parseFloat(se.spl_allow) || 0)) : 0)
+      ) : null;
+
+      const tr = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.tr_allow) || 0) : 0)
+      ) : null;
+
+      const otherEarn = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.other_earnings) || 0) : 0)
+      ) : null;
+
+      const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
       
-      const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
-      const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : null;
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
-      const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : null;
-      const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : null;
-      const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : null;
-      const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : null;
-      const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : null;
-      const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : null;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
-      const totDed = isLocked ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT) : null;
-      const net = isLocked ? (gross - totDed) : null;
+      const d = deductions.find(x => x.month_year === my) || {};
+      const epf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
+      ) : null;
+
+      const cpf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.cpf) || 0) : 0)
+      ) : null;
+
+      const it = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.income_tax) || 0) : 0)
+      ) : null;
+
+      const pt = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.professional_tax) || 0) : 0)
+      ) : null;
+
+      const sli = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.sli) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.sli) || 0) : 0)
+      ) : null;
+
+      const gis = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.gis) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.gis) || 0) : 0)
+      ) : null;
+
+      const lic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.lic) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.lic) || 0) : 0)
+      ) : null;
+
+      const adv = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.onam_advance) || 0) : 0)
+      ) : null;
+
+      const hrRec = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.hra_recovery) || 0) : 0)
+      ) : null;
+
+      const otherDed = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.other_deductions) || 0) : 0)
+      ) : null;
+
+      const totDed = hasApprovedBill ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + (arrearIT || 0)) : null;
+      const net = hasApprovedBill ? (gross - totDed) : null;
 
       const [yearStr, monthStr] = my.split('-');
       const year = parseInt(yearStr, 10);
@@ -356,7 +511,7 @@ const ConsolidatedStatement = () => {
 
   const generatePDF = async (reportData, fyStart) => {
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
-    const { employee, earnings, deductions, arrears, surrender, festival } = reportData;
+    const { employee, earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = [] } = reportData;
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
     const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
 
@@ -384,43 +539,121 @@ const ConsolidatedStatement = () => {
     months.forEach(my => {
       const e = earnings.find(x => x.month_year === my);
       const isLocked = e && e.is_approved === 1;
-      const d = deductions.find(x => x.month_year === my) || {};
       
+      const se = supplementaryEarnings.find(x => x.month_year === my);
+      const isSupApproved = !!se;
+      const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
+      
+      const hasApprovedBill = isLocked || isSupApproved;
+
       // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const arrearAmt = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
-      const arrearIT = isLocked ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
+      const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
+      const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
 
       // Find surrender bills for this month
       const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const surrenderAmt = isLocked ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
+      const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
 
       // Find festival allowance bills for this month
       const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const festivalAmt = isLocked ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
+      const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
-      const da = isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : null;
-      const hra = isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : null;
-      const dpgp = isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : null;
-      const cca = isLocked ? Math.round(parseFloat(e.cca) || 0) : null;
-      const spl = isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : null;
-      const tr = isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : null;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
-      const gross = isLocked ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + arrearAmt + surrenderAmt + festivalAmt) : null;
+      const basic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0)
+      ) : null;
+
+      const da = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.da_state) || 0) + (parseFloat(se.da_ugc) || 0)) : 0)
+      ) : null;
+
+      const hra = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.hra_state) || 0) + (parseFloat(se.hra_ugc) || 0)) : 0)
+      ) : null;
+
+      const dpgp = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.dp_gp) || 0) : 0)
+      ) : null;
+
+      const cca = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.cca) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.cca) || 0) : 0)
+      ) : null;
+
+      const spl = hasApprovedBill ? (
+        (isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0) +
+        (isSupApproved ? Math.round((parseFloat(se.spl_pay) || 0) + (parseFloat(se.spl_allow) || 0)) : 0)
+      ) : null;
+
+      const tr = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.tr_allow) || 0) : 0)
+      ) : null;
+
+      const otherEarn = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(se.other_earnings) || 0) : 0)
+      ) : null;
+
+      const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
       
-      const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
-      const cpf = isLocked ? Math.round(parseFloat(d.cpf) || 0) : null;
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
-      const pt = isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : null;
-      const sli = isLocked ? Math.round(parseFloat(d.sli) || 0) : null;
-      const gis = isLocked ? Math.round(parseFloat(d.gis) || 0) : null;
-      const lic = isLocked ? Math.round(parseFloat(d.lic) || 0) : null;
-      const adv = isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : null;
-      const hrRec = isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : null;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
-      const totDed = isLocked ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + arrearIT) : null;
-      const net = isLocked ? (gross - totDed) : null;
+      const d = deductions.find(x => x.month_year === my) || {};
+      const epf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
+      ) : null;
+
+      const cpf = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.cpf) || 0) : 0)
+      ) : null;
+
+      const it = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.income_tax) || 0) : 0)
+      ) : null;
+
+      const pt = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.professional_tax) || 0) : 0)
+      ) : null;
+
+      const sli = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.sli) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.sli) || 0) : 0)
+      ) : null;
+
+      const gis = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.gis) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.gis) || 0) : 0)
+      ) : null;
+
+      const lic = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.lic) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.lic) || 0) : 0)
+      ) : null;
+
+      const adv = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.onam_advance) || 0) : 0)
+      ) : null;
+
+      const hrRec = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.hra_recovery) || 0) : 0)
+      ) : null;
+
+      const otherDed = hasApprovedBill ? (
+        (isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0) +
+        (isSupApproved ? Math.round(parseFloat(sd.other_deductions) || 0) : 0)
+      ) : null;
+
+      const totDed = hasApprovedBill ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + (arrearIT || 0)) : null;
+      const net = hasApprovedBill ? (gross - totDed) : null;
 
       const [, monthStr] = my.split('-');
       const month = parseInt(monthStr, 10);

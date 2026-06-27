@@ -2,6 +2,8 @@ import { onRequestGet as __api_arrears_approve__month_year__js_onRequestGet } fr
 import { onRequestPost as __api_arrears_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\arrears\\approve\\[month_year].js"
 import { onRequestGet as __api_festival_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\approve\\[month_year].js"
 import { onRequestPost as __api_festival_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\approve\\[month_year].js"
+import { onRequestGet as __api_supplementary_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\approve\\[month_year].js"
+import { onRequestPost as __api_supplementary_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\approve\\[month_year].js"
 import { onRequestGet as __api_surrender_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\surrender\\approve\\[month_year].js"
 import { onRequestPost as __api_surrender_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\surrender\\approve\\[month_year].js"
 import { onRequestPost as __api_auth_login_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\login.js"
@@ -29,6 +31,9 @@ import { onRequestGet as __api_earnings__month_year__js_onRequestGet } from "D:\
 import { onRequestPost as __api_earnings__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\[month_year].js"
 import { onRequestGet as __api_festival__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\[month_year].js"
 import { onRequestPost as __api_festival__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\[month_year].js"
+import { onRequestDelete as __api_supplementary__month_year__js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\[month_year].js"
+import { onRequestGet as __api_supplementary__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\[month_year].js"
+import { onRequestPost as __api_supplementary__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\[month_year].js"
 import { onRequestGet as __api_surrender__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\surrender\\[month_year].js"
 import { onRequestPost as __api_surrender__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\surrender\\[month_year].js"
 import { onRequestGet as __api_backup_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\backup.js"
@@ -72,6 +77,20 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_festival_approve__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/supplementary/approve/:month_year",
+      mountPath: "/api/supplementary/approve",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_supplementary_approve__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/supplementary/approve/:month_year",
+      mountPath: "/api/supplementary/approve",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_supplementary_approve__month_year__js_onRequestPost],
     },
   {
       routePath: "/api/surrender/approve/:month_year",
@@ -261,6 +280,27 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_festival__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/supplementary/:month_year",
+      mountPath: "/api/supplementary",
+      method: "DELETE",
+      middlewares: [],
+      modules: [__api_supplementary__month_year__js_onRequestDelete],
+    },
+  {
+      routePath: "/api/supplementary/:month_year",
+      mountPath: "/api/supplementary",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_supplementary__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/supplementary/:month_year",
+      mountPath: "/api/supplementary",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_supplementary__month_year__js_onRequestPost],
     },
   {
       routePath: "/api/surrender/:month_year",

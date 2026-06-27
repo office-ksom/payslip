@@ -25,9 +25,13 @@ export async function onRequestGet(context) {
          SELECT DISTINCT emp_id 
          FROM monthly_earnings 
          WHERE month_year >= ? AND month_year <= ?
+         UNION
+         SELECT DISTINCT emp_id
+         FROM supplementary_earnings
+         WHERE month_year >= ? AND month_year <= ?
        )
        ORDER BY sort_order ASC, name ASC`
-    ).bind(startMonth, endMonth).all();
+    ).bind(startMonth, endMonth, startMonth, endMonth).all();
 
     // Fetch all monthly_earnings in range
     const { results: earnings } = await env.ksom_payslip_db.prepare(
@@ -54,13 +58,25 @@ export async function onRequestGet(context) {
       "SELECT * FROM festival_allowance_bills WHERE substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1"
     ).bind(startMonth, endMonth).all();
 
+    // Fetch all approved supplementary earnings in range
+    const { results: supplementaryEarnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM supplementary_earnings WHERE month_year >= ? AND month_year <= ? AND is_approved = 1"
+    ).bind(startMonth, endMonth).all();
+
+    // Fetch all supplementary deductions in range
+    const { results: supplementaryDeductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM supplementary_deductions WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+
     return new Response(JSON.stringify({
       employees,
       earnings,
       deductions,
       arrears,
       surrender,
-      festival
+      festival,
+      supplementaryEarnings,
+      supplementaryDeductions
     }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -69,3 +85,4 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
+

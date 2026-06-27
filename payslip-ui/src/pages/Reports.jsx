@@ -89,6 +89,202 @@ const addSealAndWatermark = (doc, logoImg, sealImg, margin, pageW, sigY, record,
   doc.setTextColor(0, 0, 0);
 };
 
+// ── SUPPLEMENTARY PAYSLIP PDF ──────────────────────────────────────────────
+const generatePDFSupplementary = async (employee, monthYear, activeRule = {}, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
+  const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 15;
+  const contentW = pageW - 2 * margin;
+
+  let logoImg = preloadedLogo;
+  let sealImg = preloadedSeal;
+  if (!logoImg) {
+    try { logoImg = await loadImage('/logo.png'); } catch(e){}
+  }
+  if (!sealImg) {
+    try { sealImg = await loadImage('/KSoM_seal.png'); } catch(e){}
+  }
+
+  addKSoMHeader(doc, logoImg, margin, pageW);
+
+  // PAY SLIP INFO TABLE
+  const infoY = 38;
+  const infoH = 55; // Expanded for extra fields
+  doc.setLineWidth(0.4);
+  doc.rect(margin, infoY, contentW, infoH);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('SUPPLEMENTARY PAY SLIP', pageW / 2, infoY + 7, { align: 'center' });
+  doc.line(margin, infoY + 10, margin + contentW, infoY + 10);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  const col1X = margin + 3;
+  const col1ValX = margin + 38;
+  const col2X = margin + contentW / 2 + 3;
+  const col2ValX = margin + contentW / 2 + 40;
+  const rowH = 8.5;
+  const startY = infoY + 15;
+
+  const [yr, mn] = (monthYear || '').split('-');
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
+
+  const infoRows = [
+    ['Name', (employee.title ? `${employee.title} ` : '') + (employee.name || ''), 'Month & Year', monthDisplay],
+    ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
+    ['Scale of Pay', employee.scale_of_pay || '', 'Category', (employee.category || '').toUpperCase()],
+    ['EPF UAN', employee.epf_uan || '', 'Days Worked', `${employee.num_days || 0} days`],
+    ['Ref. Basic Pay', `Rs. ${Math.round(employee.regular_basic || 0)}`, '', '']
+  ];
+
+  infoRows.forEach((row, i) => {
+    const y = startY + i * rowH;
+    doc.setFont('helvetica', 'bold');
+    doc.text(row[0] + ' :', col1X, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(row[1]), col1ValX, y);
+    if (row[2]) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(row[2] + ' :', col2X, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(row[3]), col2ValX, y);
+    }
+    doc.line(margin + contentW / 2, infoY + 10, margin + contentW / 2, infoY + infoH);
+  });
+
+  const isState = employee.category === 'state';
+  const isUGC = employee.category === 'ugc/csir' || employee.category === 'ugc';
+  const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
+  const hra_pct = isState ? (activeRule.hra_state_percentage || 0) : isUGC ? (activeRule.hra_ugc_percentage || 0) : 0;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.text(`DA: ${da_pct}%  |  HRA: ${hra_pct}%`, margin, infoY + infoH + 3);
+
+  // EARNINGS & DEDUCTIONS SIDE-BY-SIDE
+  const tableTop = infoY + infoH + 6;
+  const halfW = contentW / 2 - 1;
+
+  const da = (parseFloat(employee.da_state) || 0) + (parseFloat(employee.da_ugc) || 0);
+  const hra = (parseFloat(employee.hra_state) || 0) + (parseFloat(employee.hra_ugc) || 0);
+
+  let otherEarnRows = [];
+  try {
+    const arr = typeof employee.other_earnings_breakdown === 'string' ? JSON.parse(employee.other_earnings_breakdown) : (employee.other_earnings_breakdown || []);
+    if (arr.length > 0) {
+      otherEarnRows = arr.map(a => [a.desc || 'Other Earnings', fmt(a.amount)]);
+    } else {
+      otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+    }
+  } catch(e) {
+    otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+  }
+
+  const earningsRows = [
+    ['Basic Pay', fmt(employee.basic_pay)],
+    ['DA', fmt(da)],
+    ['HRA', fmt(hra)],
+    ['DP / GP', fmt(employee.dp_gp)],
+    ['CCA', fmt(employee.cca)],
+    ['Spl. Pay', fmt(employee.spl_pay)],
+    ['Tr. Allow', fmt(employee.tr_allow)],
+    ['Spl. Allow.', fmt(employee.spl_allow)],
+    ['Fest. Allow.', fmt(employee.fest_allow)],
+    ...otherEarnRows
+  ].filter(item => parseFloat(item[1]) > 0);
+
+  let otherDeduxRows = [];
+  try {
+    const arr = typeof employee.other_deductions_breakdown === 'string' ? JSON.parse(employee.other_deductions_breakdown) : (employee.other_deductions_breakdown || []);
+    if (arr.length > 0) {
+      otherDeduxRows = arr.map(a => [a.desc || 'Other Deductions', fmt(a.amount)]);
+    } else {
+      otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+    }
+  } catch(e) {
+    otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+  }
+
+  const deductionsRows = [
+    ['EPF', fmt(employee.epf)],
+    ['CPF', fmt(employee.cpf)],
+    ['Professional Tax', fmt(employee.professional_tax)],
+    ['SLI', fmt(employee.sli)],
+    ['GIS', fmt(employee.gis)],
+    ['LIC', fmt(employee.lic)],
+    ['Income Tax', fmt(employee.income_tax)],
+    ['Onam Advance', fmt(employee.onam_advance)],
+    ['HRA Recovery', fmt(employee.hra_recovery)],
+    ...otherDeduxRows
+  ].filter(item => parseFloat(item[1]) > 0);
+
+  // Make them equal length
+  const maxRows = Math.max(earningsRows.length, deductionsRows.length);
+  const tableBody = [];
+  for (let i = 0; i < maxRows; i++) {
+    const earnCol = earningsRows[i] || ['', ''];
+    const dedCol = deductionsRows[i] || ['', ''];
+    tableBody.push([earnCol[0], earnCol[1], dedCol[0], dedCol[1]]);
+  }
+
+  // Add total row
+  tableBody.push([
+    { content: 'GROSS PAY', styles: { fontStyle: 'bold' } },
+    { content: `Rs. ${fmt(employee.gross)}`, styles: { fontStyle: 'bold', halign: 'right' } },
+    { content: 'TOTAL DEDUCTIONS', styles: { fontStyle: 'bold' } },
+    { content: `Rs. ${fmt(employee.dedux)}`, styles: { fontStyle: 'bold', halign: 'right' } }
+  ]);
+
+  autoTable(doc, {
+    startY: tableTop,
+    margin: { left: margin, right: margin },
+    head: [['Earnings', 'Amount (Rs)', 'Deductions', 'Amount (Rs)']],
+    body: tableBody,
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 3, textColor: 20 },
+    headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: halfW * 0.7 },
+      1: { cellWidth: halfW * 0.3, halign: 'right' },
+      2: { cellWidth: halfW * 0.7 },
+      3: { cellWidth: halfW * 0.3, halign: 'right' }
+    },
+    didParseCell: function(data) {
+      if (data.row.index === tableBody.length - 1) {
+        data.cell.styles.fillColor = [243, 244, 246];
+      }
+    }
+  });
+
+  const netY = doc.lastAutoTable.finalY + 6;
+  doc.setLineWidth(0.4);
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, netY, contentW, 12, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(22, 101, 52);
+  doc.text('NET PAYABLE AMOUNT', margin + 4, netY + 7.5);
+  doc.setFontSize(12);
+  doc.text(`Rs. ${Math.round(employee.net || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + contentW - 4, netY + 8, { align: 'right' });
+
+  doc.setTextColor(20);
+
+  const sigY = netY + 45;
+  addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
+
+  const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
+  const fileName = `SupplementaryPayslip_${fullName.replace(/\s+/g, '_')}_${formatMonthYear(monthYear)}.pdf`;
+  if (pdfDoc) {
+    return { fileName };
+  }
+  if (returnBase64) {
+    return { fileName, content: doc.output('datauristring').split(',')[1] };
+  } else {
+    doc.save(fileName);
+  }
+};
+
 // ── REGULAR PAYSLIP PDF ───────────────────────────────────────────────────
 const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBase64 = false, usersList = [], pdfDoc = null, preloadedLogo = null, preloadedSeal = null) => {
   const doc = pdfDoc || new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -283,7 +479,7 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
     columnStyles: { 0: { cellWidth: contentW * 0.7 }, 1: { cellWidth: contentW * 0.3 } },
   });
 
-  const sigY = doc.lastAutoTable.finalY + 25;
+  const sigY = doc.lastAutoTable.finalY + 33;
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
@@ -381,7 +577,7 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
   doc.setFontSize(8.5);
   doc.text(`* Formula: (Basic Pay + DA + HRA) / 30 * Leaves Surrendered`, margin, formulaY);
 
-  const sigY = formulaY + 25;
+  const sigY = formulaY + 33;
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
@@ -470,7 +666,7 @@ const generatePDFArrear = async (employee, monthYear, returnBase64 = false, user
     columnStyles: { 0: { cellWidth: contentW * 0.4 }, 1: { cellWidth: contentW * 0.2, halign: 'right' }, 2: { cellWidth: contentW * 0.2, halign: 'right' }, 3: { cellWidth: contentW * 0.2, halign: 'right' } },
   });
 
-  const sigY = doc.lastAutoTable.finalY + 25;
+  const sigY = doc.lastAutoTable.finalY + 33;
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
@@ -559,7 +755,7 @@ const generatePDFFestival = async (employee, monthYear, returnBase64 = false, us
     columnStyles: { 0: { cellWidth: contentW * 0.7 }, 1: { cellWidth: contentW * 0.3, halign: 'right' } },
   });
 
-  const sigY = doc.lastAutoTable.finalY + 25;
+  const sigY = doc.lastAutoTable.finalY + 33;
   addSealAndWatermark(doc, logoImg, sealImg, margin, pageW, sigY, employee, usersList);
 
   const fullName = (employee.title ? `${employee.title} ` : '') + (employee.name || 'Emp');
@@ -874,6 +1070,139 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
     );
   }
 
+  if (billType === 'supplementary') {
+    const da = (parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0);
+    const hra = (parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0);
+
+    let otherEarnPreview = [];
+    try {
+      const arr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []);
+      if (arr.length > 0) {
+        otherEarnPreview = arr.map(a => ({ label: a.desc || 'Other Earnings', val: a.amount }));
+      } else {
+        otherEarnPreview = [{ label: 'Others', val: emp.other_earnings }];
+      }
+    } catch(e) {
+      otherEarnPreview = [{ label: 'Others', val: emp.other_earnings }];
+    }
+
+    const earnings = [
+      { label: 'Basic Pay', val: emp.basic_pay },
+      { label: 'DA', val: da },
+      { label: 'HRA', val: hra },
+      { label: 'DP / GP', val: emp.dp_gp },
+      { label: 'CCA', val: emp.cca },
+      { label: 'Spl. Pay', val: emp.spl_pay },
+      { label: 'Tr. Allow', val: emp.tr_allow },
+      { label: 'Spl. Allow.', val: emp.spl_allow },
+      { label: 'Fest. Allow.', val: emp.fest_allow },
+      ...otherEarnPreview
+    ].filter(i => parseFloat(i.val) > 0);
+
+    let otherDeduxPreview = [];
+    try {
+      const arr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []);
+      if (arr.length > 0) {
+        otherDeduxPreview = arr.map(a => ({ label: a.desc || 'Other Deductions', val: a.amount }));
+      } else {
+        otherDeduxPreview = [{ label: 'Others', val: emp.other_deductions }];
+      }
+    } catch(e) {
+      otherDeduxPreview = [{ label: 'Others', val: emp.other_deductions }];
+    }
+
+    const deductions = [
+      { label: 'EPF', val: emp.epf },
+      { label: 'CPF', val: emp.cpf },
+      { label: 'Prof. Tax', val: emp.professional_tax },
+      { label: 'SLI', val: emp.sli },
+      { label: 'GIS', val: emp.gis },
+      { label: 'LIC', val: emp.lic },
+      { label: 'Income Tax', val: emp.income_tax },
+      { label: 'Onam Adv', val: emp.onam_advance },
+      { label: 'HRA Rec', val: emp.hra_recovery },
+      ...otherDeduxPreview
+    ].filter(i => parseFloat(i.val) > 0);
+
+    return (
+      <div style={{ marginTop: '2rem', padding: '2.5rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #d1d5db', maxWidth: '850px', margin: '2rem auto', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', marginBottom: '0.5rem' }}>Kerala School of Mathematics</h2>
+          <p style={{ fontSize: '1.1rem', color: '#4b5563', fontWeight: 600 }}>Supplementary Payslip for {monthDisplay}</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem', fontSize: '1rem', borderBottom: '2px solid #e5e7eb', paddingBottom: '1.5rem' }}>
+          <div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Name:</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{emp.title ? `${emp.title} ` : ''}{emp.name}</span>
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Designation:</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{emp.designation}</span>
+            </div>
+            <div>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Days Worked:</span>
+              <span style={{ fontWeight: 700, color: '#2563eb' }}>{emp.num_days} days</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Emp ID:</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{emp.emp_id}</span>
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Category:</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{emp.category?.toUpperCase()}</span>
+            </div>
+            <div>
+              <span style={{ color: '#6b7280', width: '130px', display: 'inline-block', fontWeight: 500 }}>Reference Basic:</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(emp.regular_basic)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem' }}>
+          <div>
+            <h4 style={{ borderBottom: '2px solid #2563eb', paddingBottom: '0.5rem', marginBottom: '1.25rem', fontSize: '1.1rem', fontWeight: '800', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Earnings</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {earnings.map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem' }}>
+                  <span style={{ color: '#374151', fontWeight: 500 }}>{item.label}</span>
+                  <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(item.val)}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '2px solid #e5e7eb', fontWeight: '800', color: '#1e40af', fontSize: '1.1rem' }}>
+              <span>GROSS PAY</span>
+              <span>₹ {fmt(emp.gross)}</span>
+            </div>
+          </div>
+          <div>
+            <h4 style={{ borderBottom: '2px solid #dc2626', paddingBottom: '0.5rem', marginBottom: '1.25rem', fontSize: '1.1rem', fontWeight: '800', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.025em' }}>Deductions</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {deductions.map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem' }}>
+                  <span style={{ color: '#374151', fontWeight: 500 }}>{item.label}</span>
+                  <span style={{ fontWeight: 700, color: '#111827' }}>₹ {fmt(item.val)}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '2px solid #e5e7eb', fontWeight: '800', color: '#991b1b', fontSize: '1.1rem' }}>
+              <span>TOTAL DEDUCTIONS</span>
+              <span>₹ {fmt(emp.dedux)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '3rem', padding: '1.5rem', background: '#f0fdf4', borderRadius: '10px', border: '2px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)' }}>
+          <span style={{ fontWeight: '800', fontSize: '1.25rem', color: '#166534' }}>NET PAYABLE AMOUNT</span>
+          <span style={{ fontWeight: '900', fontSize: '1.75rem', color: '#15803d' }}>₹ {fmt(emp.net)}</span>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 };
 
@@ -959,6 +1288,19 @@ const Reports = () => {
         // Keep approved records only
         const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
         setData(approved);
+      } else if (type === 'supplementary') {
+        const res = await fetch(`/api/supplementary/${targetMonth}`);
+        const list = await res.json();
+        // Keep approved records only
+        const approved = list.filter(bill => bill.earnings_id !== null && bill.is_approved === 1);
+        const combined = approved.map(e => {
+          const da = (e.da_state||0) + (e.da_ugc||0);
+          const hra = (e.hra_state||0) + (e.hra_ugc||0);
+          const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
+          const dedux = (e.epf||0)+(e.cpf||0)+(e.professional_tax||0)+(e.income_tax||0)+(e.sli||0)+(e.gis||0)+(e.lic||0)+(e.onam_advance||0)+(e.hra_recovery||0)+(e.other_deductions||0);
+          return { ...e, da, hra, gross, dedux, net: gross - dedux };
+        });
+        setData(combined.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
       }
     } catch (err) { 
       console.error(err); 
@@ -1311,6 +1653,121 @@ const Reports = () => {
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `KSoM_FestivalAllowances_${formatMonthYear(monthYear)}.xlsx`);
+  };
+
+  const exportSupplementaryExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Supplementary Paybills');
+
+    sheet.columns = [
+      { header: 'Sl. No.', key: 'sl', width: 8 },
+      { header: 'Employee ID', key: 'emp_id', width: 15 },
+      { header: 'Employee Name', key: 'name', width: 25 },
+      { header: 'Designation', key: 'designation', width: 22 },
+      { header: 'Category', key: 'category', width: 12 },
+      { header: 'Days Worked', key: 'num_days', width: 14 },
+      { header: 'Reference Basic (Rs)', key: 'regular_basic', width: 18 },
+      { header: 'Calculated Basic (Rs)', key: 'basic_pay', width: 18 },
+      { header: 'Gross Pay (Rs)', key: 'gross', width: 16 },
+      { header: 'Total Ded (Rs)', key: 'dedux', width: 16 },
+      { header: 'Net Pay (Rs)', key: 'net', width: 16 }
+    ];
+
+    // Add Title
+    sheet.insertRow(1, []);
+    sheet.insertRow(2, ['Kerala School of Mathematics - Supplementary Salary Statement']);
+    sheet.insertRow(3, [`Month: ${monthYear} | Generated on ${new Date().toLocaleDateString()}`]);
+    sheet.insertRow(4, []);
+
+    sheet.mergeCells('A2:K2');
+    sheet.mergeCells('A3:K3');
+
+    sheet.getCell('A2').font = { name: 'Arial', size: 14, bold: true };
+    sheet.getCell('A2').alignment = { horizontal: 'center' };
+    sheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
+    sheet.getCell('A3').alignment = { horizontal: 'center' };
+
+    // Format Headers
+    const headerRow = sheet.getRow(5);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF3B82F6' } // Modern blue
+      };
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
+    });
+
+    let sumRef = 0, sumCalc = 0, sumGross = 0, sumDed = 0, sumNet = 0;
+
+    data.forEach((emp, i) => {
+      sumRef += emp.regular_basic || 0;
+      sumCalc += emp.basic_pay || 0;
+      sumGross += emp.gross || 0;
+      sumDed += emp.dedux || 0;
+      sumNet += emp.net || 0;
+
+      const row = sheet.addRow({
+        sl: i + 1,
+        emp_id: emp.emp_id,
+        name: (emp.title ? `${emp.title} ` : '') + emp.name,
+        designation: emp.designation,
+        category: emp.category?.toUpperCase(),
+        num_days: emp.num_days,
+        regular_basic: emp.regular_basic,
+        basic_pay: emp.basic_pay,
+        gross: emp.gross,
+        dedux: emp.dedux,
+        net: emp.net
+      });
+
+      row.height = 20;
+      row.eachCell((cell, colNum) => {
+        cell.font = { name: 'Arial', size: 9 };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+        };
+        if (colNum <= 6) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0.00';
+        }
+      });
+    });
+
+    // Totals row
+    const totalsRow = sheet.addRow({
+      sl: 'TOTAL',
+      regular_basic: sumRef,
+      basic_pay: sumCalc,
+      gross: sumGross,
+      dedux: sumDed,
+      net: sumNet
+    });
+    sheet.mergeCells(`A${totalsRow.number}:F${totalsRow.number}`);
+    totalsRow.getCell(1).font = { name: 'Arial', size: 10, bold: true };
+    totalsRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+
+    totalsRow.eachCell((cell, colNum) => {
+      if (colNum >= 7 || colNum === 1) {
+        cell.font = { name: 'Arial', size: 10, bold: true };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
+        if (colNum >= 7) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0.00';
+        }
+      }
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `KSoM_SupplementaryPaybill_${formatMonthYear(monthYear)}.xlsx`);
   };
 
   // Original Regular Paybill Excel Export
@@ -1687,6 +2144,7 @@ const Reports = () => {
 
   const handleExportMaster = () => {
     if (billType === 'regular') exportExcel();
+    else if (billType === 'supplementary') exportSupplementaryExcel();
     else if (billType === 'surrender') exportSurrenderExcel();
     else if (billType === 'arrears') exportArrearExcel();
     else if (billType === 'festival') exportFestivalExcel();
@@ -1695,6 +2153,7 @@ const Reports = () => {
   const triggerDownloadPDF = (emp) => {
     const activeRule = globalSettingsList.find(r => r.effective_from <= monthYear) || {};
     if (billType === 'regular') generatePDFPayslip(emp, monthYear, activeRule, false, usersList);
+    else if (billType === 'supplementary') generatePDFSupplementary(emp, monthYear, activeRule, false, usersList);
     else if (billType === 'surrender') generatePDFSurrender(emp, monthYear, false, usersList);
     else if (billType === 'arrears') generatePDFArrear(emp, monthYear, false, usersList);
     else if (billType === 'festival') generatePDFFestival(emp, monthYear, false, usersList);
@@ -1738,6 +2197,10 @@ const Reports = () => {
           pdfResult = await generatePDFFestival(emp, monthYear, true, usersList);
           subjectStr = `KSoM Festival Allowance Slip - ${formatMonthYear(monthYear)}`;
           bodyStr = `Dear ${emp.name},\n\nPlease find attached your Festival Allowance slip for ${formatMonthYear(monthYear)}.\n\nRegards,\nKerala School of Mathematics`;
+        } else if (billType === 'supplementary') {
+          pdfResult = await generatePDFSupplementary(emp, monthYear, activeRule, true, usersList);
+          subjectStr = `KSoM Supplementary Payslip - ${formatMonthYear(monthYear)}`;
+          bodyStr = `Dear ${emp.name},\n\nPlease find attached your supplementary salary payslip for ${formatMonthYear(monthYear)} (${emp.num_days} days).\n\nRegards,\nKerala School of Mathematics`;
         }
 
         if (pdfResult) {
@@ -1816,6 +2279,8 @@ const Reports = () => {
           await generatePDFArrear(emp, monthYear, false, usersList, doc, logoImg, sealImg);
         } else if (billType === 'festival') {
           await generatePDFFestival(emp, monthYear, false, usersList, doc, logoImg, sealImg);
+        } else if (billType === 'supplementary') {
+          await generatePDFSupplementary(emp, monthYear, activeRule, false, usersList, doc, logoImg, sealImg);
         }
       }
 
@@ -1832,6 +2297,7 @@ const Reports = () => {
 
   const getBillTypeTitle = () => {
     if (billType === 'regular') return 'Regular Paybill';
+    if (billType === 'supplementary') return 'Supplementary Paybill';
     if (billType === 'surrender') return 'Leave Surrender Bill';
     if (billType === 'arrears') return 'Salary Arrears';
     if (billType === 'festival') return 'Festival Allowance';
@@ -1855,6 +2321,7 @@ const Reports = () => {
             <label style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Bill Type:</label>
             <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }}>
               <option value="regular">Regular Paybill</option>
+              <option value="supplementary">Supplementary Paybill</option>
               <option value="surrender">Leave Surrender Bill</option>
               <option value="arrears">Salary Arrear Bill</option>
               <option value="festival">Festival Allowance Bill</option>
@@ -1916,6 +2383,7 @@ const Reports = () => {
                   )}
                   <th>Employee</th>
                   {billType === 'regular' && <><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th></>}
+                  {billType === 'supplementary' && <><th>Days Worked</th><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th></>}
                   {billType === 'surrender' && <><th>ELs Surrendered</th><th>Basic + DA + HRA</th><th>Surrender Amount</th></>}
                   {billType === 'arrears' && <><th>Arrear Type</th><th>Gross Arrear</th><th>IT Deduction</th><th>Net Arrear</th></>}
                   {billType === 'festival' && <><th>Allowance Description</th><th>Allowance Date</th><th>Payout Amount</th></>}
@@ -1952,6 +2420,16 @@ const Reports = () => {
                     {/* Regular Paybill Row */}
                     {billType === 'regular' && (
                       <>
+                        <td>₹ {fmt(emp.gross)}</td>
+                        <td>₹ {fmt(emp.dedux)}</td>
+                        <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                      </>
+                    )}
+
+                    {/* Supplementary Row */}
+                    {billType === 'supplementary' && (
+                      <>
+                        <td style={{ fontWeight: 'bold' }}>{emp.num_days} days</td>
                         <td>₹ {fmt(emp.gross)}</td>
                         <td>₹ {fmt(emp.dedux)}</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>

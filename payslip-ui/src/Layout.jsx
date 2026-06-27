@@ -63,7 +63,7 @@ const Layout = () => {
 
   useEffect(() => {
     const path = window.location.pathname;
-    if (['/paybill', '/surrender-bill', '/arrear-bill', '/festival-bill'].includes(path)) {
+    if (['/paybill', '/surrender-bill', '/arrear-bill', '/festival-bill', '/supplementary-bill'].includes(path)) {
       setBillMenuOpen(true);
     }
   }, []);
@@ -245,6 +245,9 @@ const Layout = () => {
                 <div style={{ paddingLeft: '2.75rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <NavLink to="/paybill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Paybill</span>
+                  </NavLink>
+                  <NavLink to="/supplementary-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                    <span>Supplementary Paybill</span>
                   </NavLink>
                   <NavLink to="/surrender-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Surrender Bill</span>

@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
     }
 
     // Security check
-    if (userRole === 'viewer') {
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
       // Find own emp_id
       const emp = await env.ksom_payslip_db.prepare(
         "SELECT emp_id FROM employees WHERE email_id = ?"
@@ -67,6 +67,16 @@ export async function onRequestGet(context) {
       "SELECT * FROM festival_allowance_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1 ORDER BY bill_date ASC"
     ).bind(empId, startMonth, endMonth).all();
 
+    // Fetch approved supplementary earnings for the range
+    const { results: supplementaryEarnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM supplementary_earnings WHERE emp_id = ? AND month_year >= ? AND month_year <= ? AND is_approved = 1 ORDER BY month_year ASC"
+    ).bind(empId, startMonth, endMonth).all();
+
+    // Fetch supplementary deductions for the range
+    const { results: supplementaryDeductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM supplementary_deductions WHERE emp_id = ? AND month_year >= ? AND month_year <= ? ORDER BY month_year ASC"
+    ).bind(empId, startMonth, endMonth).all();
+
     // Fetch settings to get rules that might apply during this period
     const { results: settings } = await env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from ASC"
@@ -79,6 +89,8 @@ export async function onRequestGet(context) {
       arrears,
       surrender,
       festival,
+      supplementaryEarnings,
+      supplementaryDeductions,
       settings
     }), {
       headers: { 'Content-Type': 'application/json' },
@@ -88,3 +100,4 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
+

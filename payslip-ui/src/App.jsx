@@ -7,6 +7,7 @@ import Paybill from './pages/Paybill';
 import SurrenderBill from './pages/SurrenderBill';
 import ArrearBill from './pages/ArrearBill';
 import FestivalAllowanceBill from './pages/FestivalAllowanceBill';
+import SupplementaryPaybill from './pages/SupplementaryPaybill';
 import Reports from './pages/Reports';
 import Backup from './pages/Backup';
 import UserManagement from './pages/UserManagement';
@@ -60,6 +61,7 @@ function App() {
           <Route index element={<Overview user={user} />} />
           <Route path="employees" element={<Employees user={user} />} />
           <Route path="paybill" element={<Paybill user={user} />} />
+          <Route path="supplementary-bill" element={<SupplementaryPaybill user={user} />} />
           <Route path="surrender-bill" element={<SurrenderBill user={user} />} />
           <Route path="arrear-bill" element={<ArrearBill user={user} />} />
           <Route path="festival-bill" element={<FestivalAllowanceBill user={user} />} />
