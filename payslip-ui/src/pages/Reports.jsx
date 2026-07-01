@@ -1656,118 +1656,374 @@ const Reports = () => {
   };
 
   const exportSupplementaryExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Supplementary Paybills');
+    const monthDisplay = new Date(monthYear + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const activeRule = globalSettingsList.find(r => r.effective_from <= monthYear) || {};
+    
+    const dynamicEarnKeysSet = new Set();
+    const dynamicDeduxKeysSet = new Set();
+    data.forEach(emp => {
+      let eArr = [];
+      let dArr = [];
+      try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
+      try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
+      eArr.forEach(i => { if(i.desc) dynamicEarnKeysSet.add(i.desc); });
+      dArr.forEach(i => { if(i.desc) dynamicDeduxKeysSet.add(i.desc); });
+    });
+    const dynamicEarnKeys = Array.from(dynamicEarnKeysSet);
+    const dynamicDeduxKeys = Array.from(dynamicDeduxKeysSet);
 
-    sheet.columns = [
-      { header: 'Sl. No.', key: 'sl', width: 8 },
-      { header: 'Employee ID', key: 'emp_id', width: 15 },
-      { header: 'Employee Name', key: 'name', width: 25 },
-      { header: 'Designation', key: 'designation', width: 22 },
-      { header: 'Category', key: 'category', width: 12 },
-      { header: 'Days Worked', key: 'num_days', width: 14 },
-      { header: 'Reference Basic (Rs)', key: 'regular_basic', width: 18 },
-      { header: 'Calculated Basic (Rs)', key: 'basic_pay', width: 18 },
-      { header: 'Gross Pay (Rs)', key: 'gross', width: 16 },
-      { header: 'Total Ded (Rs)', key: 'dedux', width: 16 },
-      { header: 'Net Pay (Rs)', key: 'net', width: 16 }
-    ];
-
-    // Add Title
-    sheet.insertRow(1, []);
-    sheet.insertRow(2, ['Kerala School of Mathematics - Supplementary Salary Statement']);
-    sheet.insertRow(3, [`Month: ${monthYear} | Generated on ${new Date().toLocaleDateString()}`]);
-    sheet.insertRow(4, []);
-
-    sheet.mergeCells('A2:K2');
-    sheet.mergeCells('A3:K3');
-
-    sheet.getCell('A2').font = { name: 'Arial', size: 14, bold: true };
-    sheet.getCell('A2').alignment = { horizontal: 'center' };
-    sheet.getCell('A3').font = { name: 'Arial', size: 10, italic: true };
-    sheet.getCell('A3').alignment = { horizontal: 'center' };
-
-    // Format Headers
-    const headerRow = sheet.getRow(5);
-    headerRow.height = 28;
-    headerRow.eachCell((cell) => {
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF3B82F6' } // Modern blue
+    try {
+      const response = await fetch('/pay_bill-format.xlsx');
+      const arrayBuffer = await response.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      const sheet = workbook.worksheets[0];
+      
+      const safeMerge = (range) => {
+        const [tl, br] = range.split(':');
+        const tlRow = parseInt(tl.replace(/[A-Z]+/i, ''));
+        const brRow = parseInt(br.replace(/[A-Z]+/i, ''));
+        const merges = (sheet.model.merges || []).filter(m => {
+          const [ms, me] = m.split(':');
+          const mRow1 = parseInt(ms.replace(/[A-Z]+/i, ''));
+          const mRow2 = parseInt(me.replace(/[A-Z]+/i, ''));
+          return mRow1 <= brRow && mRow2 >= tlRow;
+        });
+        merges.forEach(m => { try { sheet.unMergeCells(m); } catch(e) {} });
+        try { sheet.mergeCells(range); } catch(e) {}
       };
-      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'medium' }, right: { style: 'thin' } };
-    });
 
-    let sumRef = 0, sumCalc = 0, sumGross = 0, sumDed = 0, sumNet = 0;
-
-    data.forEach((emp, i) => {
-      sumRef += emp.regular_basic || 0;
-      sumCalc += emp.basic_pay || 0;
-      sumGross += emp.gross || 0;
-      sumDed += emp.dedux || 0;
-      sumNet += emp.net || 0;
-
-      const row = sheet.addRow({
-        sl: i + 1,
-        emp_id: emp.emp_id,
-        name: (emp.title ? `${emp.title} ` : '') + emp.name,
-        designation: emp.designation,
-        category: emp.category?.toUpperCase(),
-        num_days: emp.num_days,
-        regular_basic: emp.regular_basic,
-        basic_pay: emp.basic_pay,
-        gross: emp.gross,
-        dedux: emp.dedux,
-        net: emp.net
-      });
-
-      row.height = 20;
-      row.eachCell((cell, colNum) => {
-        cell.font = { name: 'Arial', size: 9 };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-          left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-          bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-          right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
-        };
-        if (colNum <= 6) {
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        } else {
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.numFmt = '#,##0.00';
-        }
-      });
-    });
-
-    // Totals row
-    const totalsRow = sheet.addRow({
-      sl: 'TOTAL',
-      regular_basic: sumRef,
-      basic_pay: sumCalc,
-      gross: sumGross,
-      dedux: sumDed,
-      net: sumNet
-    });
-    sheet.mergeCells(`A${totalsRow.number}:F${totalsRow.number}`);
-    totalsRow.getCell(1).font = { name: 'Arial', size: 10, bold: true };
-    totalsRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
-
-    totalsRow.eachCell((cell, colNum) => {
-      if (colNum >= 7 || colNum === 1) {
-        cell.font = { name: 'Arial', size: 10, bold: true };
-        cell.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
-        if (colNum >= 7) {
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.numFmt = '#,##0.00';
-        }
+      const eHeaders = ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow'];
+      if (dynamicEarnKeys.length > 0) {
+        eHeaders.push(...dynamicEarnKeys);
+      } else {
+        eHeaders.push('Others');
       }
-    });
+      eHeaders.push('Gross Pay');
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `KSoM_SupplementaryPaybill_${formatMonthYear(monthYear)}.xlsx`);
+      const dedHeaders = [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
+      if (dynamicDeduxKeys.length > 0) {
+        dedHeaders.push(...dynamicDeduxKeys);
+      } else {
+        dedHeaders.push('Others');
+      }
+      dedHeaders.push('Total Ded', 'Net Pay');
+
+      const earnColCount = eHeaders.length;
+      const maxColCount = Math.max(earnColCount, dedHeaders.length - 1);
+      const lastColLetter = sheet.getColumn(maxColCount).letter;
+
+      const r4 = sheet.getRow(4);
+      const r5 = sheet.getRow(5);
+      
+      for(let i=1; i<=20; i++) r4.getCell(i).value = null;
+      r4.getCell(1).value = 'EARNINGS';
+
+      for (let col = 1; col <= maxColCount; col++) {
+        const cell = r5.getCell(col);
+        if (col <= eHeaders.length) {
+          cell.value = eHeaders[col - 1];
+        }
+        cell.style = sheet.getCell('N5').style;
+      }
+      r4.commit();
+      r5.commit();
+
+      safeMerge(`A4:${lastColLetter}4`);
+      sheet.getCell('A3').value = 'Supplementary Pay Bill Statement for the Month of ' + monthDisplay;
+      safeMerge(`A3:${lastColLetter}3`);
+      sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const dataStyle = sheet.getCell('A6').style;
+      const slNoStyle = JSON.parse(JSON.stringify(dataStyle));
+      slNoStyle.numFmt = '0';
+      slNoStyle.alignment = { ...((slNoStyle.alignment) || {}), horizontal: 'center', vertical: 'center' };
+      const totalStyle = sheet.getCell('E15').style;
+      const totalLabelStyle = sheet.getCell('A15').style;
+      const dedTitleStyle = sheet.getCell('A16').style;
+      const dedHeaderStyle = sheet.getCell('A17').style;
+
+      const maxRows = Math.max(sheet.rowCount, 30);
+      for (let i = maxRows; i >= 6; i--) {
+        sheet.spliceRows(i, 1);
+      }
+
+      let currentRow = 6;
+      let sumBasic = 0, sumGP = 0, sumDA = 0, sumHRA = 0, sumCCA = 0, sumSpl = 0, sumTr = 0, sumFest = 0, sumOther = 0, sumGross = 0;
+      let sumDynamicE = {};
+
+      data.forEach((emp, i) => {
+        const basic = Math.round(parseFloat(emp.basic_pay) || 0);
+        const gp = Math.round(parseFloat(emp.dp_gp) || 0);
+        const da = Math.round(parseFloat(emp.da) || 0);
+        const hra = Math.round(parseFloat(emp.hra) || 0);
+        const cca = Math.round(parseFloat(emp.cca) || 0);
+        const spl = Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0));
+        const tr = Math.round(parseFloat(emp.tr_allow) || 0);
+        const fest = Math.round(parseFloat(emp.fest_allow) || 0);
+
+        let eArr = [];
+        try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
+        const dynE = {};
+        eArr.forEach(item => {
+          if (item.desc) {
+            dynE[item.desc] = Math.round(parseFloat(item.amount) || 0);
+            sumDynamicE[item.desc] = (sumDynamicE[item.desc] || 0) + dynE[item.desc];
+          }
+        });
+
+        let dynamicEarnSum = 0;
+        if (dynamicEarnKeys.length > 0) {
+          dynamicEarnKeys.forEach(k => {
+            dynamicEarnSum += dynE[k] || 0;
+          });
+        } else {
+          dynamicEarnSum = Math.round(parseFloat(emp.other_earnings) || 0);
+        }
+        const gross = basic + gp + da + hra + cca + spl + tr + fest + dynamicEarnSum;
+        emp.roundedGross = gross;
+
+        sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; 
+        if (dynamicEarnKeys.length > 0) {
+          // Dynamic keys sums are tracked in sumDynamicE
+        } else {
+          sumOther += dynamicEarnSum;
+        }
+        sumGross += gross;
+
+        const row = sheet.getRow(currentRow);
+        const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
+        const values = [null, i + 1, fullName, emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest];
+        if (dynamicEarnKeys.length > 0) {
+          dynamicEarnKeys.forEach(k => values.push(dynE[k] || 0));
+        } else {
+          values.push(dynamicEarnSum);
+        }
+        values.push(gross);
+
+        for (let col = 1; col <= maxColCount; col++) {
+          const cell = row.getCell(col);
+          if (col < values.length) {
+            cell.value = values[col];
+          }
+          if (col === 1) {
+            cell.style = slNoStyle;
+          } else {
+            cell.style = dataStyle;
+            if (col === 2 || col === 3 || col === 4) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            } else if (col >= 5) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+              if (col < values.length && typeof values[col] === 'number') {
+                cell.numFmt = '0.00';
+              }
+            }
+          }
+        }
+        row.commit();
+        currentRow++;
+      });
+
+      const totalRow = sheet.getRow(currentRow);
+      totalRow.getCell(1).value = 'TOTAL';
+      totalRow.getCell(1).style = totalLabelStyle;
+      safeMerge(`A${currentRow}:D${currentRow}`);
+      
+      const sumsEarn = [sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest];
+      if (dynamicEarnKeys.length > 0) {
+        dynamicEarnKeys.forEach(k => sumsEarn.push(sumDynamicE[k] || 0));
+      } else {
+        sumsEarn.push(sumOther);
+      }
+      sumsEarn.push(sumGross);
+
+      for (let col = 5; col <= maxColCount; col++) {
+        const cell = totalRow.getCell(col);
+        const idx = col - 5;
+        if (idx < sumsEarn.length) {
+          cell.value = sumsEarn[idx];
+        }
+        cell.style = totalStyle;
+        cell.alignment = { ...totalStyle.alignment, horizontal: 'right' };
+        if (idx < sumsEarn.length) cell.numFmt = '0.00';
+      }
+      totalRow.commit();
+      currentRow++;
+
+      currentRow++; // Empty row
+
+      const dedTitleRow = sheet.getRow(currentRow);
+      dedTitleRow.getCell(1).value = 'DEDUCTIONS';
+      dedTitleRow.getCell(1).style = dedTitleStyle;
+      safeMerge(`A${currentRow}:${lastColLetter}${currentRow}`);
+      dedTitleRow.commit();
+      currentRow++;
+
+      const dedHeaderRow = sheet.getRow(currentRow);
+      for (let c = 1; c <= maxColCount; c++) {
+        const cell = dedHeaderRow.getCell(c);
+        if (c < dedHeaders.length) {
+          cell.value = dedHeaders[c];
+        }
+        if (c > 0) cell.style = dedHeaderStyle;
+      }
+      dedHeaderRow.commit();
+      currentRow++;
+
+      let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRAOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
+      let sumDynamicD = {};
+      data.forEach((emp, i) => {
+        const epf = Math.round(parseFloat(emp.epf) || 0);
+        const cpf = Math.round(parseFloat(emp.cpf) || 0);
+        const it = Math.round(parseFloat(emp.income_tax) || 0);
+        const gis = Math.round(parseFloat(emp.gis) || 0);
+        const sli = Math.round(parseFloat(emp.sli) || 0);
+        const lic = Math.round(parseFloat(emp.lic) || 0);
+        const pt = Math.round(parseFloat(emp.professional_tax) || 0);
+        const hraOnam = Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0));
+
+        let dArr = [];
+        try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
+        const dynD = {};
+        dArr.forEach(item => {
+          if (item.desc) {
+            dynD[item.desc] = Math.round(parseFloat(item.amount) || 0);
+            sumDynamicD[item.desc] = (sumDynamicD[item.desc] || 0) + dynD[item.desc];
+          }
+        });
+
+        let dynamicDeduxSum = 0;
+        if (dynamicDeduxKeys.length > 0) {
+          dynamicDeduxKeys.forEach(k => {
+            dynamicDeduxSum += dynD[k] || 0;
+          });
+        } else {
+          dynamicDeduxSum = Math.round(parseFloat(emp.other_deductions) || 0);
+        }
+
+        const dedux = epf + cpf + it + gis + sli + lic + pt + hraOnam + dynamicDeduxSum;
+        const net = (emp.roundedGross || 0) - dedux;
+
+        sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRAOnam += hraOnam;
+        if (dynamicDeduxKeys.length > 0) {
+          // Dynamic keys sums are tracked in sumDynamicD
+        } else {
+          sumOtherDed += dynamicDeduxSum;
+        }
+        sumTotDed += dedux; sumNet += net;
+
+        const row = sheet.getRow(currentRow);
+        const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', epf, cpf, it, gis, sli, lic, pt, hraOnam];
+        if (dynamicDeduxKeys.length > 0) {
+          dynamicDeduxKeys.forEach(k => values.push(dynD[k] || 0));
+        } else {
+          values.push(dynamicDeduxSum);
+        }
+        values.push(dedux, net);
+
+        for (let c = 1; c <= maxColCount; c++) {
+          const cell = row.getCell(c);
+          if (c < values.length) {
+            cell.value = values[c];
+          }
+          if (c === 1) {
+            cell.style = slNoStyle;
+          } else {
+            cell.style = dataStyle;
+            if (c === 2 || c === 3 || c === 4) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'left' };
+            } else if (c >= 5) {
+              cell.alignment = { ...dataStyle.alignment, horizontal: 'right' };
+              if (c < values.length && typeof values[c] === 'number') {
+                cell.numFmt = '0.00';
+              }
+            }
+          }
+        }
+        row.commit();
+        currentRow++;
+      });
+
+      const dedTotalRow = sheet.getRow(currentRow);
+      dedTotalRow.getCell(1).value = 'TOTAL';
+      dedTotalRow.getCell(1).style = totalLabelStyle;
+      safeMerge(`A${currentRow}:D${currentRow}`);
+
+      const sumsDedux = [sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam];
+      if (dynamicDeduxKeys.length > 0) {
+        dynamicDeduxKeys.forEach(k => sumsDedux.push(sumDynamicD[k] || 0));
+      } else {
+        sumsDedux.push(sumOtherDed);
+      }
+      sumsDedux.push(sumTotDed, sumNet);
+
+      for (let c = 5; c <= maxColCount; c++) {
+        const cell = dedTotalRow.getCell(c);
+        if (c - 5 < sumsDedux.length) {
+          cell.value = sumsDedux[c - 5];
+        }
+        cell.style = totalStyle;
+        cell.alignment = { ...totalStyle.alignment, horizontal: 'right' };
+        if (c - 5 < sumsDedux.length) cell.numFmt = '0.00';
+      }
+      dedTotalRow.commit();
+      currentRow++;
+
+      currentRow++;
+
+      const bottomRows = [
+        ['UGC/CSIR - DA Rate (%) 7th CPC', activeRule.da_ugc_percentage || ''],
+        ['State DA (%) 11th Pay', activeRule.da_state_percentage || ''],
+        ['UGC - HRA (%) 7th CPC', activeRule.hra_ugc_percentage || ''],
+        ['STATE HRA - 10 % BASIC', activeRule.hra_state_percentage || ''],
+        ['7th CPC DA Rate -Deputation', ''],
+        ['7th CPC DA HRA - Deputation', ''],
+        ['7th CPC Travel Allowance', 3600],
+        ['7th CPC Deputation Allowance', 6800],
+        [],
+        ['Gross Pay', sumGross],
+        ['Net Pay', sumNet]
+      ];
+
+      bottomRows.forEach(br => {
+        const r = sheet.getRow(currentRow);
+        if (br.length > 0) {
+          r.getCell(3).value = br[0];
+          r.getCell(4).value = br[1];
+          r.getCell(3).font = { name: 'Arial Narrow', size: 10, bold: true };
+          r.getCell(4).font = { name: 'Arial Narrow', size: 10, bold: true };
+          if (typeof br[1] === 'number' || parseFloat(br[1])) {
+             r.getCell(4).alignment = { horizontal: 'right' };
+             if (br[0] === 'Gross Pay' || br[0] === 'Net Pay') {
+                 r.getCell(4).numFmt = '0.00';
+             }
+          }
+        }
+        r.commit();
+        currentRow++;
+      });
+
+      currentRow++;
+      const sigRow = sheet.getRow(currentRow);
+      const sigFont = { name: 'Arial Narrow', size: 10, bold: true };
+      const sigAlign = { horizontal: 'center' };
+      sigRow.getCell(5).value  = 'Assistant - Gr.II';
+      sigRow.getCell(5).font   = sigFont;
+      sigRow.getCell(5).alignment = sigAlign;
+      sigRow.getCell(9).value  = 'AO';
+      sigRow.getCell(9).font   = sigFont;
+      sigRow.getCell(9).alignment = sigAlign;
+      sigRow.getCell(13).value = 'DIRECTOR';
+      sigRow.getCell(13).font  = sigFont;
+      sigRow.getCell(13).alignment = sigAlign;
+      sigRow.commit();
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `KSoM_SupplementaryPaybill_${formatMonthYear(monthYear)}.xlsx`);
+    } catch (err) {
+      console.error("Error generating Supplementary Excel:", err);
+      alert("Failed to generate Excel: " + err.message);
+    }
   };
 
   // Original Regular Paybill Excel Export
