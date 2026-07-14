@@ -138,10 +138,12 @@ const SurrenderBill = (props) => {
     }
   }, [billDate]);
 
-  // Auto-calculate DA when basic pay or selected employee changes
+  // Auto-calculate total amount when basic pay, da, hra, or numEls changes
   useEffect(() => {
-    calculateDAAndTotal();
-  }, [basicPay, selectedEmpId, numEls, hra]);
+    const base = basicPay + da + hra;
+    const total = Math.round((base / 30) * numEls);
+    setTotalAmount(total);
+  }, [basicPay, da, hra, numEls]);
 
   const loadBaseData = async () => {
     try {
@@ -199,13 +201,11 @@ const SurrenderBill = (props) => {
 
   const fetchLastEarning = async (empId) => {
     try {
-      // Find basic pay from the current month or previous month earnings
+      // Find details from the current month or previous month earnings
       const res = await fetch(`/api/earnings/${monthYear}`);
       const data = await res.json();
-      const match = data.find(e => e.emp_id === empId);
-      if (match && match.basic_pay) {
-        setBasicPay(match.basic_pay);
-      } else {
+      let match = data.find(e => e.emp_id === empId);
+      if (!match || !match.basic_pay) {
         // Try previous month
         const [yr, mn] = monthYear.split('-');
         let prevM = parseInt(mn) - 1;
@@ -215,15 +215,22 @@ const SurrenderBill = (props) => {
         
         const prevRes = await fetch(`/api/earnings/${prevMonthStr}`);
         const prevData = await prevRes.json();
-        const prevMatch = prevData.find(e => e.emp_id === empId);
-        if (prevMatch && prevMatch.basic_pay) {
-          setBasicPay(prevMatch.basic_pay);
-        } else {
-          setBasicPay(0);
-        }
+        match = prevData.find(e => e.emp_id === empId);
+      }
+
+      if (match && match.basic_pay) {
+        setBasicPay(match.basic_pay);
+        setDa((match.da_state || 0) + (match.da_ugc || 0));
+        setHra((match.hra_state || 0) + (match.hra_ugc || 0));
+      } else {
+        setBasicPay(0);
+        setDa(0);
+        setHra(0);
       }
     } catch (e) {
       setBasicPay(0);
+      setDa(0);
+      setHra(0);
     }
   };
 
@@ -243,23 +250,6 @@ const SurrenderBill = (props) => {
     }
   };
 
-  const calculateDAAndTotal = () => {
-    if (!selectedEmpId) return;
-    const emp = employees.find(e => e.emp_id === selectedEmpId);
-    if (!emp) return;
-
-    const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
-    const isState = emp.category === 'state';
-    const isUGC = emp.category === 'ugc/csir';
-    const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
-
-    const calculatedDa = Math.round((basicPay * da_pct) / 100);
-    setDa(calculatedDa);
-
-    const base = basicPay + calculatedDa + hra;
-    const total = Math.round((base / 30) * numEls);
-    setTotalAmount(total);
-  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -609,7 +599,19 @@ const SurrenderBill = (props) => {
                   type="number" 
                   className="form-control" 
                   value={basicPay || ''} 
-                  onChange={(e) => setBasicPay(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const newBasic = parseFloat(e.target.value) || 0;
+                    setBasicPay(newBasic);
+                    // Also auto-calculate DA when user manually changes Basic Pay
+                    const emp = employees.find(e => e.emp_id === selectedEmpId);
+                    if (emp) {
+                      const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
+                      const isState = emp.category === 'state';
+                      const isUGC = emp.category === 'ugc/csir';
+                      const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
+                      setDa(Math.round((newBasic * da_pct) / 100));
+                    }
+                  }}
                   disabled={isReadOnly}
                   placeholder="0.00"
                   required
