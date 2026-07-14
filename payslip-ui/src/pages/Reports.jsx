@@ -562,7 +562,7 @@ const generatePDFSurrender = async (employee, monthYear, returnBase64 = false, u
       ['Basic Pay', `Base basic pay for calculation`, fmt(employee.basic_pay)],
       ['Dearness Allowance (DA)', `Calculated DA`, fmt(employee.da)],
       ['HRA Payout', `House Rent Allowance (if applicable)`, fmt(employee.hra)],
-      ['No. of ELs Surrendered', `${employee.num_els} days`, `${employee.num_els} / 30`],
+      ['No. of ELs Surrendered', `${employee.num_els} days` + (employee.is_terminal === 1 ? ' (Terminal Surrender)' : ''), `${employee.num_els} / ${employee.is_terminal === 1 ? 300 : 30}`],
       [{ content: 'TOTAL LEAVE SURRENDER PAYOUT', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [220, 250, 235] } }, 
        { content: `Rs. ${Math.round(employee.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 250, 235] } }]
     ],
@@ -952,7 +952,7 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '0.5rem' }}>
             <span style={{ color: '#374151', fontWeight: 500 }}>ELs Surrendered:</span>
-            <span style={{ fontWeight: 700, color: '#2563eb' }}>{emp.num_els} days</span>
+            <span style={{ fontWeight: 700, color: '#2563eb' }}>{emp.num_els} days{emp.is_terminal === 1 && ' (Terminal Surrender)'}</span>
           </div>
         </div>
 
@@ -1385,7 +1385,7 @@ const Reports = () => {
         basic_pay: basicPay,
         da: da,
         hra: hra,
-        num_els: `${emp.num_els} days`,
+        num_els: `${emp.num_els} days` + (emp.is_terminal === 1 ? ' (Terminal)' : ''),
         financial_year: emp.financial_year,
         total_amount: totalAmount
       });
@@ -2695,7 +2695,23 @@ const Reports = () => {
                     {/* Surrender Row */}
                     {billType === 'surrender' && (
                       <>
-                        <td style={{ fontWeight: 'bold' }}>{emp.num_els} days</td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          <div>{emp.num_els} days</div>
+                          {emp.is_terminal === 1 && (
+                            <span style={{
+                              backgroundColor: '#6366f1',
+                              color: '#fff',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.65rem',
+                              fontWeight: 'bold',
+                              display: 'inline-block',
+                              marginTop: '0.25rem'
+                            }}>
+                              Terminal
+                            </span>
+                          )}
+                        </td>
                         <td>
                           <div style={{ fontSize: '0.85rem' }}>₹ {fmt(emp.basic_pay)} (Basic)</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>+ ₹ {fmt(emp.da)} (DA) + ₹ {fmt(emp.hra)} (HRA)</div>

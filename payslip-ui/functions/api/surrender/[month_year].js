@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
     let query = `
       SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
              s.id as bill_id, s.bill_date, s.financial_year, s.basic_pay, s.da, s.hra, s.num_els, s.total_amount,
-             s.is_approved, s.approved_on, s.approved_by
+             s.is_approved, s.approved_on, s.approved_by, s.is_terminal
       FROM employees e
       LEFT JOIN surrender_bills s ON e.emp_id = s.emp_id AND substr(s.bill_date, 1, ${dateLen}) = ?
     `;
@@ -65,15 +65,16 @@ export async function onRequestPost(context) {
 
     for (const record of records) {
       if (record.num_els && record.num_els > 0) {
-        // Limit to 30 ELs check on backend as well
-        if (record.num_els > 30) {
-          return new Response(JSON.stringify({ error: 'Maximum 30 Earned Leaves can be surrendered.' }), { status: 400 });
+        // Limit check on backend as well (300 for terminal surrender, 30 for regular surrender)
+        const maxEls = record.is_terminal ? 300 : 30;
+        if (record.num_els > maxEls) {
+          return new Response(JSON.stringify({ error: `Maximum ${maxEls} Earned Leaves can be surrendered.` }), { status: 400 });
         }
 
         statements.push(
           db.prepare(`
-            INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2)
+            INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved, is_terminal)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, ?)
             ON CONFLICT(emp_id, bill_date) DO UPDATE SET
               financial_year = excluded.financial_year,
               basic_pay = excluded.basic_pay,
@@ -81,7 +82,8 @@ export async function onRequestPost(context) {
               hra = excluded.hra,
               num_els = excluded.num_els,
               total_amount = excluded.total_amount,
-              is_approved = 2
+              is_approved = 2,
+              is_terminal = excluded.is_terminal
           `).bind(
             record.emp_id,
             record.bill_date,
@@ -90,7 +92,8 @@ export async function onRequestPost(context) {
             record.da || 0,
             record.hra || 0,
             record.num_els,
-            record.total_amount || 0
+            record.total_amount || 0,
+            record.is_terminal ? 1 : 0
           )
         );
       } else {

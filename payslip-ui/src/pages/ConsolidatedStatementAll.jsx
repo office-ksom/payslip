@@ -47,16 +47,15 @@ const ConsolidatedStatementAll = () => {
     const isSupApproved = !!se;
     const sd = supplementaryDeductions.find(x => x.emp_id === emp_id && x.month_year === monthYearStr) || {};
 
-    const hasApprovedBill = isLocked || isSupApproved;
-
     const empArrears = arrears.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+
+    const hasApprovedBill = isLocked || isSupApproved || empSurrender.length > 0 || empArrears.length > 0 || empFestival.length > 0;
+
     const arrearAmt = hasApprovedBill ? empArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : 0;
     const arrearIT = hasApprovedBill ? empArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : 0;
-
-    const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
     const surrenderAmt = hasApprovedBill ? empSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : 0;
-
-    const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
     const festivalAmt = hasApprovedBill ? empFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : 0;
 
     const basic = (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) + (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0);

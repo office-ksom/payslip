@@ -47,6 +47,7 @@ const SurrenderBill = (props) => {
   const [hra, setHra] = useState(0);
   const [numEls, setNumEls] = useState(30);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [isTerminal, setIsTerminal] = useState(false);
 
   // Validation/FY states
   const [cumulativeSurrendered, setCumulativeSurrendered] = useState(0);
@@ -109,6 +110,7 @@ const SurrenderBill = (props) => {
           setDa(existingBill.da || 0);
           setHra(existingBill.hra || 0);
           setNumEls(existingBill.num_els || 30);
+          setIsTerminal(existingBill.is_terminal === 1);
           if (existingBill.bill_date) {
             setBillDate(existingBill.bill_date);
           }
@@ -117,6 +119,7 @@ const SurrenderBill = (props) => {
           // Prepopulate basic pay from last saved earnings if available, or 0
           fetchLastEarning(emp.emp_id);
           fetchCumulativeLeaves(emp.emp_id, billDate);
+          setIsTerminal(false);
         }
       }
     } else {
@@ -124,6 +127,7 @@ const SurrenderBill = (props) => {
       setDa(0);
       setHra(0);
       setCumulativeSurrendered(0);
+      setIsTerminal(false);
     }
   }, [selectedEmpId, employees, existingBills]);
 
@@ -263,8 +267,9 @@ const SurrenderBill = (props) => {
       alert("Please select an employee.");
       return;
     }
-    if (numEls <= 0 || numEls > 30) {
-      alert("Number of ELs must be between 1 and 30.");
+    const maxElsLimit = isTerminal ? 300 : 30;
+    if (numEls <= 0 || numEls > maxElsLimit) {
+      alert(`Number of ELs must be between 1 and ${maxElsLimit}.`);
       return;
     }
 
@@ -276,9 +281,10 @@ const SurrenderBill = (props) => {
     const alreadyCountedLeaves = existingBillForEmpThisMonth ? existingBillForEmpThisMonth.num_els : 0;
     const netFutureLeaves = futureTotalLeaves - alreadyCountedLeaves;
 
-    if (netFutureLeaves > 30) {
+    const yearlyMaxLimit = isTerminal ? 300 : 30;
+    if (netFutureLeaves > yearlyMaxLimit) {
       alert(`VALIDATION ERROR:\n\nThis employee has already surrendered ${cumulativeSurrendered} Earned Leaves in the Financial Year ${fy}.\n` +
-            `Surrendering ${numEls} more leaves would exceed the yearly maximum limit of 30 leaves (Total would be ${netFutureLeaves}).\n\n` +
+            `Surrendering ${numEls} more leaves would exceed the yearly maximum limit of ${yearlyMaxLimit} leaves (Total would be ${netFutureLeaves}).\n\n` +
             `Please adjust the number of leaves.`);
       return;
     }
@@ -294,7 +300,8 @@ const SurrenderBill = (props) => {
           da: da,
           hra: hra,
           num_els: numEls,
-          total_amount: totalAmount
+          total_amount: totalAmount,
+          is_terminal: isTerminal ? 1 : 0
         }]
       };
 
@@ -314,6 +321,7 @@ const SurrenderBill = (props) => {
         setDa(0);
         setHra(0);
         setNumEls(30);
+        setIsTerminal(false);
         // Refresh monthly grid
         loadBillsForMonth(monthYear);
       } else {
@@ -424,7 +432,8 @@ const SurrenderBill = (props) => {
     }
   };
 
-  const filteredEmployees = activeEmployees.filter(emp => 
+  const employeesListToUse = isTerminal ? employees : activeEmployees;
+  const filteredEmployees = employeesListToUse.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.emp_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -646,13 +655,34 @@ const SurrenderBill = (props) => {
                   type="number" 
                   className="form-control" 
                   value={numEls} 
-                  onChange={(e) => setNumEls(Math.min(30, Math.max(1, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => setNumEls(Math.min(isTerminal ? 300 : 30, Math.max(1, parseInt(e.target.value) || 0)))}
                   disabled={isReadOnly}
                   min="1"
-                  max="30"
+                  max={isTerminal ? 300 : 30}
                   required
                 />
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Max 30 leaves</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Max {isTerminal ? 300 : 30} leaves</span>
+              </div>
+
+              {/* Terminal Surrender Checkbox */}
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '1.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={isTerminal}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsTerminal(checked);
+                      if (!checked && numEls > 30) {
+                        setNumEls(30);
+                      }
+                    }}
+                    disabled={isReadOnly}
+                    style={{ width: '18px', height: '18px' }}
+                  />
+                  <span style={{ fontWeight: 600 }}>Terminal Surrender</span>
+                </label>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>For retiring employees (Max 300 leaves)</span>
               </div>
             </div>
 
@@ -682,14 +712,14 @@ const SurrenderBill = (props) => {
 
                 {loadingCumulative ? (
                   <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Checking FY cap...</span>
-                ) : cumulativeSurrendered + numEls > 30 ? (
+                ) : cumulativeSurrendered + numEls > (isTerminal ? 300 : 30) ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '0.85rem' }}>
                     <AlertTriangle size={18} />
-                    Exceeds 30-day limit! (Total: {cumulativeSurrendered + numEls} days)
+                    Exceeds {isTerminal ? 300 : 30}-day limit! (Total: {cumulativeSurrendered + numEls} days)
                   </div>
                 ) : (
                   <div style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: '0.85rem' }}>
-                    ✓ Within limit (Remaining: {30 - (cumulativeSurrendered + numEls)} days)
+                    ✓ Within limit (Remaining: {(isTerminal ? 300 : 30) - (cumulativeSurrendered + numEls)} days)
                   </div>
                 )}
               </div>
@@ -736,6 +766,7 @@ const SurrenderBill = (props) => {
                   setDa(0);
                   setHra(0);
                   setNumEls(30);
+                  setIsTerminal(false);
                 }}
                 disabled={isReadOnly}
               >
@@ -744,7 +775,7 @@ const SurrenderBill = (props) => {
               <button 
                 type="submit" 
                 className="btn btn-primary" 
-                disabled={saving || isReadOnly || cumulativeSurrendered + numEls > 30}
+                disabled={saving || isReadOnly || cumulativeSurrendered + numEls > (isTerminal ? 300 : 30)}
               >
                 <Save size={18} />
                 {saving ? "Saving..." : "Save Surrender Bill"}
@@ -911,7 +942,23 @@ const SurrenderBill = (props) => {
                       <td>₹ {fmt(bill.basic_pay)}</td>
                       <td>₹ {fmt(bill.da)}</td>
                       <td>₹ {fmt(bill.hra)}</td>
-                      <td style={{ fontWeight: 'bold', textAlign: 'center' }}>{bill.num_els} days</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ fontWeight: 'bold' }}>{bill.num_els} days</div>
+                        {bill.is_terminal === 1 && (
+                          <span style={{
+                            backgroundColor: '#6366f1',
+                            color: '#fff',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: 'bold',
+                            display: 'inline-block',
+                            marginTop: '0.25rem'
+                          }}>
+                            Terminal
+                          </span>
+                        )}
+                      </td>
                       <td>{bill.financial_year}</td>
                       <td style={{ fontWeight: 'bold', color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : (bill.is_approved === 1 ? 'var(--color-success)' : 'inherit')) }}>
                         ₹ {Math.round(bill.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

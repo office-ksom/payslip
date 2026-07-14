@@ -99,16 +99,15 @@ const ConsolidatedStatement = () => {
       const isSupApproved = !!se;
       const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
       
-      const hasApprovedBill = isLocked || isSupApproved;
-
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+
+      const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
+
       const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
       const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
-
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
-
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
       const basic = hasApprovedBill ? (
@@ -356,19 +355,15 @@ const ConsolidatedStatement = () => {
       const isSupApproved = !!se;
       const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
       
-      const hasApprovedBill = isLocked || isSupApproved;
-
-      // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+
+      const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
+
       const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
       const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
-
-      // Find surrender bills for this month
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
-
-      // Find festival allowance bills for this month
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
       const basic = hasApprovedBill ? (
@@ -545,19 +540,15 @@ const ConsolidatedStatement = () => {
       const isSupApproved = !!se;
       const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
       
-      const hasApprovedBill = isLocked || isSupApproved;
-
-      // Find arrears for this month
       const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+
+      const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
+
       const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
       const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
-
-      // Find surrender bills for this month
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
-
-      // Find festival allowance bills for this month
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
       const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
 
       const basic = hasApprovedBill ? (
