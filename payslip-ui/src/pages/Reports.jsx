@@ -404,7 +404,7 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
 
     deductionsRows = [
       ['Income Tax', fmt(employee.income_tax)],
-      ['HRA', fmt(employee.hra)],
+      ['HRA.R', fmt(employee.hra)],
       ...otherDeduxRows
     ].filter(item => parseFloat(item[1]) > 0);
 
@@ -873,7 +873,7 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
 
     const deductions = isVisiting ? [
       { label: 'Income Tax', val: emp.income_tax },
-      { label: 'HRA', val: emp.hra },
+      { label: 'HRA.R', val: emp.hra },
       ...otherDeduxPreview
     ].filter(i => parseFloat(i.val) > 0) : [
       { label: 'EPF', val: emp.epf },
@@ -2139,7 +2139,7 @@ const Reports = () => {
       eHeaders.push('Gross Pay');
 
       const dedHeaders = isVisiting
-        ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA']
+        ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA.R']
         : [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
       if (dynamicDeduxKeys.length > 0) {
         dedHeaders.push(...dynamicDeduxKeys);
@@ -2764,7 +2764,7 @@ const Reports = () => {
                           <th>Others (Earn)</th>
                           <th>Gross Pay</th>
                           <th>Income Tax</th>
-                          <th>HRA</th>
+                          <th>HRA.R</th>
                           <th>Others (Ded)</th>
                           <th>Net Pay</th>
                         </>

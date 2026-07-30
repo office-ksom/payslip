@@ -1127,7 +1127,7 @@ const Paybill = (props) => {
                     <th style={{ background: 'rgba(59,130,246,0.04)' }}>Others</th>
                     <th style={{ background: 'rgba(59,130,246,0.04)', fontWeight: 'bold' }}>Gross</th>
                     <th style={{ background: 'rgba(239,68,68,0.04)' }}>Income Tax</th>
-                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>HRA</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>HRA.R</th>
                     <th style={{ background: 'rgba(239,68,68,0.04)' }}>Others</th>
                     <th style={{ fontWeight: 'bold' }}>Net Pay</th>
                     {(user?.role === 'admin' || user?.role === 'super_admin') && <th></th>}
@@ -1508,7 +1508,7 @@ const Paybill = (props) => {
                 { key: 'other_earnings', label: 'Other' },
                 { key: 'gross', label: 'Gross', isBold: true },
                 { key: 'income_tax', label: 'Income Tax' },
-                { key: 'hra', label: 'HRA' },
+                { key: 'hra', label: 'HRA.R' },
                 { key: 'other_deductions', label: 'Other Ded' },
                 { key: 'net', label: 'Net Pay', isBold: true }
               ];
