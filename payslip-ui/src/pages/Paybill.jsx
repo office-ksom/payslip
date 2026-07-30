@@ -1521,8 +1521,14 @@ const Paybill = (props) => {
                 });
               });
 
-              const earnCols = activeCols.filter(c => ['basic_pay', 'dp_gp', 'da', 'hra', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key));
-              const deduxCols = activeCols.filter(c => ['epf', 'cpf', 'professional_tax', 'income_tax', 'sli', 'gis', 'lic', 'onam_advance', 'hra_recovery', 'other_deductions', 'hra'].includes(c.key));
+              const earnCols = activeCols.filter(c => {
+                if (c.key === 'hra') return activeTab === 'permanent';
+                return ['basic_pay', 'dp_gp', 'da', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key);
+              });
+              const deduxCols = activeCols.filter(c => {
+                if (c.key === 'hra') return activeTab === 'visiting';
+                return ['epf', 'cpf', 'professional_tax', 'income_tax', 'sli', 'gis', 'lic', 'onam_advance', 'hra_recovery', 'other_deductions'].includes(c.key);
+              });
 
               return (
                 <table style={{ 
