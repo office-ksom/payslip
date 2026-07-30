@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Table, Download, Loader2, Eye, EyeOff } from 'lucide-react';
+import { FileText, Table, Download, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,13 +9,13 @@ import { saveAs } from 'file-saver';
 const fmt = (v) => (v === null || v === undefined || v === '') ? '' : Math.round(parseFloat(v) || 0).toFixed(2);
 
 const ConsolidatedStatement = () => {
-  const { user } = useOutletContext();
+  const { user } = useOutletContext() || {};
   const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
   
   const currentYear = new Date().getFullYear();
+  const [employeeCategory, setEmployeeCategory] = useState('permanent'); // 'permanent', 'visiting'
   const [fy, setFy] = useState(() => {
     const now = new Date();
-    // If before April, default to previous year
     return now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
   });
   
@@ -26,10 +26,13 @@ const ConsolidatedStatement = () => {
   const [previewData, setPreviewData] = useState(null);
   const [fetchingEmployees, setFetchingEmployees] = useState(false);
 
-  const fetchEmployees = async (financialYear, currentSelectedId) => {
+  const fetchEmployeesList = async (category, financialYear, currentSelectedId) => {
     setFetchingEmployees(true);
     try {
-      const res = await fetch(`/api/employees?fy=${financialYear}`);
+      const endpoint = category === 'permanent' 
+        ? `/api/employees?fy=${financialYear}` 
+        : `/api/employees/visiting`;
+      const res = await fetch(endpoint);
       const data = await res.json();
       setEmployees(data);
       if (data.length > 0) {
@@ -41,7 +44,7 @@ const ConsolidatedStatement = () => {
         setSelectedEmpId('');
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch employees", err);
     } finally {
       setFetchingEmployees(false);
     }
@@ -49,11 +52,16 @@ const ConsolidatedStatement = () => {
 
   useEffect(() => {
     if (isAdmin && fy) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      fetchEmployees(fy, selectedEmpId);
+      fetchEmployeesList(employeeCategory, fy, selectedEmpId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, fy]);
+  }, [isAdmin, fy, employeeCategory]);
+
+  const handleCategoryChange = (category) => {
+    setEmployeeCategory(category);
+    setPreviewData(null);
+    setEmployees([]);
+    setSelectedEmpId('');
+  };
 
   const handlePreview = async () => {
     if (previewData) {
@@ -62,7 +70,8 @@ const ConsolidatedStatement = () => {
     }
     setPreviewLoading(true);
     try {
-      const url = `/api/reports/consolidated?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
+      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated' : '/api/reports/visiting/consolidated';
+      const url = `${endpoint}?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -81,7 +90,8 @@ const ConsolidatedStatement = () => {
   };
 
   const getPreviewRows = () => {
-    const { earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = [] } = previewData;
+    if (!previewData) return null;
+    const { earnings = [], deductions = [], arrears = [], surrender = [], festival = [], supplementaryEarnings = [], supplementaryDeductions = [] } = previewData;
 
     const months = [];
     for (let i = 3; i <= 14; i++) {
@@ -90,121 +100,336 @@ const ConsolidatedStatement = () => {
       months.push(`${y}-${String(m).padStart(2, '0')}`);
     }
 
-    let grandTotals = Array(25).fill(0);
-    const rows = months.map(my => {
+    if (employeeCategory === 'visiting') {
+      let grandTotals = Array(7).fill(0);
+      const rows = months.map(my => {
+        const e = earnings.find(x => x.month_year === my);
+        const d = deductions.find(x => x.month_year === my) || {};
+        const isLocked = e && e.is_approved === 1;
+
+        const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (basic + otherEarn) : null;
+
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+        const totDed = isLocked ? (it + hraVal + otherDed) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        const [yearStr, monthStr] = my.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        let receivedMonth = month + 1;
+        let receivedYear = year;
+        if (receivedMonth > 12) {
+          receivedMonth = 1;
+          receivedYear = year + 1;
+        }
+        const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
+
+        const values = [
+          basic, otherEarn, gross,
+          it, hraVal, otherDed, totDed, net
+        ];
+
+        values.forEach((v, idx) => {
+          if (v !== null && v !== undefined) {
+            grandTotals[idx] += v;
+          }
+        });
+
+        return {
+          month: displayMonth,
+          values
+        };
+      });
+
+      return { rows, grandTotals };
+
+    } else {
+      // Permanent
+      let grandTotals = Array(25).fill(0);
+      const rows = months.map(my => {
+        const e = earnings.find(x => x.month_year === my);
+        const isLocked = e && e.is_approved === 1;
+        
+        const se = supplementaryEarnings.find(x => x.month_year === my);
+        const isSupApproved = !!se;
+        const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
+        
+        const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+        const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+        const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+
+        const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
+
+        const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
+        const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
+        const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
+        const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
+
+        const basic = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0)
+        ) : null;
+
+        const da = hasApprovedBill ? (
+          (isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0) +
+          (isSupApproved ? Math.round((parseFloat(se.da_state) || 0) + (parseFloat(se.da_ugc) || 0)) : 0)
+        ) : null;
+
+        const hra = hasApprovedBill ? (
+          (isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0) +
+          (isSupApproved ? Math.round((parseFloat(se.hra_state) || 0) + (parseFloat(se.hra_ugc) || 0)) : 0)
+        ) : null;
+
+        const dpgp = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(se.dp_gp) || 0) : 0)
+        ) : null;
+
+        const cca = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(e.cca) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(se.cca) || 0) : 0)
+        ) : null;
+
+        const spl = hasApprovedBill ? (
+          (isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0) +
+          (isSupApproved ? Math.round((parseFloat(se.spl_pay) || 0) + (parseFloat(se.spl_allow) || 0)) : 0)
+        ) : null;
+
+        const tr = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(se.tr_allow) || 0) : 0)
+        ) : null;
+
+        const otherEarn = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(se.other_earnings) || 0) : 0)
+        ) : null;
+
+        const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
+        
+        const d = deductions.find(x => x.month_year === my) || {};
+        const epf = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
+        ) : null;
+
+        const cpf = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.cpf) || 0) : 0)
+        ) : null;
+
+        const it = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.income_tax) || 0) : 0)
+        ) : null;
+
+        const pt = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.professional_tax) || 0) : 0)
+        ) : null;
+
+        const sli = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.sli) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.sli) || 0) : 0)
+        ) : null;
+
+        const gis = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.gis) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.gis) || 0) : 0)
+        ) : null;
+
+        const lic = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.lic) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.lic) || 0) : 0)
+        ) : null;
+
+        const adv = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.onam_advance) || 0) : 0)
+        ) : null;
+
+        const hrRec = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.hra_recovery) || 0) : 0)
+        ) : null;
+
+        const otherDed = hasApprovedBill ? (
+          (isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0) +
+          (isSupApproved ? Math.round(parseFloat(sd.other_deductions) || 0) : 0)
+        ) : null;
+
+        const totDed = hasApprovedBill ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + (arrearIT || 0)) : null;
+        const net = hasApprovedBill ? (gross - totDed) : null;
+
+        const [yearStr, monthStr] = my.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        let receivedMonth = month + 1;
+        let receivedYear = year;
+        if (receivedMonth > 12) {
+          receivedMonth = 1;
+          receivedYear = year + 1;
+        }
+        const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
+
+        const values = [
+          basic, da, hra, dpgp, cca, spl, tr, otherEarn, arrearAmt, surrenderAmt, festivalAmt, gross,
+          epf, cpf, it, pt, sli, gis, lic, adv, hrRec, otherDed, arrearIT, totDed, net
+        ];
+
+        values.forEach((v, idx) => {
+          if (v !== null && v !== undefined) {
+            grandTotals[idx] += v;
+          }
+        });
+
+        return {
+          month: displayMonth,
+          values
+        };
+      });
+
+      return { rows, grandTotals };
+    }
+  };
+
+  const handleDownload = async (format) => {
+    setLoading(true);
+    try {
+      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated' : '/api/reports/visiting/consolidated';
+      const url = `${endpoint}?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
+      const res = await fetch(url);
+      const reportData = await res.json();
+
+      if (reportData.error) {
+        alert(reportData.error);
+        return;
+      }
+
+      if (format === 'excel') {
+        if (employeeCategory === 'visiting') {
+          await generateExcelVisiting(reportData, fy);
+        } else {
+          await generateExcel(reportData, fy);
+        }
+      } else {
+        if (employeeCategory === 'visiting') {
+          await generatePDFVisiting(reportData, fy);
+        } else {
+          await generatePDF(reportData, fy);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate report: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateExcelVisiting = async (reportData, fyStart) => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Visiting Consolidated Statement');
+    const { employee, earnings, deductions } = reportData;
+
+    const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
+    const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
+
+    sheet.mergeCells('A1:J1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'KERALA SCHOOL OF MATHEMATICS';
+    titleCell.font = { bold: true, size: 14 };
+    titleCell.alignment = { horizontal: 'center' };
+
+    sheet.mergeCells('A2:J2');
+    const subTitleCell = sheet.getCell('A2');
+    subTitleCell.value = `Visiting Faculty Consolidated Statement for FY ${fyDisplay}`;
+    subTitleCell.font = { bold: true, size: 12 };
+    subTitleCell.alignment = { horizontal: 'center' };
+
+    sheet.getCell('A4').value = 'Name:';
+    sheet.getCell('B4').value = fullName;
+    sheet.getCell('D4').value = 'Emp ID:';
+    sheet.getCell('E4').value = employee.emp_id;
+    sheet.getCell('A5').value = 'Designation:';
+    sheet.getCell('B5').value = employee.designation;
+    sheet.getCell('D5').value = 'Pay Type:';
+    sheet.getCell('E5').value = employee.pay_type;
+
+    sheet.getColumn(1).width = 24;
+    const rowNum = 7;
+
+    const superHeaderRow = sheet.getRow(rowNum);
+    superHeaderRow.values = [
+      'Payment received month', 'Allowances', '', 'Gross Pay', 'Deductions', '', '', 'Total Ded', 'Net Pay'
+    ];
+    superHeaderRow.font = { bold: true };
+
+    sheet.mergeCells(`A${rowNum}:A${rowNum+1}`);
+    sheet.mergeCells(`B${rowNum}:C${rowNum}`); // Allowances
+    sheet.mergeCells(`D${rowNum}:D${rowNum+1}`); // Gross Pay
+    sheet.mergeCells(`E${rowNum}:G${rowNum}`); // Deductions
+    sheet.mergeCells(`H${rowNum}:H${rowNum+1}`); // Total Ded
+    sheet.mergeCells(`I${rowNum}:I${rowNum+1}`); // Net Pay
+
+    const headerRow = [
+      '', 'Honorarium / Consolidated', 'Others', '', 'Income Tax', 'HRA', 'Others', '', ''
+    ];
+    const tableHeaderRow = sheet.getRow(rowNum + 1);
+    tableHeaderRow.values = headerRow;
+    tableHeaderRow.font = { bold: true };
+
+    const getHeaderColor = (c) => {
+      if (c === 1) return 'FFB0BEC5';
+      if (c >= 2 && c <= 3) return 'FFC8E6C9';
+      if (c === 4) return 'FFBBDEFB';
+      if (c >= 5 && c <= 7) return 'FFFFCCBC';
+      if (c === 8) return 'FFFFCCBC';
+      if (c === 9) return 'FFBBDEFB';
+      return 'FFE0E0E0';
+    };
+
+    for (let r = rowNum; r <= rowNum + 1; r++) {
+      for (let c = 1; c <= 9; c++) {
+        const cell = sheet.getCell(r, c);
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        cell.fill = { type: 'pattern', pattern:'solid', fgColor: { argb: getHeaderColor(c) } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+
+    const months = [];
+    for(let i=3; i<=14; i++) {
+      const m = i > 12 ? i - 12 : i;
+      const y = i > 12 ? fyStart + 1 : fyStart;
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+
+    let grandTotals = Array(8).fill(0);
+    let currentDataRow = 9;
+
+    months.forEach(my => {
       const e = earnings.find(x => x.month_year === my);
-      const isLocked = e && e.is_approved === 1;
-      
-      const se = supplementaryEarnings.find(x => x.month_year === my);
-      const isSupApproved = !!se;
-      const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
-      
-      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-
-      const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
-
-      const arrearAmt = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.arrear_amount) || 0), 0) : null;
-      const arrearIT = hasApprovedBill ? monthArrears.reduce((sum, curr) => sum + Math.round(parseFloat(curr.income_tax) || 0), 0) : null;
-      const surrenderAmt = hasApprovedBill ? monthSurrender.reduce((sum, curr) => sum + Math.round(parseFloat(curr.total_amount) || 0), 0) : null;
-      const festivalAmt = hasApprovedBill ? monthFestival.reduce((sum, curr) => sum + Math.round(parseFloat(curr.amount) || 0), 0) : null;
-
-      const basic = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(se.basic_pay) || 0) : 0)
-      ) : null;
-
-      const da = hasApprovedBill ? (
-        (isLocked ? Math.round((parseFloat(e.da_state) || 0) + (parseFloat(e.da_ugc) || 0)) : 0) +
-        (isSupApproved ? Math.round((parseFloat(se.da_state) || 0) + (parseFloat(se.da_ugc) || 0)) : 0)
-      ) : null;
-
-      const hra = hasApprovedBill ? (
-        (isLocked ? Math.round((parseFloat(e.hra_state) || 0) + (parseFloat(e.hra_ugc) || 0)) : 0) +
-        (isSupApproved ? Math.round((parseFloat(se.hra_state) || 0) + (parseFloat(se.hra_ugc) || 0)) : 0)
-      ) : null;
-
-      const dpgp = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(e.dp_gp) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(se.dp_gp) || 0) : 0)
-      ) : null;
-
-      const cca = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(e.cca) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(se.cca) || 0) : 0)
-      ) : null;
-
-      const spl = hasApprovedBill ? (
-        (isLocked ? Math.round((parseFloat(e.spl_pay) || 0) + (parseFloat(e.spl_allow) || 0)) : 0) +
-        (isSupApproved ? Math.round((parseFloat(se.spl_pay) || 0) + (parseFloat(se.spl_allow) || 0)) : 0)
-      ) : null;
-
-      const tr = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(e.tr_allow) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(se.tr_allow) || 0) : 0)
-      ) : null;
-
-      const otherEarn = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(se.other_earnings) || 0) : 0)
-      ) : null;
-
-      const gross = hasApprovedBill ? (basic + dpgp + da + hra + spl + cca + tr + otherEarn + (arrearAmt || 0) + (surrenderAmt || 0) + (festivalAmt || 0)) : null;
-      
       const d = deductions.find(x => x.month_year === my) || {};
-      const epf = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.epf) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.epf) || 0) : 0)
-      ) : null;
+      const isLocked = e && e.is_approved === 1;
 
-      const cpf = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.cpf) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.cpf) || 0) : 0)
-      ) : null;
+      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+      const gross = isLocked ? (basic + otherEarn) : null;
 
-      const it = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.income_tax) || 0) : 0)
-      ) : null;
+      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+      const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
 
-      const pt = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.professional_tax) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.professional_tax) || 0) : 0)
-      ) : null;
-
-      const sli = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.sli) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.sli) || 0) : 0)
-      ) : null;
-
-      const gis = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.gis) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.gis) || 0) : 0)
-      ) : null;
-
-      const lic = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.lic) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.lic) || 0) : 0)
-      ) : null;
-
-      const adv = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.onam_advance) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.onam_advance) || 0) : 0)
-      ) : null;
-
-      const hrRec = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.hra_recovery) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.hra_recovery) || 0) : 0)
-      ) : null;
-
-      const otherDed = hasApprovedBill ? (
-        (isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0) +
-        (isSupApproved ? Math.round(parseFloat(sd.other_deductions) || 0) : 0)
-      ) : null;
-
-      const totDed = hasApprovedBill ? (epf + cpf + it + pt + sli + gis + lic + adv + hrRec + otherDed + (arrearIT || 0)) : null;
-      const net = hasApprovedBill ? (gross - totDed) : null;
+      const totDed = isLocked ? (it + hraVal + otherDed) : null;
+      const net = isLocked ? (gross - totDed) : null;
 
       const [yearStr, monthStr] = my.split('-');
       const year = parseInt(yearStr, 10);
@@ -218,49 +443,34 @@ const ConsolidatedStatement = () => {
       const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
 
-      const values = [
-        basic, da, hra, dpgp, cca, spl, tr, otherEarn, arrearAmt, surrenderAmt, festivalAmt, gross,
-        epf, cpf, it, pt, sli, gis, lic, adv, hrRec, otherDed, arrearIT, totDed, net
+      const rowValues = [
+        displayMonth,
+        basic, otherEarn, gross,
+        it, hraVal, otherDed, totDed, net
       ];
 
-      values.forEach((v, idx) => {
-        if (v !== null && v !== undefined) {
-          grandTotals[idx] += v;
+      const r = sheet.getRow(currentDataRow++);
+      r.values = rowValues;
+      r.eachCell((cell, colNumber) => {
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        if (colNumber > 1) {
+          cell.numFmt = '0.00';
+          grandTotals[colNumber-2] += (rowValues[colNumber-1] || 0);
         }
       });
-
-      return {
-        month: displayMonth,
-        values
-      };
     });
 
-    return { rows, grandTotals };
-  };
+    const totalRowValues = ['TOTAL', ...grandTotals];
+    const tr = sheet.getRow(currentDataRow++);
+    tr.values = totalRowValues;
+    tr.font = { bold: true };
+    tr.eachCell((cell, colNumber) => {
+      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+      if (colNumber > 1) cell.numFmt = '0.00';
+    });
 
-  const handleDownload = async (format) => {
-    setLoading(true);
-    try {
-      const url = `/api/reports/consolidated?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
-      const res = await fetch(url);
-      const reportData = await res.json();
-
-      if (reportData.error) {
-        alert(reportData.error);
-        return;
-      }
-
-      if (format === 'excel') {
-        await generateExcel(reportData, fy);
-      } else {
-        await generatePDF(reportData, fy);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to generate report: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `Consolidated_Statement_${employee.emp_id}_FY${fyDisplay}.xlsx`);
   };
 
   const generateExcel = async (reportData, fyStart) => {
@@ -271,7 +481,6 @@ const ConsolidatedStatement = () => {
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
     const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
 
-    // Title
     sheet.mergeCells('A1:Z1');
     const titleCell = sheet.getCell('A1');
     titleCell.value = 'KERALA SCHOOL OF MATHEMATICS';
@@ -284,7 +493,6 @@ const ConsolidatedStatement = () => {
     subTitleCell.font = { bold: true, size: 12 };
     subTitleCell.alignment = { horizontal: 'center' };
 
-    // Employee Info
     sheet.getCell('A4').value = 'Name:';
     sheet.getCell('B4').value = fullName;
     sheet.getCell('D4').value = 'Emp ID:';
@@ -295,7 +503,6 @@ const ConsolidatedStatement = () => {
     sheet.getCell('E5').value = employee.scale_of_pay;
 
     sheet.getColumn(1).width = 24;
-    // Table Header
     const superHeaderRow = sheet.getRow(7);
     superHeaderRow.values = [
       'Payment received month', 'Earnings', '', '', '', '', '', '', '', '', '', '', 'Gross Pay', 'Deductions', '', '', '', '', '', '', '', '', '', '', 'Total Ded', 'Net Pay'
@@ -304,9 +511,9 @@ const ConsolidatedStatement = () => {
     const rowNum = 7;
     
     sheet.mergeCells(`A${rowNum}:A${rowNum+1}`);
-    sheet.mergeCells(`B${rowNum}:L${rowNum}`); // Earnings (B to L)
+    sheet.mergeCells(`B${rowNum}:L${rowNum}`); // Earnings
     sheet.mergeCells(`M${rowNum}:M${rowNum+1}`); // Gross Pay
-    sheet.mergeCells(`N${rowNum}:X${rowNum}`); // Deductions (N to X)
+    sheet.mergeCells(`N${rowNum}:X${rowNum}`); // Deductions
     sheet.mergeCells(`Y${rowNum}:Y${rowNum+1}`); // Total Ded
     sheet.mergeCells(`Z${rowNum}:Z${rowNum+1}`); // Net Pay
 
@@ -319,12 +526,12 @@ const ConsolidatedStatement = () => {
     tableHeaderRow.font = { bold: true };
 
     const getHeaderColor = (colNumber) => {
-      if (colNumber === 1) return 'FFB0BEC5'; // Gray
-      if (colNumber >= 2 && colNumber <= 12) return 'FFC8E6C9'; // Light Green
-      if (colNumber === 13) return 'FFBBDEFB'; // Light Blue (Gross)
-      if (colNumber >= 14 && colNumber <= 24) return 'FFFFCCBC'; // Light Red
-      if (colNumber === 25) return 'FFFFCCBC'; // Light Red (Total Ded)
-      if (colNumber === 26) return 'FFBBDEFB'; // Light Blue (Net)
+      if (colNumber === 1) return 'FFB0BEC5';
+      if (colNumber >= 2 && colNumber <= 12) return 'FFC8E6C9';
+      if (colNumber === 13) return 'FFBBDEFB';
+      if (colNumber >= 14 && colNumber <= 24) return 'FFFFCCBC';
+      if (colNumber === 25) return 'FFFFCCBC';
+      if (colNumber === 26) return 'FFBBDEFB';
       return 'FFE0E0E0';
     };
 
@@ -337,7 +544,6 @@ const ConsolidatedStatement = () => {
       }
     }
 
-    // Data Rows (salary entered from March to February)
     const months = [];
     for(let i=3; i<=14; i++) {
       const m = i > 12 ? i - 12 : i;
@@ -345,7 +551,7 @@ const ConsolidatedStatement = () => {
       months.push(`${y}-${String(m).padStart(2, '0')}`);
     }
 
-    let grandTotals = Array(25).fill(0); // 2 to 26
+    let grandTotals = Array(25).fill(0);
     let currentDataRow = 9;
     months.forEach(my => {
       const e = earnings.find(x => x.month_year === my);
@@ -491,7 +697,6 @@ const ConsolidatedStatement = () => {
       });
     });
 
-    // Totals Row
     const totalRowValues = ['TOTAL', ...grandTotals];
     const tr = sheet.getRow(currentDataRow++);
     tr.values = totalRowValues;
@@ -503,6 +708,92 @@ const ConsolidatedStatement = () => {
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `Consolidated_Statement_${employee.emp_id}_FY${fyDisplay}.xlsx`);
+  };
+
+  const generatePDFVisiting = async (reportData, fyStart) => {
+    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+    const { employee, earnings, deductions } = reportData;
+    const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
+    const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
+
+    doc.setFontSize(16);
+    doc.text('KERALA SCHOOL OF MATHEMATICS', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text(`Consolidated Visiting Faculty Salary Statement for FY ${fyDisplay}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.text(`Name: ${fullName}`, 14, 32);
+    doc.text(`Emp ID: ${employee.emp_id}`, 14, 37);
+    doc.text(`Designation: ${employee.designation}`, 100, 32);
+    doc.text(`Pay Type: ${employee.pay_type}`, 100, 37);
+
+    const months = [];
+    for(let i=3; i<=14; i++) {
+      const m = i > 12 ? i - 12 : i;
+      const y = i > 12 ? fyStart + 1 : fyStart;
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+
+    const body = [];
+    let totals = Array(8).fill(0);
+
+    months.forEach(my => {
+      const e = earnings.find(x => x.month_year === my);
+      const d = deductions.find(x => x.month_year === my) || {};
+      const isLocked = e && e.is_approved === 1;
+
+      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+      const gross = isLocked ? (basic + otherEarn) : null;
+
+      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+      const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+      const totDed = isLocked ? (it + hraVal + otherDed) : null;
+      const net = isLocked ? (gross - totDed) : null;
+
+      const [, monthStr] = my.split('-');
+      const month = parseInt(monthStr, 10);
+      let receivedMonth = month + 1;
+      if (receivedMonth > 12) receivedMonth = 1;
+      const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const displayMonth = calendarMonthNames[receivedMonth - 1];
+
+      body.push([
+        displayMonth,
+        fmt(basic), fmt(otherEarn), fmt(gross),
+        fmt(it), fmt(hraVal), fmt(otherDed), fmt(totDed), fmt(net)
+      ]);
+
+      [basic, otherEarn, gross, it, hraVal, otherDed, totDed, net].forEach((v, idx) => totals[idx] += (v || 0));
+    });
+
+    body.push([{ content: 'TOTAL', styles: { fontStyle: 'bold' } }, ...totals.map(v => ({ content: fmt(v), styles: { fontStyle: 'bold' } }))]);
+
+    autoTable(doc, {
+      startY: 45,
+      head: [
+        [
+          { content: 'Payment received month', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [176, 190, 197] } },
+          { content: 'Allowances', colSpan: 2, styles: { halign: 'center', fillColor: [200, 230, 201] } },
+          { content: 'Gross', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [187, 222, 251] } },
+          { content: 'Deductions', colSpan: 3, styles: { halign: 'center', fillColor: [255, 204, 188] } },
+          { content: 'TotDed', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 204, 188] } },
+          { content: 'NetPay', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [187, 222, 251] } }
+        ],
+        [
+          ...['Honorarium / Consolidated', 'Others'].map(c => ({ content: c, styles: { fillColor: [200, 230, 201], halign: 'center' } })),
+          ...['Income Tax', 'HRA', 'Others'].map(c => ({ content: c, styles: { fillColor: [255, 204, 188], halign: 'center' } }))
+        ]
+      ],
+      body: body,
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.1 }
+    });
+
+    doc.save(`Consolidated_Statement_${employee.emp_id}_FY${fyDisplay}.pdf`);
   };
 
   const generatePDF = async (reportData, fyStart) => {
@@ -689,7 +980,7 @@ const ConsolidatedStatement = () => {
       body: body,
       theme: 'grid',
       styles: { fontSize: 5.8, cellPadding: 0.6, overflow: 'linebreak' },
-      headStyles: { textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.1, halign: 'center' },
       columnStyles: { 0: { cellWidth: 20 } }
     });
 
@@ -701,6 +992,103 @@ const ConsolidatedStatement = () => {
     try {
       const preview = getPreviewRows();
       if (!preview) return null;
+
+      if (employeeCategory === 'visiting') {
+        return (
+          <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                  Statement Preview: {(previewData.employee?.title ? `${previewData.employee.title} ` : '') + (previewData.employee?.name || '')}
+                </h3>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  FY {fy}-{ (fy + 1).toString().slice(-2) } | Pay Type: {previewData.employee?.pay_type || ''}
+                </p>
+              </div>
+              <button 
+                className="btn" 
+                onClick={() => setPreviewData(null)} 
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+              >
+                Hide Preview
+              </button>
+            </div>
+
+            <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <table className="table" style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-primary)' }}>
+                    <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
+                    <th colSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Allowances</th>
+                    <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Gross Pay</th>
+                    <th colSpan="3" style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
+                    <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Total Ded</th>
+                    <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Net Pay</th>
+                  </tr>
+                  <tr style={{ background: 'var(--color-bg-primary)' }}>
+                    {/* Allowances sub-headers */}
+                    {['Honorarium / Consolidated', 'Others'].map((h, i) => (
+                      <th key={`earn-${i}`} style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                    ))}
+                    {/* Deductions sub-headers */}
+                    {['Income Tax', 'HRA', 'Others'].map((h, i) => (
+                      <th key={`ded-${i}`} style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((row, rIdx) => (
+                    <tr key={rIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '0.6rem 0.8rem', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.month}</td>
+                      {row.values.map((val, vIdx) => {
+                        const isHighlight = vIdx === 2 || vIdx === 6 || vIdx === 7; // Gross, TotDed, Net
+                        return (
+                          <td 
+                            key={vIdx} 
+                            style={{ 
+                              padding: '0.6rem 0.8rem', 
+                              textAlign: 'center', 
+                              fontWeight: isHighlight ? 'bold' : 'normal',
+                              color: isHighlight 
+                                ? (vIdx === 6 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                                : (val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)')
+                            }}
+                          >
+                            {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
+                    <td style={{ padding: '0.6rem 0.8rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
+                    {preview.grandTotals.map((tot, idx) => {
+                      const isHighlight = idx === 2 || idx === 6 || idx === 7; // Gross, TotDed, Net
+                      return (
+                        <td 
+                          key={idx} 
+                          style={{ 
+                            padding: '0.6rem 0.8rem', 
+                            textAlign: 'center', 
+                            color: isHighlight 
+                              ? (idx === 6 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                              : 'var(--color-text-primary)' 
+                          }}
+                        >
+                          {tot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+
+      // Permanent View
       return (
         <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -724,7 +1112,6 @@ const ConsolidatedStatement = () => {
           <div className="table-container" style={{ overflowX: 'auto', maxHeight: '600px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
             <table className="table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
               <thead>
-                {/* Super Headers */}
                 <tr style={{ background: 'var(--color-bg-primary)' }}>
                   <th rowSpan="2" style={{ padding: '0.5rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
                   <th colSpan="11" style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Earnings</th>
@@ -817,6 +1204,44 @@ const ConsolidatedStatement = () => {
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
           Download a consolidated salary summary for the financial year (salary entered from March to February, paid from April to March).
         </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+        <button 
+          onClick={() => handleCategoryChange('permanent')}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Permanent Employees
+        </button>
+        <button 
+          onClick={() => handleCategoryChange('visiting')}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Visiting Professors & Assistant Professors
+        </button>
       </div>
 
       <div className="card" style={{ maxWidth: '600px' }}>

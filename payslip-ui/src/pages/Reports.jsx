@@ -303,9 +303,11 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
 
   addKSoMHeader(doc, logoImg, margin, pageW);
 
+  const isVisiting = !!employee.pay_type;
+
   // PAY SLIP INFO TABLE
   const infoY = 38;
-  const infoH = 46.5;
+  const infoH = isVisiting ? 38 : 46.5;
   doc.setLineWidth(0.4);
   doc.rect(margin, infoY, contentW, infoH);
 
@@ -327,7 +329,11 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
 
-  const infoRows = [
+  const infoRows = isVisiting ? [
+    ['Name', (employee.title ? `${employee.title} ` : '') + (employee.name || ''), 'Month & Year', monthDisplay],
+    ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
+    ['Pay Type', employee.pay_type || '', 'Default Pay', `Rs. ${employee.pay || 0}`]
+  ] : [
     ['Name', (employee.title ? `${employee.title} ` : '') + (employee.name || ''), 'Month & Year', monthDisplay],
     ['Designation', employee.designation || '', 'Employee ID', employee.emp_id || ''],
     ['Scale of Pay', employee.scale_of_pay || '', 'Category', (employee.category || '').toUpperCase()],
@@ -339,80 +345,123 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
     doc.setFont('helvetica', 'bold');
     doc.text(row[0] + ' :', col1X, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(row[1], col1ValX, y);
+    doc.text(row[1] ? String(row[1]) : '', col1ValX, y);
     if (row[2]) {
       doc.setFont('helvetica', 'bold');
       doc.text(row[2] + ' :', col2X, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(row[3], col2ValX, y);
+      doc.text(row[3] ? String(row[3]) : '', col2ValX, y);
     }
     doc.line(margin + contentW / 2, infoY + 10, margin + contentW / 2, infoY + infoH);
   });
 
-  const isState = employee.category === 'state';
-  const isUGC = employee.category === 'ugc/csir' || employee.category === 'ugc';
-  const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
-  const hra_pct = isState ? (activeRule.hra_state_percentage || 0) : isUGC ? (activeRule.hra_ugc_percentage || 0) : 0;
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8);
-  doc.text(`DA: ${da_pct}%  |  HRA: ${hra_pct}%`, margin, infoY + infoH + 3);
+  if (!isVisiting) {
+    const isState = employee.category === 'state';
+    const isUGC = employee.category === 'ugc/csir' || employee.category === 'ugc';
+    const da_pct = isState ? (activeRule.da_state_percentage || 0) : isUGC ? (activeRule.da_ugc_percentage || 0) : 0;
+    const hra_pct = isState ? (activeRule.hra_state_percentage || 0) : isUGC ? (activeRule.hra_ugc_percentage || 0) : 0;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.text(`DA: ${da_pct}%  |  HRA: ${hra_pct}%`, margin, infoY + infoH + 3);
+  }
 
   // EARNINGS & DEDUCTIONS SIDE-BY-SIDE
   const tableTop = infoY + infoH + 6;
   const halfW = contentW / 2 - 1;
 
-  const da = (parseFloat(employee.da_state) || 0) + (parseFloat(employee.da_ugc) || 0);
-  const hra = (parseFloat(employee.hra_state) || 0) + (parseFloat(employee.hra_ugc) || 0);
+  let earningsRows = [];
+  let deductionsRows = [];
 
-  let otherEarnRows = [];
-  try {
-    const arr = typeof employee.other_earnings_breakdown === 'string' ? JSON.parse(employee.other_earnings_breakdown) : (employee.other_earnings_breakdown || []);
-    if (arr.length > 0) {
-      otherEarnRows = arr.map(a => [a.desc || 'Other Earnings', fmt(a.amount)]);
-    } else {
+  if (isVisiting) {
+    let otherEarnRows = [];
+    try {
+      const arr = typeof employee.other_earnings_breakdown === 'string' ? JSON.parse(employee.other_earnings_breakdown) : (employee.other_earnings_breakdown || []);
+      if (arr.length > 0) {
+        otherEarnRows = arr.map(a => [a.desc || 'Other Earnings', fmt(a.amount)]);
+      } else {
+        otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+      }
+    } catch(e) {
       otherEarnRows = [['Others', fmt(employee.other_earnings)]];
     }
-  } catch(e) {
-    otherEarnRows = [['Others', fmt(employee.other_earnings)]];
-  }
+    
+    earningsRows = [
+      [employee.pay_type === 'Consolidated Salary' ? 'Consolidated Salary' : 'Honorarium', fmt(employee.basic_pay)],
+      ...otherEarnRows
+    ].filter(item => parseFloat(item[1]) > 0);
 
-  const earningsRows = [
-    ['Basic Pay', fmt(employee.basic_pay)],
-    ['DA', fmt(da)],
-    ['HRA', fmt(hra)],
-    ['DP / GP', fmt(employee.dp_gp)],
-    ['CCA', fmt(employee.cca)],
-    ['Spl. Pay', fmt(employee.spl_pay)],
-    ['Tr. Allow', fmt(employee.tr_allow)],
-    ['Spl. Allow.', fmt(employee.spl_allow)],
-    ['Fest. Allow.', fmt(employee.fest_allow)],
-    ...otherEarnRows
-  ];
-
-  let otherDeduxRows = [];
-  try {
-    const arr = typeof employee.other_deductions_breakdown === 'string' ? JSON.parse(employee.other_deductions_breakdown) : (employee.other_deductions_breakdown || []);
-    if (arr.length > 0) {
-      otherDeduxRows = arr.map(a => [a.desc || 'Other Deductions', fmt(a.amount)]);
-    } else {
+    let otherDeduxRows = [];
+    try {
+      const arr = typeof employee.other_deductions_breakdown === 'string' ? JSON.parse(employee.other_deductions_breakdown) : (employee.other_deductions_breakdown || []);
+      if (arr.length > 0) {
+        otherDeduxRows = arr.map(a => [a.desc || 'Other Deductions', fmt(a.amount)]);
+      } else {
+        otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+      }
+    } catch(e) {
       otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
     }
-  } catch(e) {
-    otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
-  }
 
-  const deductionsRows = [
-    ['EPF', fmt(employee.epf)],
-    ['CPF', fmt(employee.cpf)],
-    ['Professional Tax', fmt(employee.professional_tax)],
-    ['SLI', fmt(employee.sli)],
-    ['GIS', fmt(employee.gis)],
-    ['LIC', fmt(employee.lic)],
-    ['Income Tax', fmt(employee.income_tax)],
-    ['Onam Advance', fmt(employee.onam_advance)],
-    ['HRA Recovery', fmt(employee.hra_recovery)],
-    ...otherDeduxRows
-  ];
+    deductionsRows = [
+      ['Income Tax', fmt(employee.income_tax)],
+      ['HRA', fmt(employee.hra)],
+      ...otherDeduxRows
+    ].filter(item => parseFloat(item[1]) > 0);
+
+  } else {
+    const da = (parseFloat(employee.da_state) || 0) + (parseFloat(employee.da_ugc) || 0);
+    const hra = (parseFloat(employee.hra_state) || 0) + (parseFloat(employee.hra_ugc) || 0);
+
+    let otherEarnRows = [];
+    try {
+      const arr = typeof employee.other_earnings_breakdown === 'string' ? JSON.parse(employee.other_earnings_breakdown) : (employee.other_earnings_breakdown || []);
+      if (arr.length > 0) {
+        otherEarnRows = arr.map(a => [a.desc || 'Other Earnings', fmt(a.amount)]);
+      } else {
+        otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+      }
+    } catch(e) {
+      otherEarnRows = [['Others', fmt(employee.other_earnings)]];
+    }
+
+    earningsRows = [
+      ['Basic Pay', fmt(employee.basic_pay)],
+      ['DA', fmt(da)],
+      ['HRA', fmt(hra)],
+      ['DP / GP', fmt(employee.dp_gp)],
+      ['CCA', fmt(employee.cca)],
+      ['Spl. Pay', fmt(employee.spl_pay)],
+      ['Tr. Allow', fmt(employee.tr_allow)],
+      ['Spl. Allow.', fmt(employee.spl_allow)],
+      ['Fest. Allow.', fmt(employee.fest_allow)],
+      ...otherEarnRows
+    ].filter(item => parseFloat(item[1]) > 0);
+
+    let otherDeduxRows = [];
+    try {
+      const arr = typeof employee.other_deductions_breakdown === 'string' ? JSON.parse(employee.other_deductions_breakdown) : (employee.other_deductions_breakdown || []);
+      if (arr.length > 0) {
+        otherDeduxRows = arr.map(a => [a.desc || 'Other Deductions', fmt(a.amount)]);
+      } else {
+        otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+      }
+    } catch(e) {
+      otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
+    }
+
+    deductionsRows = [
+      ['EPF', fmt(employee.epf)],
+      ['CPF', fmt(employee.cpf)],
+      ['Professional Tax', fmt(employee.professional_tax)],
+      ['SLI', fmt(employee.sli)],
+      ['GIS', fmt(employee.gis)],
+      ['LIC', fmt(employee.lic)],
+      ['Income Tax', fmt(employee.income_tax)],
+      ['Onam Advance', fmt(employee.onam_advance)],
+      ['HRA Recovery', fmt(employee.hra_recovery)],
+      ...otherDeduxRows
+    ].filter(item => parseFloat(item[1]) > 0);
+  }
 
   const grossPay = earningsRows.reduce((s, r) => s + parseFloat(r[1]), 0);
   const totalDeductions = deductionsRows.reduce((s, r) => s + parseFloat(r[1]), 0);
@@ -778,8 +827,9 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
 
   if (billType === 'regular') {
-    const da = (parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0);
-    const hra = (parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0);
+    const isVisiting = !!emp.pay_type;
+    const da = isVisiting ? 0 : (parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0);
+    const hra = isVisiting ? (parseFloat(emp.hra) || 0) : (parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0);
 
     let otherEarnPreview = [];
     try {
@@ -793,7 +843,10 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
       otherEarnPreview = [{ label: 'Others', val: emp.other_earnings }];
     }
 
-    const earnings = [
+    const earnings = isVisiting ? [
+      { label: emp.pay_type === 'Consolidated Salary' ? 'Consolidated Salary' : 'Honorarium', val: emp.basic_pay },
+      ...otherEarnPreview
+    ].filter(i => parseFloat(i.val) > 0) : [
       { label: 'Basic Pay', val: emp.basic_pay },
       { label: 'DA', val: da },
       { label: 'HRA', val: hra },
@@ -818,7 +871,11 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
       otherDeduxPreview = [{ label: 'Others', val: emp.other_deductions }];
     }
 
-    const deductions = [
+    const deductions = isVisiting ? [
+      { label: 'Income Tax', val: emp.income_tax },
+      { label: 'HRA', val: emp.hra },
+      ...otherDeduxPreview
+    ].filter(i => parseFloat(i.val) > 0) : [
       { label: 'EPF', val: emp.epf },
       { label: 'CPF', val: emp.cpf },
       { label: 'Prof. Tax', val: emp.professional_tax },
@@ -856,7 +913,7 @@ const PayslipPreview = ({ emp, monthYear, billType }) => {
             </div>
             <div>
               <span style={{ color: '#6b7280', width: '110px', display: 'inline-block', fontWeight: 500 }}>Category:</span>
-              <span style={{ fontWeight: 700, color: '#111827' }}>{emp.category?.toUpperCase()}</span>
+              <span style={{ fontWeight: 700, color: '#111827' }}>{isVisiting ? 'VISITING' : emp.category?.toUpperCase()}</span>
             </div>
           </div>
         </div>
@@ -1211,6 +1268,7 @@ const Reports = () => {
   const { user } = useOutletContext() || {};
   const isViewer = user && user.role === 'viewer';
   
+  const [employeeCategory, setEmployeeCategory] = useState('permanent'); // 'permanent', 'visiting'
   const [billType, setBillType] = useState('regular'); // 'regular', 'surrender', 'arrears', 'festival'
   const [monthYear, setMonthYear] = useState(() => {
     const today = new Date();
@@ -1235,63 +1293,67 @@ const Reports = () => {
 
   useEffect(() => { 
     loadDataForMonth(monthYear, billType); 
-  }, [monthYear, billType]);
+  }, [monthYear, billType, employeeCategory]);
+
+
 
   const loadDataForMonth = async (targetMonth, type) => {
     setLoading(true);
     setSelectedEmps(new Set());
     try {
-      // 1. Fetch settings
       const settingsRes = await fetch('/api/settings');
       const settingsData = await settingsRes.json();
       setGlobalSettingsList(Array.isArray(settingsData) ? settingsData : []);
 
-      // 2. Fetch specific bill records
       if (type === 'regular') {
+        const earnEndpoint = employeeCategory === 'permanent' ? `/api/earnings/${targetMonth}` : `/api/earnings/visiting/${targetMonth}`;
+        const deduxEndpoint = employeeCategory === 'permanent' ? `/api/deductions/${targetMonth}` : `/api/deductions/visiting/${targetMonth}`;
+        
         const [earnRes, deduxRes] = await Promise.all([
-          fetch(`/api/earnings/${targetMonth}`),
-          fetch(`/api/deductions/${targetMonth}`)
+          fetch(earnEndpoint),
+          fetch(deduxEndpoint)
         ]);
         const earnData = await earnRes.json();
         const deduxData = await deduxRes.json();
 
         const combined = earnData.map(e => {
           const d = deduxData.find(x => x.emp_id === e.emp_id) || {};
-          const da = (e.da_state||0) + (e.da_ugc||0);
-          const hra = (e.hra_state||0) + (e.hra_ugc||0);
-          const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
-          const dedux = (d.epf||0)+(d.cpf||0)+(d.professional_tax||0)+(d.income_tax||0)+(d.sli||0)+(d.gis||0)+(d.lic||0)+(d.onam_advance||0)+(d.hra_recovery||0)+(d.other_deductions||0);
-          return { ...e, ...d, da, hra, gross, dedux, net: gross - dedux };
+          if (employeeCategory === 'permanent') {
+            const da = (e.da_state||0) + (e.da_ugc||0);
+            const hra = (e.hra_state||0) + (e.hra_ugc||0);
+            const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
+            const dedux = (d.epf||0)+(d.cpf||0)+(d.professional_tax||0)+(d.income_tax||0)+(d.sli||0)+(d.gis||0)+(d.lic||0)+(d.onam_advance||0)+(d.hra_recovery||0)+(d.other_deductions||0);
+            return { ...e, ...d, da, hra, gross, dedux, net: gross - dedux };
+          } else {
+            const gross = (e.basic_pay||0)+(e.other_earnings||0);
+            const dedux = (d.income_tax||0)+(d.hra||0)+(d.other_deductions||0);
+            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0 };
+          }
         });
 
-        // Enforce approved bills only in Reports
         const approved = combined.filter(e => e.is_approved === 1);
         setData(approved.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
 
       } else if (type === 'surrender') {
         const res = await fetch(`/api/surrender/${targetMonth}`);
         const list = await res.json();
-        // Keep approved records only
         const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
         setData(approved);
 
       } else if (type === 'arrears') {
         const res = await fetch(`/api/arrears/${targetMonth}`);
         const list = await res.json();
-        // Keep approved records only
         const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
         setData(approved);
 
       } else if (type === 'festival') {
         const res = await fetch(`/api/festival/${targetMonth}`);
         const list = await res.json();
-        // Keep approved records only
         const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
         setData(approved);
       } else if (type === 'supplementary') {
         const res = await fetch(`/api/supplementary/${targetMonth}`);
         const list = await res.json();
-        // Keep approved records only
         const approved = list.filter(bill => bill.earnings_id !== null && bill.is_approved === 1);
         const combined = approved.map(e => {
           const da = (e.da_state||0) + (e.da_ugc||0);
@@ -2026,7 +2088,6 @@ const Reports = () => {
     }
   };
 
-  // Original Regular Paybill Excel Export
   const exportExcel = async () => {
     const monthDisplay = new Date(monthYear + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const activeRule = globalSettingsList.find(r => r.effective_from <= monthYear) || {};
@@ -2065,7 +2126,11 @@ const Reports = () => {
         try { sheet.mergeCells(range); } catch(e) {}
       };
 
-      const eHeaders = ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow'];
+      const isVisiting = employeeCategory === 'visiting';
+
+      const eHeaders = isVisiting 
+        ? ['Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'Honorarium / Consolidated', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow']
+        : ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow'];
       if (dynamicEarnKeys.length > 0) {
         eHeaders.push(...dynamicEarnKeys);
       } else {
@@ -2073,7 +2138,9 @@ const Reports = () => {
       }
       eHeaders.push('Gross Pay');
 
-      const dedHeaders = [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
+      const dedHeaders = isVisiting
+        ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA']
+        : [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
       if (dynamicDeduxKeys.length > 0) {
         dedHeaders.push(...dynamicDeduxKeys);
       } else {
@@ -2102,7 +2169,7 @@ const Reports = () => {
       r5.commit();
 
       safeMerge(`A4:${lastColLetter}4`);
-      sheet.getCell('A3').value = 'Pay Bill Statement for the Month of ' + monthDisplay;
+      sheet.getCell('A3').value = (isVisiting ? 'Visiting Faculty Pay Bill Statement for the Month of ' : 'Pay Bill Statement for the Month of ') + monthDisplay;
       safeMerge(`A3:${lastColLetter}3`);
       sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -2126,13 +2193,13 @@ const Reports = () => {
 
       data.forEach((emp, i) => {
         const basic = Math.round(parseFloat(emp.basic_pay) || 0);
-        const gp = Math.round(parseFloat(emp.dp_gp) || 0);
-        const da = Math.round(parseFloat(emp.da) || 0);
-        const hra = Math.round(parseFloat(emp.hra) || 0);
-        const cca = Math.round(parseFloat(emp.cca) || 0);
-        const spl = Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0));
-        const tr = Math.round(parseFloat(emp.tr_allow) || 0);
-        const fest = Math.round(parseFloat(emp.fest_allow) || 0);
+        const gp = isVisiting ? 0 : Math.round(parseFloat(emp.dp_gp) || 0);
+        const da = isVisiting ? 0 : Math.round(parseFloat(emp.da) || 0);
+        const hra = isVisiting ? 0 : Math.round(parseFloat(emp.hra) || 0);
+        const cca = isVisiting ? 0 : Math.round(parseFloat(emp.cca) || 0);
+        const spl = isVisiting ? 0 : Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0));
+        const tr = isVisiting ? 0 : Math.round(parseFloat(emp.tr_allow) || 0);
+        const fest = isVisiting ? 0 : Math.round(parseFloat(emp.fest_allow) || 0);
 
         let eArr = [];
         try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
@@ -2165,7 +2232,8 @@ const Reports = () => {
 
         const row = sheet.getRow(currentRow);
         const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
-        const values = [null, i + 1, fullName, emp.designation || '', emp.scale_of_pay || '', basic, gp, da, hra, cca, spl, tr, fest];
+        const scaleOrPayType = isVisiting ? (emp.pay_type || '') : (emp.scale_of_pay || '');
+        const values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, basic, gp, da, hra, cca, spl, tr, fest];
         if (dynamicEarnKeys.length > 0) {
           dynamicEarnKeys.forEach(k => values.push(dynE[k] || 0));
         } else {
@@ -2245,14 +2313,14 @@ const Reports = () => {
       let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRAOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
       let sumDynamicD = {};
       data.forEach((emp, i) => {
-        const epf = Math.round(parseFloat(emp.epf) || 0);
-        const cpf = Math.round(parseFloat(emp.cpf) || 0);
+        const epf = isVisiting ? 0 : Math.round(parseFloat(emp.epf) || 0);
+        const cpf = isVisiting ? 0 : Math.round(parseFloat(emp.cpf) || 0);
         const it = Math.round(parseFloat(emp.income_tax) || 0);
-        const gis = Math.round(parseFloat(emp.gis) || 0);
-        const sli = Math.round(parseFloat(emp.sli) || 0);
-        const lic = Math.round(parseFloat(emp.lic) || 0);
-        const pt = Math.round(parseFloat(emp.professional_tax) || 0);
-        const hraOnam = Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0));
+        const gis = isVisiting ? 0 : Math.round(parseFloat(emp.gis) || 0);
+        const sli = isVisiting ? 0 : Math.round(parseFloat(emp.sli) || 0);
+        const lic = isVisiting ? 0 : Math.round(parseFloat(emp.lic) || 0);
+        const pt = isVisiting ? 0 : Math.round(parseFloat(emp.professional_tax) || 0);
+        const hraOnam = isVisiting ? Math.round(parseFloat(emp.hra) || 0) : Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0));
 
         let dArr = [];
         try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
@@ -2285,7 +2353,8 @@ const Reports = () => {
         sumTotDed += dedux; sumNet += net;
 
         const row = sheet.getRow(currentRow);
-        const values = [null, i + 1, emp.name || '', emp.designation || '', emp.scale_of_pay || '', epf, cpf, it, gis, sli, lic, pt, hraOnam];
+        const scaleOrPayType = isVisiting ? (emp.pay_type || '') : (emp.scale_of_pay || '');
+        const values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, cpf, it, gis, sli, lic, pt, hraOnam];
         if (dynamicDeduxKeys.length > 0) {
           dynamicDeduxKeys.forEach(k => values.push(dynD[k] || 0));
         } else {
@@ -2343,7 +2412,10 @@ const Reports = () => {
 
       currentRow++;
 
-      const bottomRows = [
+      const bottomRows = isVisiting ? [
+        ['Gross Pay', sumGross],
+        ['Net Pay', sumNet]
+      ] : [
         ['UGC/CSIR - DA Rate (%) 7th CPC', activeRule.da_ugc_percentage || ''],
         ['State DA (%) 11th Pay', activeRule.da_state_percentage || ''],
         ['UGC - HRA (%) 7th CPC', activeRule.hra_ugc_percentage || ''],
@@ -2367,7 +2439,7 @@ const Reports = () => {
           if (typeof br[1] === 'number' || parseFloat(br[1])) {
              r.getCell(4).alignment = { horizontal: 'right' };
              if (br[0] === 'Gross Pay' || br[0] === 'Net Pay') {
-                 r.getCell(4).numFmt = '0.00';
+                  r.getCell(4).numFmt = '0.00';
              }
           }
         }
@@ -2391,7 +2463,8 @@ const Reports = () => {
       sigRow.commit();
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer]), `KSoM_Paybill_${formatMonthYear(monthYear)}.xlsx`);
+      const prefix = isVisiting ? 'KSoM_Visiting_Paybill_' : 'KSoM_Paybill_';
+      saveAs(new Blob([buffer]), `${prefix}${formatMonthYear(monthYear)}.xlsx`);
     } catch (err) {
       console.error("Error generating Excel:", err);
       alert("Failed to generate Excel: " + err.message);
@@ -2399,7 +2472,8 @@ const Reports = () => {
   };
 
   const handleExportMaster = () => {
-    if (billType === 'regular') exportExcel();
+    if (employeeCategory === 'visiting') exportExcel();
+    else if (billType === 'regular') exportExcel();
     else if (billType === 'supplementary') exportSupplementaryExcel();
     else if (billType === 'surrender') exportSurrenderExcel();
     else if (billType === 'arrears') exportArrearExcel();
@@ -2562,6 +2636,44 @@ const Reports = () => {
 
   return (
     <div>
+      {/* Category Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+        <button 
+          onClick={() => { setEmployeeCategory('permanent'); setBillType('regular'); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Permanent Employees
+        </button>
+        <button 
+          onClick={() => { setEmployeeCategory('visiting'); setBillType('regular'); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Visiting Professors & Assistant Professors
+        </button>
+      </div>
+
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -2575,7 +2687,7 @@ const Reports = () => {
           {/* Bill Type Selector */}
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Bill Type:</label>
-            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }}>
+            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }} disabled={employeeCategory === 'visiting'}>
               <option value="regular">Regular Paybill</option>
               <option value="supplementary">Supplementary Paybill</option>
               <option value="surrender">Leave Surrender Bill</option>
@@ -2638,7 +2750,27 @@ const Reports = () => {
                     </th>
                   )}
                   <th>Employee</th>
-                  {billType === 'regular' && <><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th></>}
+                  {billType === 'regular' && (
+                    <>
+                      {employeeCategory === 'permanent' ? (
+                        <>
+                          <th>Gross Pay</th>
+                          <th>Deductions</th>
+                          <th>Net Pay</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Honorarium/Consolidated</th>
+                          <th>Others (Earn)</th>
+                          <th>Gross Pay</th>
+                          <th>Income Tax</th>
+                          <th>HRA</th>
+                          <th>Others (Ded)</th>
+                          <th>Net Pay</th>
+                        </>
+                      )}
+                    </>
+                  )}
                   {billType === 'supplementary' && <><th>Days Worked</th><th>Gross Pay</th><th>Deductions</th><th>Net Pay</th></>}
                   {billType === 'surrender' && <><th>ELs Surrendered</th><th>Basic + DA + HRA</th><th>Surrender Amount</th></>}
                   {billType === 'arrears' && <><th>Arrear Type</th><th>Gross Arrear</th><th>IT Deduction</th><th>Net Arrear</th></>}
@@ -2649,7 +2781,7 @@ const Reports = () => {
               <tbody>
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={isViewer ? "5" : "6"} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
+                    <td colSpan={isViewer ? (employeeCategory === 'permanent' ? "5" : "9") : (employeeCategory === 'permanent' ? "6" : "10")} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                         <AlertTriangle size={24} style={{ color: 'var(--color-warning)' }} />
                         <span>No approved {getBillTypeTitle()} records found for this month.</span>
@@ -2676,9 +2808,23 @@ const Reports = () => {
                     {/* Regular Paybill Row */}
                     {billType === 'regular' && (
                       <>
-                        <td>₹ {fmt(emp.gross)}</td>
-                        <td>₹ {fmt(emp.dedux)}</td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                        {employeeCategory === 'permanent' ? (
+                          <>
+                            <td>₹ {fmt(emp.gross)}</td>
+                            <td>₹ {fmt(emp.dedux)}</td>
+                            <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td>₹ {fmt(emp.basic_pay)}</td>
+                            <td>₹ {fmt(emp.other_earnings)}</td>
+                            <td>₹ {fmt(emp.gross)}</td>
+                            <td>₹ {fmt(emp.income_tax)}</td>
+                            <td>₹ {fmt(emp.hra)}</td>
+                            <td>₹ {fmt(emp.other_deductions)}</td>
+                            <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                          </>
+                        )}
                       </>
                     )}
 

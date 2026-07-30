@@ -18,11 +18,28 @@ const emptyForm = {
   sort_order: 0
 };
 
+const emptyVisitingForm = {
+  emp_id: '',
+  title: 'Dr.',
+  name: '',
+  sort_order: 0,
+  designation: 'Visiting Professor',
+  pay_type: 'Honorarium',
+  pay: '',
+  date_of_birth: '',
+  date_of_joining: '',
+  mob_no: '',
+  email_id: '',
+  is_active: 1
+};
+
 const Employees = () => {
   const { user } = useOutletContext();
   if (user && user.role === 'viewer') {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
   }
+  
+  const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting'
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -34,12 +51,13 @@ const Employees = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [activeTab]);
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/employees');
+      const endpoint = activeTab === 'permanent' ? '/api/employees' : '/api/employees/visiting';
+      const res = await fetch(endpoint);
       if (res.ok) setEmployees(await res.json());
     } catch (err) {
       console.error('Failed to fetch employees', err);
@@ -54,28 +72,45 @@ const Employees = () => {
   };
 
   const openAddForm = () => {
-    setFormData(emptyForm);
+    setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
     setIsEditMode(false);
     setShowForm(true);
     setMessage(null);
   };
 
   const openEditForm = (emp) => {
-    setFormData({
-      emp_id: emp.emp_id || '',
-      name: emp.name || '',
-      designation: emp.designation || '',
-      date_of_birth: emp.date_of_birth || '',
-      date_of_joining: emp.date_of_joining || '',
-      scale_of_pay: emp.scale_of_pay || '',
-      category: emp.category || 'state',
-      email_id: emp.email_id || '',
-      mob_no: emp.mob_no || '',
-      epf_uan: emp.epf_uan || '',
-      is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1,
-      title: emp.title || 'Mr.',
-      sort_order: emp.sort_order || 0
-    });
+    if (activeTab === 'permanent') {
+      setFormData({
+        emp_id: emp.emp_id || '',
+        name: emp.name || '',
+        designation: emp.designation || '',
+        date_of_birth: emp.date_of_birth || '',
+        date_of_joining: emp.date_of_joining || '',
+        scale_of_pay: emp.scale_of_pay || '',
+        category: emp.category || 'state',
+        email_id: emp.email_id || '',
+        mob_no: emp.mob_no || '',
+        epf_uan: emp.epf_uan || '',
+        is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1,
+        title: emp.title || 'Mr.',
+        sort_order: emp.sort_order || 0
+      });
+    } else {
+      setFormData({
+        emp_id: emp.emp_id || '',
+        title: emp.title || 'Dr.',
+        name: emp.name || '',
+        sort_order: emp.sort_order || 0,
+        designation: emp.designation || 'Visiting Professor',
+        pay_type: emp.pay_type || 'Honorarium',
+        pay: emp.pay || '',
+        date_of_birth: emp.date_of_birth || '',
+        date_of_joining: emp.date_of_joining || '',
+        mob_no: emp.mob_no || '',
+        email_id: emp.email_id || '',
+        is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1
+      });
+    }
     setIsEditMode(true);
     setShowForm(true);
     setMessage(null);
@@ -85,7 +120,7 @@ const Employees = () => {
   const handleCancel = () => {
     setShowForm(false);
     setIsEditMode(false);
-    setFormData(emptyForm);
+    setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
     setMessage(null);
   };
 
@@ -95,7 +130,8 @@ const Employees = () => {
     setMessage(null);
     try {
       const method = isEditMode ? 'PUT' : 'POST';
-      const res = await fetch('/api/employees', {
+      const endpoint = activeTab === 'permanent' ? '/api/employees' : '/api/employees/visiting';
+      const res = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -104,7 +140,7 @@ const Employees = () => {
         setMessage({ type: 'success', text: isEditMode ? 'Employee updated successfully!' : 'Employee added successfully!' });
         setShowForm(false);
         setIsEditMode(false);
-        setFormData(emptyForm);
+        setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
         fetchEmployees();
       } else {
         const err = await res.json();
@@ -138,6 +174,44 @@ const Employees = () => {
         )}
       </div>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+        <button 
+          onClick={() => { setActiveTab('permanent'); setShowForm(false); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Permanent Employees
+        </button>
+        <button 
+          onClick={() => { setActiveTab('visiting'); setShowForm(false); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Visiting Professors & Assistant Professors
+        </button>
+      </div>
+
       {/* Status message */}
       {message && (
         <div style={{
@@ -164,105 +238,198 @@ const Employees = () => {
             </button>
           </div>
           <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Employee ID *</label>
-                <input required type="text" name="emp_id" value={formData.emp_id} onChange={handleInputChange}
-                  className="form-control" placeholder="e.g., KSM001"
-                  disabled={isEditMode} style={isEditMode ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Title</label>
-                <select name="title" value={formData.title} onChange={handleInputChange} className="form-control">
-                  <option value="Mr.">Mr.</option>
-                  <option value="Ms.">Ms.</option>
-                  <option value="Mrs.">Mrs.</option>
-                  <option value="Dr.">Dr.</option>
-                  <option value="Prof.">Prof.</option>
-                </select>
-              </div>
-            </div>
+            {activeTab === 'permanent' ? (
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Employee ID *</label>
+                    <input required type="text" name="emp_id" value={formData.emp_id} onChange={handleInputChange}
+                      className="form-control" placeholder="e.g., KSM001"
+                      disabled={isEditMode} style={isEditMode ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Title</label>
+                    <select name="title" value={formData.title} onChange={handleInputChange} className="form-control">
+                      <option value="Mr.">Mr.</option>
+                      <option value="Ms.">Ms.</option>
+                      <option value="Mrs.">Mrs.</option>
+                      <option value="Dr.">Dr.</option>
+                      <option value="Prof.">Prof.</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Full Name *</label>
-                <input required type="text" name="name" value={formData.name} onChange={handleInputChange}
-                  className="form-control" placeholder="Full Name" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Order (for sorting)</label>
-                <input type="number" name="sort_order" value={formData.sort_order} onChange={handleInputChange}
-                  className="form-control" placeholder="0" />
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Full Name *</label>
+                    <input required type="text" name="name" value={formData.name} onChange={handleInputChange}
+                      className="form-control" placeholder="Full Name" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Order (for sorting)</label>
+                    <input type="number" name="sort_order" value={formData.sort_order} onChange={handleInputChange}
+                      className="form-control" placeholder="0" />
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Designation</label>
-                <input type="text" name="designation" value={formData.designation} onChange={handleInputChange}
-                  className="form-control" placeholder="e.g., Assistant Professor" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select name="category" value={formData.category} onChange={handleInputChange} className="form-control">
-                  <option value="state">State</option>
-                  <option value="ugc/csir">UGC/CSIR</option>
-                  <option value="temporary">Temporary</option>
-                  <option value="contract">Contract</option>
-                </select>
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Designation</label>
+                    <input type="text" name="designation" value={formData.designation} onChange={handleInputChange}
+                      className="form-control" placeholder="e.g., Assistant Professor" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Category</label>
+                    <select name="category" value={formData.category} onChange={handleInputChange} className="form-control">
+                      <option value="state">State</option>
+                      <option value="ugc/csir">UGC/CSIR</option>
+                      <option value="temporary">Temporary</option>
+                      <option value="contract">Contract</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Date of Birth</label>
-                <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleInputChange}
-                  className="form-control" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Date of Joining</label>
-                <input type="date" name="date_of_joining" value={formData.date_of_joining} onChange={handleInputChange}
-                  className="form-control" />
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Date of Birth</label>
+                    <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleInputChange}
+                      className="form-control" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Date of Joining</label>
+                    <input type="date" name="date_of_joining" value={formData.date_of_joining} onChange={handleInputChange}
+                      className="form-control" />
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Scale of Pay</label>
-                <input type="text" name="scale_of_pay" value={formData.scale_of_pay} onChange={handleInputChange}
-                  className="form-control" placeholder="e.g., 57700-182400" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Mobile Number</label>
-                <input type="tel" name="mob_no" value={formData.mob_no} onChange={handleInputChange}
-                  className="form-control" placeholder="+91 98765 43210" />
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Scale of Pay</label>
+                    <input type="text" name="scale_of_pay" value={formData.scale_of_pay} onChange={handleInputChange}
+                      className="form-control" placeholder="e.g., 57700-182400" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number</label>
+                    <input type="tel" name="mob_no" value={formData.mob_no} onChange={handleInputChange}
+                      className="form-control" placeholder="+91 98765 43210" />
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Email ID</label>
-                <input type="email" name="email_id" value={formData.email_id} onChange={handleInputChange}
-                  className="form-control" placeholder="employee@example.com" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">EPF UAN</label>
-                <input type="text" name="epf_uan" value={formData.epf_uan} onChange={handleInputChange}
-                  className="form-control" placeholder="12-digit UAN" />
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Email ID</label>
+                    <input type="email" name="email_id" value={formData.email_id} onChange={handleInputChange}
+                      className="form-control" placeholder="employee@example.com" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">EPF UAN</label>
+                    <input type="text" name="epf_uan" value={formData.epf_uan} onChange={handleInputChange}
+                      className="form-control" placeholder="12-digit UAN" />
+                  </div>
+                </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
-                  <option value={1}>Active</option>
-                  <option value={0}>Inactive</option>
-                </select>
-              </div>
-              <div className="form-group">
-              </div>
-            </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
+                      <option value={1}>Active</option>
+                      <option value={0}>Inactive</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Employee ID *</label>
+                    <input required type="text" name="emp_id" value={formData.emp_id} onChange={handleInputChange}
+                      className="form-control" placeholder="e.g., V001"
+                      disabled={isEditMode} style={isEditMode ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Title</label>
+                    <select name="title" value={formData.title} onChange={handleInputChange} className="form-control">
+                      <option value="Dr.">Dr.</option>
+                      <option value="Prof.">Prof.</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Full Name *</label>
+                    <input required type="text" name="name" value={formData.name} onChange={handleInputChange}
+                      className="form-control" placeholder="Full Name" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Order (for sorting)</label>
+                    <input type="number" name="sort_order" value={formData.sort_order} onChange={handleInputChange}
+                      className="form-control" placeholder="0" />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Designation</label>
+                    <select name="designation" value={formData.designation} onChange={handleInputChange} className="form-control">
+                      <option value="Visiting Professor">Visiting Professor</option>
+                      <option value="Visiting Assistant Professor">Visiting Assistant Professor</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Pay Type</label>
+                    <select name="pay_type" value={formData.pay_type} onChange={handleInputChange} className="form-control">
+                      <option value="Honorarium">Honorarium</option>
+                      <option value="Consolidated Salary">Consolidated Salary</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Pay *</label>
+                    <input required type="number" name="pay" value={formData.pay} onChange={handleInputChange}
+                      className="form-control" placeholder="Amount in Rs." />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Date of Birth</label>
+                    <input type="date" name="date_of_birth" value={formData.date_of_birth} onChange={handleInputChange}
+                      className="form-control" />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Date of Joining</label>
+                    <input type="date" name="date_of_joining" value={formData.date_of_joining} onChange={handleInputChange}
+                      className="form-control" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number</label>
+                    <input type="tel" name="mob_no" value={formData.mob_no} onChange={handleInputChange}
+                      className="form-control" placeholder="+91 98765 43210" />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Email ID</label>
+                    <input type="email" name="email_id" value={formData.email_id} onChange={handleInputChange}
+                      className="form-control" placeholder="employee@example.com" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
+                      <option value={1}>Active</option>
+                      <option value={0}>Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
               <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
@@ -277,7 +444,9 @@ const Employees = () => {
       {/* Employees Table */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem' }}>All Employees ({filteredEmployees.length})</h3>
+          <h3 style={{ fontSize: '1.125rem' }}>
+            {activeTab === 'permanent' ? 'All Permanent Employees' : 'All Visiting Faculty'} ({filteredEmployees.length})
+          </h3>
           <div style={{ position: 'relative', width: '260px' }}>
             <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
             <input type="text" placeholder="Search by name or ID..." value={search}
@@ -292,21 +461,35 @@ const Employees = () => {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr>
-                  <th>Emp ID</th>
-                  <th>Name</th>
-                  <th>Designation</th>
-                  <th>Category</th>
-                  <th>Pay Scale</th>
-                  <th>Mobile</th>
-                  <th>Email</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
-                </tr>
+                {activeTab === 'permanent' ? (
+                  <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Category</th>
+                    <th>Pay Scale</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Pay Type</th>
+                    <th>Pay</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan={activeTab === 'permanent' ? "8" : "9"} style={{ textAlign: 'center', padding: '2rem' }}>
                       {employees.length === 0 ? 'No employees yet. Click "Add Employee" to get started.' : 'No matches found.'}
                     </td>
                   </tr>
@@ -316,19 +499,43 @@ const Employees = () => {
                       <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
                       <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
-                      <td>
-                        <span className={`badge badge-${emp.category}`}>
-                          {emp.category === 'ugc/csir' ? 'UGC/CSIR' : (emp.category ? emp.category.charAt(0).toUpperCase() + emp.category.slice(1) : '—')}
-                        </span>
-                        <div style={{ marginTop: '0.25rem' }}>
-                          <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
-                            {emp.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{emp.scale_of_pay || '—'}</td>
+                      
+                      {activeTab === 'permanent' ? (
+                        <>
+                          <td>
+                            <span className={`badge badge-${emp.category}`}>
+                              {emp.category === 'ugc/csir' ? 'UGC/CSIR' : (emp.category ? emp.category.charAt(0).toUpperCase() + emp.category.slice(1) : '—')}
+                            </span>
+                            <div style={{ marginTop: '0.25rem' }}>
+                              <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
+                                {emp.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--color-text-secondary)' }}>{emp.scale_of_pay || '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            <span className="badge badge-contract">
+                              {emp.pay_type || '—'}
+                            </span>
+                          </td>
+                          <td style={{ color: 'var(--color-text-secondary)' }}>₹{emp.pay ? parseFloat(emp.pay).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                        </>
+                      )}
+                      
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.mob_no || '—'}</td>
                       <td style={{ color: 'var(--color-text-secondary)' }}>{emp.email_id || '—'}</td>
+                      
+                      {activeTab === 'visiting' && (
+                        <td>
+                          <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`}>
+                            {emp.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      )}
+                      
                       <td style={{ textAlign: 'center' }}>
                         <button className="btn btn-secondary"
                           style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', gap: '0.35rem' }}

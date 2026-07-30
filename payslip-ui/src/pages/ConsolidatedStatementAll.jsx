@@ -5,20 +5,20 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 const ConsolidatedStatementAll = () => {
-  const { user } = useOutletContext();
+  const { user } = useOutletContext() || {};
   const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
 
   const currentYear = new Date().getFullYear();
+  const [employeeCategory, setEmployeeCategory] = useState('permanent'); // 'permanent', 'visiting'
   const [fy, setFy] = useState(() => {
     const now = new Date();
-    // If before April, default to previous year
     return now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
   });
 
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
-  const [activeTab, setActiveTab] = useState('gross');
+  const [activeTab, setActiveTab] = useState('gross'); // 'gross', 'tds', 'epf', 'sli', 'gis', 'gpais' for perm; 'gross', 'tds', 'net' for visiting
 
   const getGPAIS = (otherDeductionsBreakdown) => {
     if (!otherDeductionsBreakdown) return 0;
@@ -42,6 +42,36 @@ const ConsolidatedStatementAll = () => {
     const e = earnings.find(x => x.emp_id === emp_id && x.month_year === monthYearStr);
     const isLocked = e && e.is_approved === 1;
     const d = deductions.find(x => x.emp_id === emp_id && x.month_year === monthYearStr) || {};
+
+    if (employeeCategory === 'visiting') {
+      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : 0;
+      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : 0;
+      const gross_regular = isLocked ? (basic + otherEarn) : 0;
+
+      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : 0;
+      const hra = isLocked ? Math.round(parseFloat(d.hra) || 0) : 0;
+      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : 0;
+
+      const totDed_regular = isLocked ? (it + hra + otherDed) : 0;
+      const net_regular = isLocked ? (gross_regular - totDed_regular) : null;
+      const tds_regular = isLocked ? it : null;
+      const gross_regular_val = isLocked ? gross_regular : null;
+
+      return {
+        gross_regular: gross_regular_val,
+        net_regular,
+        tds_regular,
+        arrears_gross: null,
+        arrears_net: null,
+        arrears_it: null,
+        surrender_net: null,
+        festival_net: null,
+        epf: null,
+        sli: null,
+        gis: null,
+        gpais: null
+      };
+    }
 
     const se = supplementaryEarnings.find(x => x.emp_id === emp_id && x.month_year === monthYearStr);
     const isSupApproved = !!se;
@@ -126,10 +156,17 @@ const ConsolidatedStatementAll = () => {
     return letter;
   };
 
+  const handleCategoryChange = (category) => {
+    setEmployeeCategory(category);
+    setPreviewData(null);
+    setActiveTab('gross');
+  };
+
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/reports/consolidated-all?fy=${fy}`);
+      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated-all' : '/api/reports/visiting/consolidated-all';
+      const res = await fetch(`${endpoint}?fy=${fy}`);
       const data = await res.json();
 
       if (data.error) {
@@ -153,7 +190,8 @@ const ConsolidatedStatementAll = () => {
     }
     setPreviewLoading(true);
     try {
-      const res = await fetch(`/api/reports/consolidated-all?fy=${fy}`);
+      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated-all' : '/api/reports/visiting/consolidated-all';
+      const res = await fetch(`${endpoint}?fy=${fy}`);
       const data = await res.json();
 
       if (data.error) {
@@ -253,6 +291,12 @@ const ConsolidatedStatementAll = () => {
             key: 'arrears_it'
           });
         }
+      } else if (activeTab === 'net') {
+        cols.push({
+          header: formattedDate,
+          monthStr,
+          key: 'net_regular'
+        });
       } else {
         cols.push({
           header: formattedDate,
@@ -299,7 +343,6 @@ const ConsolidatedStatementAll = () => {
     const { employees, earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = [] } = reportData;
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
 
-    // 12 months array (March of fyStart to February of fyStart+1)
     const months = [];
     for (let i = 3; i <= 14; i++) {
       const m = i > 12 ? i - 12 : i;
@@ -307,7 +350,6 @@ const ConsolidatedStatementAll = () => {
       months.push(`${y}-${String(m).padStart(2, '0')}`);
     }
 
-    // Header dates for display (April of fyStart to March of fyStart+1)
     const headerDates = [];
     for (let i = 4; i <= 15; i++) {
       const m = i > 12 ? i - 12 : i;
@@ -321,7 +363,6 @@ const ConsolidatedStatementAll = () => {
       bottom: { style: 'thin', color: { indexed: 64 } },
       right: { style: 'thin', color: { indexed: 64 } }
     };
-
 
     const monthHasArrears = (monthStr) => {
       return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
@@ -338,7 +379,6 @@ const ConsolidatedStatementAll = () => {
     const monthHasFestival = (monthStr) => {
       return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.amount) || 0) > 0);
     };
-
 
     const buildSheetColumns = (typeKey, secondColHeader) => {
       const cols = [
@@ -416,6 +456,15 @@ const ConsolidatedStatementAll = () => {
               key: 'arrears_it'
             });
           }
+        } else if (typeKey === 'net') {
+          cols.push({
+            header: displayDate,
+            width: 12.71,
+            numFmt: 'mmm-yy',
+            isDateHeader: true,
+            monthStr,
+            key: 'net_regular'
+          });
         } else {
           cols.push({
             header: displayDate,
@@ -572,59 +621,82 @@ const ConsolidatedStatementAll = () => {
       }
     };
 
-    // Sheet 1: Gross Salary [FY]
-    generateSheet(
-      `Gross Salary ${fyStart}-${fyStart + 1}`,
-      `Gross Salary Details for the FY ${fyStart} -${fyStart + 1}`,
-      null,
-      'gross',
-      ' Name /\r\nPayment received in the month'
-    );
+    if (employeeCategory === 'visiting') {
+      // Visiting sheets: Gross, TDS, Net
+      generateSheet(
+        `Gross Salary ${fyStart}-${fyStart + 1}`,
+        `Visiting Faculty Gross Salary Details for the FY ${fyStart} -${fyStart + 1}`,
+        null,
+        'gross',
+        ' Name /\r\nPayment received in the month'
+      );
 
-    // Sheet 2: TDS
-    generateSheet(
-      'TDS',
-      'Kerala School of Mathematics',
-      `Tax Deducted for the FY ${fyStart} -${fyStart + 1} `,
-      'tds',
-      ' Name /\r\nTDS from the salary received in.'
-    );
+      generateSheet(
+        'TDS',
+        'Kerala School of Mathematics',
+        `Visiting Faculty Tax Deducted for the FY ${fyStart} -${fyStart + 1} `,
+        'tds',
+        ' Name /\r\nTDS from the salary received in.'
+      );
 
-    // Sheet 3: EPF
-    generateSheet(
-      'EPF',
-      'Kerala School of Mathematics',
-      `EPF Deducted for the FY ${fyStart} -${fyStart + 1}`,
-      'epf',
-      ' Name /\r\nEPF recovery from the salary received in.'
-    );
+      generateSheet(
+        'Net Salary',
+        'Kerala School of Mathematics',
+        `Visiting Faculty Net Salary Payout for the FY ${fyStart} -${fyStart + 1}`,
+        'net',
+        ' Name /\r\nNet salary received in.'
+      );
 
-    // Sheet 4: SLI
-    generateSheet(
-      'SLI',
-      'Kerala School of Mathematics',
-      `SLI Deducted for the FY ${fyStart} -${fyStart + 1}`,
-      'sli',
-      ' Name /\r\nSLI deducted from the salary received in.'
-    );
+    } else {
+      // Permanent sheets: Gross, TDS, EPF, SLI, GIS, GPAIS
+      generateSheet(
+        `Gross Salary ${fyStart}-${fyStart + 1}`,
+        `Gross Salary Details for the FY ${fyStart} -${fyStart + 1}`,
+        null,
+        'gross',
+        ' Name /\r\nPayment received in the month'
+      );
 
-    // Sheet 5: GIS
-    generateSheet(
-      'GIS',
-      'Kerala School of Mathematics',
-      `GIS Deducted for the FY ${fyStart} -${fyStart + 1}`,
-      'gis',
-      ' Name /\r\nGIS deducted from the salary received in.'
-    );
+      generateSheet(
+        'TDS',
+        'Kerala School of Mathematics',
+        `Tax Deducted for the FY ${fyStart} -${fyStart + 1} `,
+        'tds',
+        ' Name /\r\nTDS from the salary received in.'
+      );
 
-    // Sheet 6: GPAIS
-    generateSheet(
-      'GPAIS',
-      'Kerala School of Mathematics',
-      `GPAIS Deducted for the FY ${fyStart} -${fyStart + 1}`,
-      'gpais',
-      ' Name /\r\nGPAIS deducted from the salary received in.'
-    );
+      generateSheet(
+        'EPF',
+        'Kerala School of Mathematics',
+        `EPF Deducted for the FY ${fyStart} -${fyStart + 1}`,
+        'epf',
+        ' Name /\r\nEPF recovery from the salary received in.'
+      );
+
+      generateSheet(
+        'SLI',
+        'Kerala School of Mathematics',
+        `SLI Deducted for the FY ${fyStart} -${fyStart + 1}`,
+        'sli',
+        ' Name /\r\nSLI deducted from the salary received in.'
+      );
+
+      generateSheet(
+        'GIS',
+        'Kerala School of Mathematics',
+        `GIS Deducted for the FY ${fyStart} -${fyStart + 1}`,
+        'gis',
+        ' Name /\r\nGIS deducted from the salary received in.'
+      );
+
+      generateSheet(
+        'GPAIS',
+        'Kerala School of Mathematics',
+        `GPAIS Deducted for the FY ${fyStart} -${fyStart + 1}`,
+        'gpais',
+        ' Name /\r\nGPAIS deducted from the salary received in.'
+      );
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `Consolidated_Salary_Deductions_FY${fyDisplay}.xlsx`);
@@ -651,8 +723,46 @@ const ConsolidatedStatementAll = () => {
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Consolidated FY Statements (All Employees)</h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-          Download a consolidated Excel workbook containing Salary, TDS, EPF, SLI, GIS, and GPAIS statements for all active employees during a financial year.
+          Download a consolidated Excel workbook containing statements for all active employees during a financial year.
         </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+        <button 
+          onClick={() => handleCategoryChange('permanent')}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Permanent Employees
+        </button>
+        <button 
+          onClick={() => handleCategoryChange('visiting')}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Visiting Professors & Assistant Professors
+        </button>
       </div>
 
       <div className="card" style={{ maxWidth: '600px' }}>
@@ -693,6 +803,20 @@ const ConsolidatedStatementAll = () => {
       {previewData && (() => {
         const preview = getPreviewContent();
         if (!preview) return null;
+
+        const tabsList = employeeCategory === 'visiting' ? [
+          { key: 'gross', label: 'Gross Salary' },
+          { key: 'tds', label: 'TDS' },
+          { key: 'net', label: 'Net Salary' }
+        ] : [
+          { key: 'gross', label: 'Gross Salary' },
+          { key: 'tds', label: 'TDS' },
+          { key: 'epf', label: 'EPF' },
+          { key: 'sli', label: 'SLI' },
+          { key: 'gis', label: 'GIS' },
+          { key: 'gpais', label: 'GPAIS' }
+        ];
+
         return (
           <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -716,14 +840,7 @@ const ConsolidatedStatementAll = () => {
 
             {/* Tab selector */}
             <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--color-bg-primary)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', marginBottom: '1.5rem', overflowX: 'auto' }}>
-              {[
-                { key: 'gross', label: 'Gross Salary' },
-                { key: 'tds', label: 'TDS' },
-                { key: 'epf', label: 'EPF' },
-                { key: 'sli', label: 'SLI' },
-                { key: 'gis', label: 'GIS' },
-                { key: 'gpais', label: 'GPAIS' }
-              ].map(tab => (
+              {tabsList.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -805,11 +922,12 @@ const ConsolidatedStatementAll = () => {
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Export Details</h4>
         <ul style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem' }}>
-          <li>Produces a multi-sheet Excel file: <strong>Salary Details</strong>, <strong>TDS</strong>, <strong>EPF</strong>, <strong>SLI</strong>, <strong>GIS</strong>, and <strong>GPAIS</strong>.</li>
+          <li>Produces a multi-sheet Excel file tailored to the selected employee category.</li>
+          <li>For Permanent Employees: includes sheets for Gross Salary, TDS, EPF, SLI, GIS, and GPAIS.</li>
+          <li>For Visiting Faculty: includes sheets for Gross Salary, TDS, and Net Salary.</li>
           <li>Data is calculated for the payment received months (April to March), which maps to salary months March to February.</li>
           <li>All amounts are rounded to the nearest integer and formatted with two decimal places (e.g. <code>.00</code>).</li>
           <li>Totals are generated using dynamic Excel formulas (e.g. <code>=SUM(...)</code>) to maintain spreadsheet interactive integrity.</li>
-          <li>GPAIS deductions are extracted dynamically from the monthly miscellaneous deduction breakdowns.</li>
         </ul>
       </div>
     </div>

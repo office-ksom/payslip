@@ -1,5 +1,14 @@
+import { onRequestGet as __api_reports_visiting_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\visiting\\consolidated.js"
+import { onRequestGet as __api_reports_visiting_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\visiting\\consolidated-all.js"
+import { onRequestGet as __api_approve_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\visiting\\[month_year].js"
+import { onRequestPost as __api_approve_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\visiting\\[month_year].js"
 import { onRequestGet as __api_arrears_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\arrears\\approve\\[month_year].js"
 import { onRequestPost as __api_arrears_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\arrears\\approve\\[month_year].js"
+import { onRequestGet as __api_deductions_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\visiting\\[month_year].js"
+import { onRequestPost as __api_deductions_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\visiting\\[month_year].js"
+import { onRequestDelete as __api_earnings_visiting__month_year__js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
+import { onRequestGet as __api_earnings_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
+import { onRequestPost as __api_earnings_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
 import { onRequestGet as __api_festival_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\approve\\[month_year].js"
 import { onRequestPost as __api_festival_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\festival\\approve\\[month_year].js"
 import { onRequestGet as __api_supplementary_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\supplementary\\approve\\[month_year].js"
@@ -10,6 +19,9 @@ import { onRequestPost as __api_auth_login_js_onRequestPost } from "D:\\KSOM\\We
 import { onRequestGet as __api_auth_logout_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\logout.js"
 import { onRequestPost as __api_auth_reset_confirm_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\reset-confirm.js"
 import { onRequestPost as __api_auth_reset_request_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\reset-request.js"
+import { onRequestGet as __api_employees_visiting_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
+import { onRequestPost as __api_employees_visiting_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
+import { onRequestPut as __api_employees_visiting_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
 import { onRequestPost as __api_me_password_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\me\\password.js"
 import { onRequestGet as __api_reports_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated.js"
 import { onRequestGet as __api_reports_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated-all.js"
@@ -51,6 +63,34 @@ import { onRequest as ___middleware_js_onRequest } from "D:\\KSOM\\Website\\Web 
 
 export const routes = [
     {
+      routePath: "/api/reports/visiting/consolidated",
+      mountPath: "/api/reports/visiting",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_visiting_consolidated_js_onRequestGet],
+    },
+  {
+      routePath: "/api/reports/visiting/consolidated-all",
+      mountPath: "/api/reports/visiting",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_visiting_consolidated_all_js_onRequestGet],
+    },
+  {
+      routePath: "/api/approve/visiting/:month_year",
+      mountPath: "/api/approve/visiting",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_approve_visiting__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/approve/visiting/:month_year",
+      mountPath: "/api/approve/visiting",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_approve_visiting__month_year__js_onRequestPost],
+    },
+  {
       routePath: "/api/arrears/approve/:month_year",
       mountPath: "/api/arrears/approve",
       method: "GET",
@@ -63,6 +103,41 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_arrears_approve__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/deductions/visiting/:month_year",
+      mountPath: "/api/deductions/visiting",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_deductions_visiting__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/deductions/visiting/:month_year",
+      mountPath: "/api/deductions/visiting",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_deductions_visiting__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/earnings/visiting/:month_year",
+      mountPath: "/api/earnings/visiting",
+      method: "DELETE",
+      middlewares: [],
+      modules: [__api_earnings_visiting__month_year__js_onRequestDelete],
+    },
+  {
+      routePath: "/api/earnings/visiting/:month_year",
+      mountPath: "/api/earnings/visiting",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_earnings_visiting__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/earnings/visiting/:month_year",
+      mountPath: "/api/earnings/visiting",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_earnings_visiting__month_year__js_onRequestPost],
     },
   {
       routePath: "/api/festival/approve/:month_year",
@@ -133,6 +208,27 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_auth_reset_request_js_onRequestPost],
+    },
+  {
+      routePath: "/api/employees/visiting",
+      mountPath: "/api/employees",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_employees_visiting_js_onRequestGet],
+    },
+  {
+      routePath: "/api/employees/visiting",
+      mountPath: "/api/employees",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_employees_visiting_js_onRequestPost],
+    },
+  {
+      routePath: "/api/employees/visiting",
+      mountPath: "/api/employees",
+      method: "PUT",
+      middlewares: [],
+      modules: [__api_employees_visiting_js_onRequestPut],
     },
   {
       routePath: "/api/me/password",

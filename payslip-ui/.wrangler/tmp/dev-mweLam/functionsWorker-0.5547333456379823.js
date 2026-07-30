@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-iVguTi/checked-fetch.js
+// .wrangler/tmp/bundle-mDTSKa/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-UAyMRP/functionsWorker-0.7923800838620553.mjs
+// .wrangler/tmp/pages-ZHm6CZ/functionsWorker-0.5547333456379823.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -55,6 +55,108 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
     return Reflect.apply(target, thisArg, argArray);
   }
 });
+async function onRequestGet(context) {
+  try {
+    const { request, env } = context;
+    const url = new URL(request.url);
+    const fy = url.searchParams.get("fy");
+    let empId = url.searchParams.get("emp_id");
+    const userEmail = request.headers.get("X-User-Email");
+    const userRole = request.headers.get("X-User-Role");
+    if (!fy) {
+      return new Response(JSON.stringify({ error: "Financial year (fy) is required" }), { status: 400 });
+    }
+    if (userRole !== "admin" && userRole !== "super_admin") {
+      const emp = await env.ksom_payslip_db.prepare(
+        "SELECT emp_id FROM visiting_employees WHERE LOWER(email_id) = LOWER(?)"
+      ).bind(userEmail).first();
+      if (!emp) {
+        return new Response(JSON.stringify({ error: "Visiting employee record not found for your email" }), { status: 404 });
+      }
+      empId = emp.emp_id;
+    } else if (!empId) {
+      return new Response(JSON.stringify({ error: "emp_id is required" }), { status: 400 });
+    }
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
+    const employee = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM visiting_employees WHERE emp_id = ?"
+    ).bind(empId).first();
+    if (!employee) {
+      return new Response(JSON.stringify({ error: "Visiting employee not found" }), { status: 404 });
+    }
+    const { results: earnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM visiting_monthly_earnings WHERE emp_id = ? AND month_year >= ? AND month_year <= ? ORDER BY month_year ASC"
+    ).bind(empId, startMonth, endMonth).all();
+    const { results: deductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM visiting_monthly_deductions WHERE emp_id = ? AND month_year >= ? AND month_year <= ? ORDER BY month_year ASC"
+    ).bind(empId, startMonth, endMonth).all();
+    return new Response(JSON.stringify({
+      employee,
+      earnings,
+      deductions,
+      arrears: [],
+      surrender: [],
+      festival: [],
+      supplementaryEarnings: [],
+      supplementaryDeductions: [],
+      settings: []
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet, "onRequestGet");
+__name2(onRequestGet, "onRequestGet");
+async function onRequestGet2(context) {
+  try {
+    const { request, env } = context;
+    const url = new URL(request.url);
+    const fy = url.searchParams.get("fy");
+    const userRole = request.headers.get("X-User-Role");
+    if (!fy) {
+      return new Response(JSON.stringify({ error: "Financial year (fy) is required" }), { status: 400 });
+    }
+    if (userRole !== "admin" && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Access denied. Admins only." }), { status: 403 });
+    }
+    const startMonth = `${fy}-03`;
+    const endMonth = `${parseInt(fy) + 1}-02`;
+    const { results: employees } = await env.ksom_payslip_db.prepare(
+      `SELECT * FROM visiting_employees 
+       WHERE emp_id IN (
+         SELECT DISTINCT emp_id 
+         FROM visiting_monthly_earnings 
+         WHERE month_year >= ? AND month_year <= ?
+       )
+       ORDER BY sort_order ASC, name ASC`
+    ).bind(startMonth, endMonth).all();
+    const { results: earnings } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM visiting_monthly_earnings WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    const { results: deductions } = await env.ksom_payslip_db.prepare(
+      "SELECT * FROM visiting_monthly_deductions WHERE month_year >= ? AND month_year <= ?"
+    ).bind(startMonth, endMonth).all();
+    return new Response(JSON.stringify({
+      employees,
+      earnings,
+      deductions,
+      arrears: [],
+      surrender: [],
+      festival: [],
+      supplementaryEarnings: [],
+      supplementaryDeductions: []
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet2, "onRequestGet2");
+__name2(onRequestGet2, "onRequestGet");
 async function logActivity2(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
   const istOffset = 5.5 * 60 * 60 * 1e3;
@@ -80,6 +182,86 @@ async function logActivity2(db, userEmail, action, description) {
 __name(logActivity2, "logActivity2");
 __name2(logActivity2, "logActivity");
 async function onRequestPost(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  try {
+    const monthYear = context.params.month_year;
+    const db = context.env.ksom_payslip_db;
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const body = await context.request.json().catch(() => ({}));
+    const action = body.action || "approve";
+    const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first("value");
+    const requireApproval = settingsCheck !== "0";
+    if (action === "submit") {
+      if (userRole !== "admin" && userRole !== "super_admin") {
+        return new Response(JSON.stringify({ error: "Only admins or super admins can submit paybills." }), { status: 403 });
+      }
+    } else if (action === "approve" || action === "reject") {
+      const isAllowed = userRole === "approver" || userRole === "super_admin" || !requireApproval && userRole === "admin";
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: "Only approvers, super admins (or admins under current settings) can approve/reject paybills." }), { status: 403 });
+      }
+    } else {
+      return new Response(JSON.stringify({ error: "Invalid action." }), { status: 400 });
+    }
+    const exists = await db.prepare("SELECT count(*) as count FROM visiting_monthly_earnings WHERE month_year = ?").bind(monthYear).first("count");
+    if (exists === 0) {
+      return new Response(JSON.stringify({ error: "No data found for this month to process." }), { status: 400 });
+    }
+    let statusValue = 1;
+    let approvedOnValue = now;
+    let approvedByValue = userEmail;
+    if (action === "submit") {
+      statusValue = 2;
+      approvedOnValue = null;
+      approvedByValue = null;
+    } else if (action === "reject") {
+      statusValue = 3;
+      approvedOnValue = null;
+      approvedByValue = null;
+    }
+    await db.prepare(`
+      UPDATE visiting_monthly_earnings 
+      SET is_approved = ?, approved_on = ?, approved_by = ?
+      WHERE month_year = ?
+    `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
+    const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
+    await logActivity2(db, userEmail, "Visiting Paybill Action", `${actionMap[action] || action} visiting paybill for ${monthYear}`);
+    return new Response(JSON.stringify({
+      success: true,
+      is_approved: statusValue,
+      approved_on: approvedOnValue,
+      approved_by: approvedByValue
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost, "onRequestPost");
+__name2(onRequestPost, "onRequestPost");
+async function onRequestGet3(context) {
+  try {
+    const monthYear = context.params.month_year;
+    const db = context.env.ksom_payslip_db;
+    const approvalInfo = await db.prepare(`
+      SELECT is_approved, approved_on, approved_by 
+      FROM visiting_monthly_earnings 
+      WHERE month_year = ?
+      ORDER BY is_approved DESC
+      LIMIT 1
+    `).bind(monthYear).first();
+    return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet3, "onRequestGet3");
+__name2(onRequestGet3, "onRequestGet");
+async function onRequestPost2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -146,9 +328,9 @@ async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost, "onRequestPost");
-__name2(onRequestPost, "onRequestPost");
-async function onRequestGet(context) {
+__name(onRequestPost2, "onRequestPost2");
+__name2(onRequestPost2, "onRequestPost");
+async function onRequestGet4(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -173,9 +355,213 @@ async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet, "onRequestGet");
-__name2(onRequestGet, "onRequestGet");
-async function onRequestPost2(context) {
+__name(onRequestGet4, "onRequestGet4");
+__name2(onRequestGet4, "onRequestGet");
+async function onRequestGet5(context) {
+  try {
+    const monthYear = context.params.month_year;
+    const userRole = context.request.headers.get("X-User-Role");
+    const userEmail = context.request.headers.get("X-User-Email");
+    let query = `
+      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.title, e.sort_order,
+             d.income_tax, d.hra, d.other_deductions, d.other_deductions_breakdown
+      FROM visiting_employees e
+      LEFT JOIN visiting_monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
+    `;
+    let params = [monthYear];
+    if (userRole === "viewer") {
+      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
+      params.push(userEmail);
+    }
+    query += ` ORDER BY e.sort_order ASC, e.name ASC`;
+    const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
+    return new Response(JSON.stringify(results), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet5, "onRequestGet5");
+__name2(onRequestGet5, "onRequestGet");
+async function onRequestPost3(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  if (userRole === "viewer") {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  try {
+    const monthYear = context.params.month_year;
+    const { records } = await context.request.json();
+    const db = context.env.ksom_payslip_db;
+    const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    }
+    const statements = [];
+    for (const record of records) {
+      statements.push(
+        db.prepare(`
+          INSERT INTO visiting_monthly_deductions (emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(emp_id, month_year) DO UPDATE SET 
+            income_tax=excluded.income_tax,
+            hra=excluded.hra,
+            other_deductions=excluded.other_deductions,
+            other_deductions_breakdown=excluded.other_deductions_breakdown
+        `).bind(
+          record.emp_id,
+          monthYear,
+          record.income_tax || 0,
+          record.hra || 0,
+          record.other_deductions || 0,
+          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+        )
+      );
+    }
+    if (statements.length > 0) {
+      await db.batch(statements);
+    }
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost3, "onRequestPost3");
+__name2(onRequestPost3, "onRequestPost");
+async function onRequestGet6(context) {
+  try {
+    const monthYear = context.params.month_year;
+    const userRole = context.request.headers.get("X-User-Role");
+    const userEmail = context.request.headers.get("X-User-Email");
+    let query = `
+      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order,
+             m.id as earnings_id, m.basic_pay, m.other_earnings, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
+             d.id as deductions_id, d.income_tax, d.hra, d.other_deductions, d.other_deductions_breakdown
+      FROM visiting_employees e
+      LEFT JOIN visiting_monthly_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
+      LEFT JOIN visiting_monthly_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
+    `;
+    let params = [monthYear, monthYear];
+    if (userRole === "viewer" && userEmail) {
+      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
+      params.push(userEmail);
+    } else {
+      query += ` WHERE e.is_active = 1 OR m.id IS NOT NULL`;
+    }
+    query += ` ORDER BY e.sort_order ASC, e.name ASC`;
+    const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
+    return new Response(JSON.stringify(results), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet6, "onRequestGet6");
+__name2(onRequestGet6, "onRequestGet");
+async function onRequestPost4(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  if (userRole === "viewer") {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  try {
+    const monthYear = context.params.month_year;
+    const { records } = await context.request.json();
+    const db = context.env.ksom_payslip_db;
+    const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    }
+    const statements = [];
+    for (const record of records) {
+      statements.push(
+        db.prepare(`
+          INSERT INTO visiting_monthly_earnings (
+            emp_id, month_year, basic_pay, other_earnings, other_earnings_breakdown
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(emp_id, month_year) DO UPDATE SET
+            basic_pay = excluded.basic_pay,
+            other_earnings = excluded.other_earnings,
+            other_earnings_breakdown = excluded.other_earnings_breakdown
+        `).bind(
+          record.emp_id,
+          monthYear,
+          record.basic_pay || 0,
+          record.other_earnings || 0,
+          record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
+        )
+      );
+      statements.push(
+        db.prepare(`
+          INSERT INTO visiting_monthly_deductions (
+            emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
+          ) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(emp_id, month_year) DO UPDATE SET
+            income_tax = excluded.income_tax,
+            hra = excluded.hra,
+            other_deductions = excluded.other_deductions,
+            other_deductions_breakdown = excluded.other_deductions_breakdown
+        `).bind(
+          record.emp_id,
+          monthYear,
+          record.income_tax || 0,
+          record.hra || 0,
+          record.other_deductions || 0,
+          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+        )
+      );
+    }
+    if (statements.length > 0) {
+      await db.batch(statements);
+      await logActivity2(db, userEmail, "Update Visiting Paybill", `Updated visiting paybill records for ${monthYear}`);
+    }
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost4, "onRequestPost4");
+__name2(onRequestPost4, "onRequestPost");
+async function onRequestDelete(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  if (userRole === "viewer") {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+  }
+  try {
+    const monthYear = context.params.month_year;
+    const url = new URL(context.request.url);
+    const empId = url.searchParams.get("emp_id");
+    if (!empId) {
+      return new Response(JSON.stringify({ error: "Missing emp_id parameter." }), { status: 400 });
+    }
+    const db = context.env.ksom_payslip_db;
+    const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
+    if (approvalCheck && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    }
+    const deleteEarnings = db.prepare("DELETE FROM visiting_monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+    const deleteDeductions = db.prepare("DELETE FROM visiting_monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
+    await db.batch([deleteEarnings, deleteDeductions]);
+    await logActivity2(db, userEmail, "Delete Visiting Paybill Record", `Deleted visiting paybill record for employee ${empId} for ${monthYear}`);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestDelete, "onRequestDelete");
+__name2(onRequestDelete, "onRequestDelete");
+async function onRequestPost5(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -232,9 +618,9 @@ async function onRequestPost2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost2, "onRequestPost2");
-__name2(onRequestPost2, "onRequestPost");
-async function onRequestGet2(context) {
+__name(onRequestPost5, "onRequestPost5");
+__name2(onRequestPost5, "onRequestPost");
+async function onRequestGet7(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -251,9 +637,9 @@ async function onRequestGet2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet2, "onRequestGet2");
-__name2(onRequestGet2, "onRequestGet");
-async function onRequestPost3(context) {
+__name(onRequestGet7, "onRequestGet7");
+__name2(onRequestGet7, "onRequestGet");
+async function onRequestPost6(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -311,9 +697,9 @@ async function onRequestPost3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost3, "onRequestPost3");
-__name2(onRequestPost3, "onRequestPost");
-async function onRequestGet3(context) {
+__name(onRequestPost6, "onRequestPost6");
+__name2(onRequestPost6, "onRequestPost");
+async function onRequestGet8(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -331,9 +717,9 @@ async function onRequestGet3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet3, "onRequestGet3");
-__name2(onRequestGet3, "onRequestGet");
-async function onRequestPost4(context) {
+__name(onRequestGet8, "onRequestGet8");
+__name2(onRequestGet8, "onRequestGet");
+async function onRequestPost7(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -392,9 +778,9 @@ async function onRequestPost4(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost4, "onRequestPost4");
-__name2(onRequestPost4, "onRequestPost");
-async function onRequestGet4(context) {
+__name(onRequestPost7, "onRequestPost7");
+__name2(onRequestPost7, "onRequestPost");
+async function onRequestGet9(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -413,8 +799,8 @@ async function onRequestGet4(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet4, "onRequestGet4");
-__name2(onRequestGet4, "onRequestGet");
+__name(onRequestGet9, "onRequestGet9");
+__name2(onRequestGet9, "onRequestGet");
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -499,7 +885,7 @@ function timingSafeEqual(a, b) {
 }
 __name(timingSafeEqual, "timingSafeEqual");
 __name2(timingSafeEqual, "timingSafeEqual");
-async function onRequestPost5(context) {
+async function onRequestPost8(context) {
   const { request, env } = context;
   try {
     const { email, password, rememberMe } = await request.json();
@@ -550,9 +936,9 @@ async function onRequestPost5(context) {
     });
   }
 }
-__name(onRequestPost5, "onRequestPost5");
-__name2(onRequestPost5, "onRequestPost");
-async function onRequestGet5(context) {
+__name(onRequestPost8, "onRequestPost8");
+__name2(onRequestPost8, "onRequestPost");
+async function onRequestGet10(context) {
   const { request } = context;
   const url = new URL(request.url);
   return new Response(null, {
@@ -563,9 +949,9 @@ async function onRequestGet5(context) {
     }
   });
 }
-__name(onRequestGet5, "onRequestGet5");
-__name2(onRequestGet5, "onRequestGet");
-async function onRequestPost6(context) {
+__name(onRequestGet10, "onRequestGet10");
+__name2(onRequestGet10, "onRequestGet");
+async function onRequestPost9(context) {
   const { request, env } = context;
   try {
     const { email, token, password } = await request.json();
@@ -587,8 +973,8 @@ async function onRequestPost6(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost6, "onRequestPost6");
-__name2(onRequestPost6, "onRequestPost");
+__name(onRequestPost9, "onRequestPost9");
+__name2(onRequestPost9, "onRequestPost");
 async function getAccessToken(clientId, clientSecret, refreshToken) {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -647,7 +1033,7 @@ function base64url(str) {
 }
 __name(base64url, "base64url");
 __name2(base64url, "base64url");
-async function onRequestPost7(context) {
+async function onRequestPost10(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   try {
@@ -689,9 +1075,86 @@ This link expires in 1 hour.`
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost7, "onRequestPost7");
-__name2(onRequestPost7, "onRequestPost");
-async function onRequestPost8(context) {
+__name(onRequestPost10, "onRequestPost10");
+__name2(onRequestPost10, "onRequestPost");
+async function onRequestGet11(context) {
+  try {
+    const userEmail = context.request.headers.get("X-User-Email");
+    const userRole = context.request.headers.get("X-User-Role");
+    const url = new URL(context.request.url);
+    const fy = url.searchParams.get("fy");
+    let query = "SELECT * FROM visiting_employees ORDER BY sort_order ASC, name ASC";
+    let params = [];
+    if (userRole !== "admin" && userRole !== "super_admin" && userEmail) {
+      query = "SELECT * FROM visiting_employees WHERE LOWER(email_id) = LOWER(?) ORDER BY sort_order ASC, name ASC";
+      params = [userEmail];
+    } else if (fy) {
+      const startMonth = `${fy}-03`;
+      const endMonth = `${parseInt(fy) + 1}-02`;
+      query = `SELECT * FROM visiting_employees 
+               WHERE emp_id IN (
+                 SELECT DISTINCT emp_id FROM visiting_monthly_earnings WHERE month_year >= ? AND month_year <= ?
+               ) 
+               ORDER BY sort_order ASC, name ASC`;
+      params = [startMonth, endMonth];
+    }
+    const { results } = await context.env.ksom_payslip_db.prepare(
+      query
+    ).bind(...params).all();
+    return new Response(JSON.stringify(results), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet11, "onRequestGet11");
+__name2(onRequestGet11, "onRequestGet");
+async function onRequestPost11(context) {
+  try {
+    const data = await context.request.json();
+    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order } = data;
+    const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
+    const sOrder = typeof sort_order !== "undefined" ? Number(sort_order) : 0;
+    const payVal = typeof pay !== "undefined" ? Number(pay) : 0;
+    await context.env.ksom_payslip_db.prepare(
+      `INSERT INTO visiting_employees (emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder).run();
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 201
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost11, "onRequestPost11");
+__name2(onRequestPost11, "onRequestPost");
+async function onRequestPut(context) {
+  try {
+    const data = await context.request.json();
+    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order } = data;
+    const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
+    const sOrder = typeof sort_order !== "undefined" ? Number(sort_order) : 0;
+    const payVal = typeof pay !== "undefined" ? Number(pay) : 0;
+    await context.env.ksom_payslip_db.prepare(
+      `UPDATE visiting_employees 
+       SET name = ?, designation = ?, date_of_birth = ?, date_of_joining = ?, 
+           pay_type = ?, pay = ?, email_id = ?, mob_no = ?, is_active = ?, title = ?, sort_order = ?
+       WHERE emp_id = ?`
+    ).bind(name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder, emp_id).run();
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+      status: 200
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPut, "onRequestPut");
+__name2(onRequestPut, "onRequestPut");
+async function onRequestPost12(context) {
   const { request, env, data } = context;
   if (!data.user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -721,9 +1184,9 @@ async function onRequestPost8(context) {
     });
   }
 }
-__name(onRequestPost8, "onRequestPost8");
-__name2(onRequestPost8, "onRequestPost");
-async function onRequestGet6(context) {
+__name(onRequestPost12, "onRequestPost12");
+__name2(onRequestPost12, "onRequestPost");
+async function onRequestGet12(context) {
   try {
     const { request, env } = context;
     const url = new URL(request.url);
@@ -794,9 +1257,9 @@ async function onRequestGet6(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet6, "onRequestGet6");
-__name2(onRequestGet6, "onRequestGet");
-async function onRequestGet7(context) {
+__name(onRequestGet12, "onRequestGet12");
+__name2(onRequestGet12, "onRequestGet");
+async function onRequestGet13(context) {
   try {
     const { request, env } = context;
     const url = new URL(request.url);
@@ -860,9 +1323,9 @@ async function onRequestGet7(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet7, "onRequestGet7");
-__name2(onRequestGet7, "onRequestGet");
-async function onRequestGet8(context) {
+__name(onRequestGet13, "onRequestGet13");
+__name2(onRequestGet13, "onRequestGet");
+async function onRequestGet14(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const { results } = await context.env.ksom_payslip_db.prepare(
@@ -879,9 +1342,9 @@ async function onRequestGet8(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet8, "onRequestGet8");
-__name2(onRequestGet8, "onRequestGet");
-async function onRequestPost9(context) {
+__name(onRequestGet14, "onRequestGet14");
+__name2(onRequestGet14, "onRequestGet");
+async function onRequestPost13(context) {
   try {
     const data = await context.request.json();
     const { backup_email, frequency, is_enabled } = data;
@@ -908,9 +1371,9 @@ async function onRequestPost9(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost9, "onRequestPost9");
-__name2(onRequestPost9, "onRequestPost");
-async function onRequestGet9(context) {
+__name(onRequestPost13, "onRequestPost13");
+__name2(onRequestPost13, "onRequestPost");
+async function onRequestGet15(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden. Only super admins can view logs." }), {
@@ -957,9 +1420,9 @@ async function onRequestGet9(context) {
     });
   }
 }
-__name(onRequestGet9, "onRequestGet9");
-__name2(onRequestGet9, "onRequestGet");
-async function onRequestGet10(context) {
+__name(onRequestGet15, "onRequestGet15");
+__name2(onRequestGet15, "onRequestGet");
+async function onRequestGet16(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const settings = await db.prepare("SELECT * FROM system_settings").all();
@@ -974,9 +1437,9 @@ async function onRequestGet10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet10, "onRequestGet10");
-__name2(onRequestGet10, "onRequestGet");
-async function onRequestPost10(context) {
+__name(onRequestGet16, "onRequestGet16");
+__name2(onRequestGet16, "onRequestGet");
+async function onRequestPost14(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole !== "super_admin") {
@@ -1005,9 +1468,9 @@ async function onRequestPost10(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost10, "onRequestPost10");
-__name2(onRequestPost10, "onRequestPost");
-async function onRequestGet11(context) {
+__name(onRequestPost14, "onRequestPost14");
+__name2(onRequestPost14, "onRequestPost");
+async function onRequestGet17(context) {
   try {
     const url = new URL(context.request.url);
     const empId = url.searchParams.get("emp_id");
@@ -1030,9 +1493,9 @@ async function onRequestGet11(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet11, "onRequestGet11");
-__name2(onRequestGet11, "onRequestGet");
-async function onRequestPost11(context) {
+__name(onRequestGet17, "onRequestGet17");
+__name2(onRequestGet17, "onRequestGet");
+async function onRequestPost15(context) {
   const { request, env, data } = context;
   if (data.user.role !== "super_admin") {
     return new Response(JSON.stringify({ error: "Forbidden: Super Admin only" }), {
@@ -1068,9 +1531,9 @@ async function onRequestPost11(context) {
     });
   }
 }
-__name(onRequestPost11, "onRequestPost11");
-__name2(onRequestPost11, "onRequestPost");
-async function onRequestPost12(context) {
+__name(onRequestPost15, "onRequestPost15");
+__name2(onRequestPost15, "onRequestPost");
+async function onRequestPost16(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -1128,9 +1591,9 @@ async function onRequestPost12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost12, "onRequestPost12");
-__name2(onRequestPost12, "onRequestPost");
-async function onRequestGet12(context) {
+__name(onRequestPost16, "onRequestPost16");
+__name2(onRequestPost16, "onRequestPost");
+async function onRequestGet18(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
@@ -1148,9 +1611,9 @@ async function onRequestGet12(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet12, "onRequestGet12");
-__name2(onRequestGet12, "onRequestGet");
-async function onRequestGet13(context) {
+__name(onRequestGet18, "onRequestGet18");
+__name2(onRequestGet18, "onRequestGet");
+async function onRequestGet19(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1190,9 +1653,9 @@ async function onRequestGet13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet13, "onRequestGet13");
-__name2(onRequestGet13, "onRequestGet");
-async function onRequestPost13(context) {
+__name(onRequestGet19, "onRequestGet19");
+__name2(onRequestGet19, "onRequestGet");
+async function onRequestPost17(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1265,9 +1728,9 @@ async function onRequestPost13(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost13, "onRequestPost13");
-__name2(onRequestPost13, "onRequestPost");
-async function onRequestGet14(context) {
+__name(onRequestPost17, "onRequestPost17");
+__name2(onRequestPost17, "onRequestPost");
+async function onRequestGet20(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1293,9 +1756,9 @@ async function onRequestGet14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet14, "onRequestGet14");
-__name2(onRequestGet14, "onRequestGet");
-async function onRequestPost14(context) {
+__name(onRequestGet20, "onRequestGet20");
+__name2(onRequestGet20, "onRequestGet");
+async function onRequestPost18(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -1354,9 +1817,9 @@ async function onRequestPost14(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost14, "onRequestPost14");
-__name2(onRequestPost14, "onRequestPost");
-async function onRequestGet15(context) {
+__name(onRequestPost18, "onRequestPost18");
+__name2(onRequestPost18, "onRequestPost");
+async function onRequestGet21(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1387,9 +1850,9 @@ async function onRequestGet15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet15, "onRequestGet15");
-__name2(onRequestGet15, "onRequestGet");
-async function onRequestPost15(context) {
+__name(onRequestGet21, "onRequestGet21");
+__name2(onRequestGet21, "onRequestGet");
+async function onRequestPost19(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1490,9 +1953,9 @@ async function onRequestPost15(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost15, "onRequestPost15");
-__name2(onRequestPost15, "onRequestPost");
-async function onRequestDelete(context) {
+__name(onRequestPost19, "onRequestPost19");
+__name2(onRequestPost19, "onRequestPost");
+async function onRequestDelete2(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1522,9 +1985,9 @@ async function onRequestDelete(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete, "onRequestDelete");
-__name2(onRequestDelete, "onRequestDelete");
-async function onRequestGet16(context) {
+__name(onRequestDelete2, "onRequestDelete2");
+__name2(onRequestDelete2, "onRequestDelete");
+async function onRequestGet22(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1552,9 +2015,9 @@ async function onRequestGet16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet16, "onRequestGet16");
-__name2(onRequestGet16, "onRequestGet");
-async function onRequestPost16(context) {
+__name(onRequestGet22, "onRequestGet22");
+__name2(onRequestGet22, "onRequestGet");
+async function onRequestPost20(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1617,9 +2080,9 @@ async function onRequestPost16(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost16, "onRequestPost16");
-__name2(onRequestPost16, "onRequestPost");
-async function onRequestGet17(context) {
+__name(onRequestPost20, "onRequestPost20");
+__name2(onRequestPost20, "onRequestPost");
+async function onRequestGet23(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1648,9 +2111,9 @@ async function onRequestGet17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet17, "onRequestGet17");
-__name2(onRequestGet17, "onRequestGet");
-async function onRequestPost17(context) {
+__name(onRequestGet23, "onRequestGet23");
+__name2(onRequestGet23, "onRequestGet");
+async function onRequestPost21(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1755,9 +2218,9 @@ async function onRequestPost17(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost17, "onRequestPost17");
-__name2(onRequestPost17, "onRequestPost");
-async function onRequestDelete2(context) {
+__name(onRequestPost21, "onRequestPost21");
+__name2(onRequestPost21, "onRequestPost");
+async function onRequestDelete3(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1787,9 +2250,9 @@ async function onRequestDelete2(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete2, "onRequestDelete2");
-__name2(onRequestDelete2, "onRequestDelete");
-async function onRequestGet18(context) {
+__name(onRequestDelete3, "onRequestDelete3");
+__name2(onRequestDelete3, "onRequestDelete");
+async function onRequestGet24(context) {
   try {
     const monthYear = context.params.month_year;
     const userRole = context.request.headers.get("X-User-Role");
@@ -1819,9 +2282,9 @@ async function onRequestGet18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet18, "onRequestGet18");
-__name2(onRequestGet18, "onRequestGet");
-async function onRequestPost18(context) {
+__name(onRequestGet24, "onRequestGet24");
+__name2(onRequestGet24, "onRequestGet");
+async function onRequestPost22(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -1900,8 +2363,8 @@ async function onRequestPost18(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost18, "onRequestPost18");
-__name2(onRequestPost18, "onRequestPost");
+__name(onRequestPost22, "onRequestPost22");
+__name2(onRequestPost22, "onRequestPost");
 async function generateBackupSql(db) {
   const { results: tables } = await db.prepare(
     "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
@@ -2023,7 +2486,7 @@ async function checkAndRunScheduledBackup(env, waitUntil) {
 }
 __name(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
 __name2(checkAndRunScheduledBackup, "checkAndRunScheduledBackup");
-async function onRequestGet19(context) {
+async function onRequestGet25(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const sqlDump = await generateBackupSql(db);
@@ -2037,9 +2500,9 @@ async function onRequestGet19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet19, "onRequestGet19");
-__name2(onRequestGet19, "onRequestGet");
-async function onRequestPost19(context) {
+__name(onRequestGet25, "onRequestGet25");
+__name2(onRequestGet25, "onRequestGet");
+async function onRequestPost23(context) {
   try {
     const db = context.env.ksom_payslip_db;
     const { sql } = await context.request.json();
@@ -2056,9 +2519,9 @@ async function onRequestPost19(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost19, "onRequestPost19");
-__name2(onRequestPost19, "onRequestPost");
-async function onRequestPost20(context) {
+__name(onRequestPost23, "onRequestPost23");
+__name2(onRequestPost23, "onRequestPost");
+async function onRequestPost24(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -2103,9 +2566,9 @@ async function onRequestPost20(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost20, "onRequestPost20");
-__name2(onRequestPost20, "onRequestPost");
-async function onRequestGet20(context) {
+__name(onRequestPost24, "onRequestPost24");
+__name2(onRequestPost24, "onRequestPost");
+async function onRequestGet26(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
@@ -2155,9 +2618,9 @@ async function onRequestGet20(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet20, "onRequestGet20");
-__name2(onRequestGet20, "onRequestGet");
-async function onRequestPost21(context) {
+__name(onRequestGet26, "onRequestGet26");
+__name2(onRequestGet26, "onRequestGet");
+async function onRequestPost25(context) {
   try {
     const data = await context.request.json();
     const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order } = data;
@@ -2175,9 +2638,9 @@ async function onRequestPost21(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost21, "onRequestPost21");
-__name2(onRequestPost21, "onRequestPost");
-async function onRequestPut(context) {
+__name(onRequestPost25, "onRequestPost25");
+__name2(onRequestPost25, "onRequestPost");
+async function onRequestPut2(context) {
   try {
     const data = await context.request.json();
     const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order } = data;
@@ -2197,9 +2660,9 @@ async function onRequestPut(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPut, "onRequestPut");
-__name2(onRequestPut, "onRequestPut");
-async function onRequestGet21(context) {
+__name(onRequestPut2, "onRequestPut2");
+__name2(onRequestPut2, "onRequestPut");
+async function onRequestGet27(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -2211,9 +2674,9 @@ async function onRequestGet21(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet21, "onRequestGet21");
-__name2(onRequestGet21, "onRequestGet");
-async function onRequestPost22(context) {
+__name(onRequestGet27, "onRequestGet27");
+__name2(onRequestGet27, "onRequestGet");
+async function onRequestPost26(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -2240,9 +2703,9 @@ async function onRequestPost22(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost22, "onRequestPost22");
-__name2(onRequestPost22, "onRequestPost");
-async function onRequestGet22(context) {
+__name(onRequestPost26, "onRequestPost26");
+__name2(onRequestPost26, "onRequestPost");
+async function onRequestGet28(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -2254,9 +2717,9 @@ async function onRequestGet22(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet22, "onRequestGet22");
-__name2(onRequestGet22, "onRequestGet");
-async function onRequestPost23(context) {
+__name(onRequestGet28, "onRequestGet28");
+__name2(onRequestGet28, "onRequestGet");
+async function onRequestPost27(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
     const data = await context.request.json();
@@ -2280,9 +2743,9 @@ async function onRequestPost23(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost23, "onRequestPost23");
-__name2(onRequestPost23, "onRequestPost");
-async function onRequestDelete3(context) {
+__name(onRequestPost27, "onRequestPost27");
+__name2(onRequestPost27, "onRequestPost");
+async function onRequestDelete4(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
     const url = new URL(context.request.url);
@@ -2298,8 +2761,8 @@ async function onRequestDelete3(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestDelete3, "onRequestDelete3");
-__name2(onRequestDelete3, "onRequestDelete");
+__name(onRequestDelete4, "onRequestDelete4");
+__name2(onRequestDelete4, "onRequestDelete");
 async function onRequest(context) {
   const { request, env, next, data } = context;
   const url = new URL(request.url);
@@ -2400,347 +2863,431 @@ __name(forbiddenResponse, "forbiddenResponse");
 __name2(forbiddenResponse, "forbiddenResponse");
 var routes = [
   {
-    routePath: "/api/arrears/approve/:month_year",
-    mountPath: "/api/arrears/approve",
+    routePath: "/api/reports/visiting/consolidated",
+    mountPath: "/api/reports/visiting",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet]
   },
   {
-    routePath: "/api/arrears/approve/:month_year",
-    mountPath: "/api/arrears/approve",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost]
-  },
-  {
-    routePath: "/api/festival/approve/:month_year",
-    mountPath: "/api/festival/approve",
+    routePath: "/api/reports/visiting/consolidated-all",
+    mountPath: "/api/reports/visiting",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet2]
   },
   {
-    routePath: "/api/festival/approve/:month_year",
-    mountPath: "/api/festival/approve",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost2]
-  },
-  {
-    routePath: "/api/supplementary/approve/:month_year",
-    mountPath: "/api/supplementary/approve",
+    routePath: "/api/approve/visiting/:month_year",
+    mountPath: "/api/approve/visiting",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet3]
   },
   {
+    routePath: "/api/approve/visiting/:month_year",
+    mountPath: "/api/approve/visiting",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost]
+  },
+  {
+    routePath: "/api/arrears/approve/:month_year",
+    mountPath: "/api/arrears/approve",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet4]
+  },
+  {
+    routePath: "/api/arrears/approve/:month_year",
+    mountPath: "/api/arrears/approve",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost2]
+  },
+  {
+    routePath: "/api/deductions/visiting/:month_year",
+    mountPath: "/api/deductions/visiting",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet5]
+  },
+  {
+    routePath: "/api/deductions/visiting/:month_year",
+    mountPath: "/api/deductions/visiting",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost3]
+  },
+  {
+    routePath: "/api/earnings/visiting/:month_year",
+    mountPath: "/api/earnings/visiting",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete]
+  },
+  {
+    routePath: "/api/earnings/visiting/:month_year",
+    mountPath: "/api/earnings/visiting",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet6]
+  },
+  {
+    routePath: "/api/earnings/visiting/:month_year",
+    mountPath: "/api/earnings/visiting",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost4]
+  },
+  {
+    routePath: "/api/festival/approve/:month_year",
+    mountPath: "/api/festival/approve",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet7]
+  },
+  {
+    routePath: "/api/festival/approve/:month_year",
+    mountPath: "/api/festival/approve",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost5]
+  },
+  {
+    routePath: "/api/supplementary/approve/:month_year",
+    mountPath: "/api/supplementary/approve",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet8]
+  },
+  {
     routePath: "/api/supplementary/approve/:month_year",
     mountPath: "/api/supplementary/approve",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost3]
+    modules: [onRequestPost6]
   },
   {
     routePath: "/api/surrender/approve/:month_year",
     mountPath: "/api/surrender/approve",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet4]
+    modules: [onRequestGet9]
   },
   {
     routePath: "/api/surrender/approve/:month_year",
     mountPath: "/api/surrender/approve",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost4]
+    modules: [onRequestPost7]
   },
   {
     routePath: "/api/auth/login",
     mountPath: "/api/auth",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost5]
+    modules: [onRequestPost8]
   },
   {
     routePath: "/api/auth/logout",
     mountPath: "/api/auth",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet5]
+    modules: [onRequestGet10]
   },
   {
     routePath: "/api/auth/reset-confirm",
     mountPath: "/api/auth",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost6]
+    modules: [onRequestPost9]
   },
   {
     routePath: "/api/auth/reset-request",
     mountPath: "/api/auth",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost7]
-  },
-  {
-    routePath: "/api/me/password",
-    mountPath: "/api/me",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost8]
-  },
-  {
-    routePath: "/api/reports/consolidated",
-    mountPath: "/api/reports",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet6]
-  },
-  {
-    routePath: "/api/reports/consolidated-all",
-    mountPath: "/api/reports",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet7]
-  },
-  {
-    routePath: "/api/settings/backup",
-    mountPath: "/api/settings",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet8]
-  },
-  {
-    routePath: "/api/settings/backup",
-    mountPath: "/api/settings",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost9]
-  },
-  {
-    routePath: "/api/settings/logs",
-    mountPath: "/api/settings",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet9]
-  },
-  {
-    routePath: "/api/settings/system",
-    mountPath: "/api/settings",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet10]
-  },
-  {
-    routePath: "/api/settings/system",
-    mountPath: "/api/settings",
-    method: "POST",
-    middlewares: [],
     modules: [onRequestPost10]
   },
   {
-    routePath: "/api/surrender/cumulative",
-    mountPath: "/api/surrender",
+    routePath: "/api/employees/visiting",
+    mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
     modules: [onRequestGet11]
   },
   {
-    routePath: "/api/users/password",
-    mountPath: "/api/users",
+    routePath: "/api/employees/visiting",
+    mountPath: "/api/employees",
     method: "POST",
     middlewares: [],
     modules: [onRequestPost11]
   },
   {
-    routePath: "/api/approve/:month_year",
-    mountPath: "/api/approve",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet12]
-  },
-  {
-    routePath: "/api/approve/:month_year",
-    mountPath: "/api/approve",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost12]
-  },
-  {
-    routePath: "/api/arrears/:month_year",
-    mountPath: "/api/arrears",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet13]
-  },
-  {
-    routePath: "/api/arrears/:month_year",
-    mountPath: "/api/arrears",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost13]
-  },
-  {
-    routePath: "/api/deductions/:month_year",
-    mountPath: "/api/deductions",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet14]
-  },
-  {
-    routePath: "/api/deductions/:month_year",
-    mountPath: "/api/deductions",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost14]
-  },
-  {
-    routePath: "/api/earnings/:month_year",
-    mountPath: "/api/earnings",
-    method: "DELETE",
-    middlewares: [],
-    modules: [onRequestDelete]
-  },
-  {
-    routePath: "/api/earnings/:month_year",
-    mountPath: "/api/earnings",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet15]
-  },
-  {
-    routePath: "/api/earnings/:month_year",
-    mountPath: "/api/earnings",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost15]
-  },
-  {
-    routePath: "/api/festival/:month_year",
-    mountPath: "/api/festival",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet16]
-  },
-  {
-    routePath: "/api/festival/:month_year",
-    mountPath: "/api/festival",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost16]
-  },
-  {
-    routePath: "/api/supplementary/:month_year",
-    mountPath: "/api/supplementary",
-    method: "DELETE",
-    middlewares: [],
-    modules: [onRequestDelete2]
-  },
-  {
-    routePath: "/api/supplementary/:month_year",
-    mountPath: "/api/supplementary",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet17]
-  },
-  {
-    routePath: "/api/supplementary/:month_year",
-    mountPath: "/api/supplementary",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost17]
-  },
-  {
-    routePath: "/api/surrender/:month_year",
-    mountPath: "/api/surrender",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet18]
-  },
-  {
-    routePath: "/api/surrender/:month_year",
-    mountPath: "/api/surrender",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost18]
-  },
-  {
-    routePath: "/api/backup",
-    mountPath: "/api",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet19]
-  },
-  {
-    routePath: "/api/backup",
-    mountPath: "/api",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost19]
-  },
-  {
-    routePath: "/api/email",
-    mountPath: "/api/email",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost20]
-  },
-  {
-    routePath: "/api/employees",
-    mountPath: "/api/employees",
-    method: "GET",
-    middlewares: [],
-    modules: [onRequestGet20]
-  },
-  {
-    routePath: "/api/employees",
-    mountPath: "/api/employees",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost21]
-  },
-  {
-    routePath: "/api/employees",
+    routePath: "/api/employees/visiting",
     mountPath: "/api/employees",
     method: "PUT",
     middlewares: [],
     modules: [onRequestPut]
   },
   {
+    routePath: "/api/me/password",
+    mountPath: "/api/me",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost12]
+  },
+  {
+    routePath: "/api/reports/consolidated",
+    mountPath: "/api/reports",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet12]
+  },
+  {
+    routePath: "/api/reports/consolidated-all",
+    mountPath: "/api/reports",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet13]
+  },
+  {
+    routePath: "/api/settings/backup",
+    mountPath: "/api/settings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet14]
+  },
+  {
+    routePath: "/api/settings/backup",
+    mountPath: "/api/settings",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost13]
+  },
+  {
+    routePath: "/api/settings/logs",
+    mountPath: "/api/settings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet15]
+  },
+  {
+    routePath: "/api/settings/system",
+    mountPath: "/api/settings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet16]
+  },
+  {
+    routePath: "/api/settings/system",
+    mountPath: "/api/settings",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost14]
+  },
+  {
+    routePath: "/api/surrender/cumulative",
+    mountPath: "/api/surrender",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet17]
+  },
+  {
+    routePath: "/api/users/password",
+    mountPath: "/api/users",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost15]
+  },
+  {
+    routePath: "/api/approve/:month_year",
+    mountPath: "/api/approve",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet18]
+  },
+  {
+    routePath: "/api/approve/:month_year",
+    mountPath: "/api/approve",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost16]
+  },
+  {
+    routePath: "/api/arrears/:month_year",
+    mountPath: "/api/arrears",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet19]
+  },
+  {
+    routePath: "/api/arrears/:month_year",
+    mountPath: "/api/arrears",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost17]
+  },
+  {
+    routePath: "/api/deductions/:month_year",
+    mountPath: "/api/deductions",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet20]
+  },
+  {
+    routePath: "/api/deductions/:month_year",
+    mountPath: "/api/deductions",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost18]
+  },
+  {
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete2]
+  },
+  {
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet21]
+  },
+  {
+    routePath: "/api/earnings/:month_year",
+    mountPath: "/api/earnings",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost19]
+  },
+  {
+    routePath: "/api/festival/:month_year",
+    mountPath: "/api/festival",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet22]
+  },
+  {
+    routePath: "/api/festival/:month_year",
+    mountPath: "/api/festival",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost20]
+  },
+  {
+    routePath: "/api/supplementary/:month_year",
+    mountPath: "/api/supplementary",
+    method: "DELETE",
+    middlewares: [],
+    modules: [onRequestDelete3]
+  },
+  {
+    routePath: "/api/supplementary/:month_year",
+    mountPath: "/api/supplementary",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet23]
+  },
+  {
+    routePath: "/api/supplementary/:month_year",
+    mountPath: "/api/supplementary",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost21]
+  },
+  {
+    routePath: "/api/surrender/:month_year",
+    mountPath: "/api/surrender",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet24]
+  },
+  {
+    routePath: "/api/surrender/:month_year",
+    mountPath: "/api/surrender",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost22]
+  },
+  {
+    routePath: "/api/backup",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet25]
+  },
+  {
+    routePath: "/api/backup",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost23]
+  },
+  {
+    routePath: "/api/email",
+    mountPath: "/api/email",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost24]
+  },
+  {
+    routePath: "/api/employees",
+    mountPath: "/api/employees",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet26]
+  },
+  {
+    routePath: "/api/employees",
+    mountPath: "/api/employees",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost25]
+  },
+  {
+    routePath: "/api/employees",
+    mountPath: "/api/employees",
+    method: "PUT",
+    middlewares: [],
+    modules: [onRequestPut2]
+  },
+  {
     routePath: "/api/settings",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet21]
+    modules: [onRequestGet27]
   },
   {
     routePath: "/api/settings",
     mountPath: "/api/settings",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost22]
+    modules: [onRequestPost26]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "DELETE",
     middlewares: [],
-    modules: [onRequestDelete3]
+    modules: [onRequestDelete4]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet22]
+    modules: [onRequestGet28]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost23]
+    modules: [onRequestPost27]
   },
   {
     routePath: "/",
@@ -3415,7 +3962,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-iVguTi/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-mDTSKa/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -3447,7 +3994,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-iVguTi/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-mDTSKa/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -3547,4 +4094,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.7923800838620553.js.map
+//# sourceMappingURL=functionsWorker-0.5547333456379823.js.map
