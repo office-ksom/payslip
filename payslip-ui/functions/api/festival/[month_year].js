@@ -6,21 +6,41 @@ export async function onRequestGet(context) {
     const userRole = context.request.headers.get('X-User-Role');
     const userEmail = context.request.headers.get('X-User-Email');
 
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category') || 'permanent';
+
+    let tableName = 'employees';
+    if (category === 'visiting') {
+      tableName = 'visiting_employees';
+    } else if (category === 'contract') {
+      tableName = 'contract_employees';
+    } else if (category === 'daily_wage') {
+      tableName = 'daily_wage_employees';
+    }
+
+    const isPerm = tableName === 'employees';
+    const payColumn = isPerm ? 'e.scale_of_pay' : 'e.pay_type as scale_of_pay';
+    const catColumn = isPerm ? 'e.category' : `'${category}' as category`;
+
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
              f.id as bill_id, f.bill_date, f.amount, f.description,
              f.is_approved, f.approved_on, f.approved_by
-      FROM employees e
+      FROM ${tableName} e
       LEFT JOIN festival_allowance_bills f ON e.emp_id = f.emp_id AND substr(f.bill_date, 1, 7) = ?
     `;
     let params = [monthYear];
 
+    let whereClauses = [];
     if (userRole === 'viewer' && userEmail) {
-      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
+      whereClauses.push("LOWER(e.email_id) = LOWER(?)");
       params.push(userEmail);
     } else {
-      // In active bill generation page, we want only active employees or those who have bills
-      query += ` WHERE e.is_active = 1 OR f.id IS NOT NULL`;
+      whereClauses.push("(e.is_active = 1 OR f.id IS NOT NULL)");
+    }
+
+    if (whereClauses.length > 0) {
+      query += " WHERE " + whereClauses.join(" AND ");
     }
 
     query += ` ORDER BY e.sort_order ASC, e.name ASC`;
@@ -61,17 +81,19 @@ export async function onRequestPost(context) {
       if (record.amount && record.amount > 0) {
         statements.push(
           db.prepare(`
-            INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, is_approved)
-            VALUES (?, ?, ?, ?, 2)
+            INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, category, is_approved)
+            VALUES (?, ?, ?, ?, ?, 2)
             ON CONFLICT(emp_id, bill_date) DO UPDATE SET
               amount = excluded.amount,
               description = excluded.description,
+              category = excluded.category,
               is_approved = 2
           `).bind(
             record.emp_id,
             record.amount || 0,
             record.bill_date,
-            record.description || null
+            record.description || null,
+            record.category || 'permanent'
           )
         );
       } else {

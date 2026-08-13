@@ -33,13 +33,43 @@ const emptyVisitingForm = {
   is_active: 1
 };
 
+const emptyContractForm = {
+  emp_id: '',
+  title: 'Mr.',
+  name: '',
+  sort_order: 0,
+  designation: 'Maintenance Engineer',
+  pay_type: 'Consolidated Salary',
+  pay: '',
+  date_of_birth: '',
+  date_of_joining: '',
+  mob_no: '',
+  email_id: '',
+  is_active: 1
+};
+
+const emptyDailyWageForm = {
+  emp_id: '',
+  title: 'Mr.',
+  name: '',
+  sort_order: 0,
+  designation: 'Electrician',
+  pay_type: 'Consolidated Salary',
+  pay: '',
+  date_of_birth: '',
+  date_of_joining: '',
+  mob_no: '',
+  email_id: '',
+  is_active: 1
+};
+
 const Employees = () => {
   const { user } = useOutletContext();
   if (user && user.role === 'viewer') {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
   }
   
-  const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting'
+  const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting', 'contract', 'daily_wage'
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -56,7 +86,10 @@ const Employees = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'permanent' ? '/api/employees' : '/api/employees/visiting';
+      const endpoint = activeTab === 'permanent' ? '/api/employees' 
+                     : activeTab === 'visiting' ? '/api/employees/visiting'
+                     : activeTab === 'contract' ? '/api/employees/contract'
+                     : '/api/employees/daily_wage';
       const res = await fetch(endpoint);
       if (res.ok) setEmployees(await res.json());
     } catch (err) {
@@ -71,8 +104,15 @@ const Employees = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const getEmptyFormForTab = (tab) => {
+    if (tab === 'permanent') return emptyForm;
+    if (tab === 'visiting') return emptyVisitingForm;
+    if (tab === 'contract') return emptyContractForm;
+    return emptyDailyWageForm;
+  };
+
   const openAddForm = () => {
-    setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
+    setFormData(getEmptyFormForTab(activeTab));
     setIsEditMode(false);
     setShowForm(true);
     setMessage(null);
@@ -98,11 +138,11 @@ const Employees = () => {
     } else {
       setFormData({
         emp_id: emp.emp_id || '',
-        title: emp.title || 'Dr.',
+        title: emp.title || (activeTab === 'visiting' ? 'Dr.' : 'Mr.'),
         name: emp.name || '',
         sort_order: emp.sort_order || 0,
-        designation: emp.designation || 'Visiting Professor',
-        pay_type: emp.pay_type || 'Honorarium',
+        designation: emp.designation || (activeTab === 'visiting' ? 'Visiting Professor' : activeTab === 'contract' ? 'Maintenance Engineer' : 'Electrician'),
+        pay_type: emp.pay_type || (activeTab === 'visiting' ? 'Honorarium' : 'Consolidated Salary'),
         pay: emp.pay || '',
         date_of_birth: emp.date_of_birth || '',
         date_of_joining: emp.date_of_joining || '',
@@ -120,7 +160,7 @@ const Employees = () => {
   const handleCancel = () => {
     setShowForm(false);
     setIsEditMode(false);
-    setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
+    setFormData(getEmptyFormForTab(activeTab));
     setMessage(null);
   };
 
@@ -130,7 +170,10 @@ const Employees = () => {
     setMessage(null);
     try {
       const method = isEditMode ? 'PUT' : 'POST';
-      const endpoint = activeTab === 'permanent' ? '/api/employees' : '/api/employees/visiting';
+      const endpoint = activeTab === 'permanent' ? '/api/employees' 
+                     : activeTab === 'visiting' ? '/api/employees/visiting'
+                     : activeTab === 'contract' ? '/api/employees/contract'
+                     : '/api/employees/daily_wage';
       const res = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +183,7 @@ const Employees = () => {
         setMessage({ type: 'success', text: isEditMode ? 'Employee updated successfully!' : 'Employee added successfully!' });
         setShowForm(false);
         setIsEditMode(false);
-        setFormData(activeTab === 'permanent' ? emptyForm : emptyVisitingForm);
+        setFormData(getEmptyFormForTab(activeTab));
         fetchEmployees();
       } else {
         const err = await res.json();
@@ -175,7 +218,7 @@ const Employees = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <button 
           onClick={() => { setActiveTab('permanent'); setShowForm(false); }}
           style={{
@@ -208,7 +251,41 @@ const Employees = () => {
             outline: 'none'
           }}
         >
-          Visiting Professors & Assistant Professors
+          Visiting Faculty
+        </button>
+        <button 
+          onClick={() => { setActiveTab('contract'); setShowForm(false); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'contract' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'contract' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Contract Staff
+        </button>
+        <button 
+          onClick={() => { setActiveTab('daily_wage'); setShowForm(false); }}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'daily_wage' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'daily_wage' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none'
+          }}
+        >
+          Daily Wage Staff
         </button>
       </div>
 
@@ -346,14 +423,25 @@ const Employees = () => {
                   <div className="form-group">
                     <label className="form-label">Employee ID *</label>
                     <input required type="text" name="emp_id" value={formData.emp_id} onChange={handleInputChange}
-                      className="form-control" placeholder="e.g., V001"
+                      className="form-control" placeholder={activeTab === 'visiting' ? "e.g., V001" : activeTab === 'contract' ? "e.g., C001" : "e.g., D001"}
                       disabled={isEditMode} style={isEditMode ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Title</label>
                     <select name="title" value={formData.title} onChange={handleInputChange} className="form-control">
-                      <option value="Dr.">Dr.</option>
-                      <option value="Prof.">Prof.</option>
+                      {activeTab === 'visiting' ? (
+                        <>
+                          <option value="Dr.">Dr.</option>
+                          <option value="Prof.">Prof.</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Mr.">Mr.</option>
+                          <option value="Ms.">Ms.</option>
+                          <option value="Mrs.">Mrs.</option>
+                          <option value="Dr.">Dr.</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -375,15 +463,42 @@ const Employees = () => {
                   <div className="form-group">
                     <label className="form-label">Designation</label>
                     <select name="designation" value={formData.designation} onChange={handleInputChange} className="form-control">
-                      <option value="Visiting Professor">Visiting Professor</option>
-                      <option value="Visiting Assistant Professor">Visiting Assistant Professor</option>
+                      {activeTab === 'visiting' && (
+                        <>
+                          <option value="Visiting Professor">Visiting Professor</option>
+                          <option value="Visiting Assistant Professor">Visiting Assistant Professor</option>
+                        </>
+                      )}
+                      {activeTab === 'contract' && (
+                        <>
+                          <option value="Maintenance Engineer">Maintenance Engineer</option>
+                          <option value="Technical Assistant">Technical Assistant</option>
+                        </>
+                      )}
+                      {activeTab === 'daily_wage' && (
+                        <>
+                          <option value="Electrician">Electrician</option>
+                          <option value="Clerical Assistant">Clerical Assistant</option>
+                          <option value="Gardner">Gardner</option>
+                          <option value="Helper">Helper</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Pay Type</label>
                     <select name="pay_type" value={formData.pay_type} onChange={handleInputChange} className="form-control">
-                      <option value="Honorarium">Honorarium</option>
-                      <option value="Consolidated Salary">Consolidated Salary</option>
+                      {activeTab === 'visiting' ? (
+                        <>
+                          <option value="Honorarium">Honorarium</option>
+                          <option value="Consolidated Salary">Consolidated Salary</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Consolidated Salary">Consolidated Salary</option>
+                          <option value="Daily Wage">Daily Wage</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -445,7 +560,10 @@ const Employees = () => {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.125rem' }}>
-            {activeTab === 'permanent' ? 'All Permanent Employees' : 'All Visiting Faculty'} ({filteredEmployees.length})
+            {activeTab === 'permanent' ? 'All Permanent Employees' 
+             : activeTab === 'visiting' ? 'All Visiting Faculty' 
+             : activeTab === 'contract' ? 'All Contract Staff' 
+             : 'All Daily Wage Staff'} ({filteredEmployees.length})
           </h3>
           <div style={{ position: 'relative', width: '260px' }}>
             <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />

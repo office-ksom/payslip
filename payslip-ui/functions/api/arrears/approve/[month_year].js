@@ -8,6 +8,9 @@ export async function onRequestPost(context) {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
 
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category');
+
     // Fetch require_approval setting
     const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first('value');
     const requireApproval = settingsCheck !== '0';
@@ -35,6 +38,10 @@ export async function onRequestPost(context) {
       existsQuery += " AND arrear_type = ?";
       existsParams.push(arrearType);
     }
+    if (category) {
+      existsQuery += " AND category = ?";
+      existsParams.push(category);
+    }
 
     const exists = await db.prepare(existsQuery).bind(...existsParams).first('count');
 
@@ -61,6 +68,10 @@ export async function onRequestPost(context) {
       updateParams = [now, userEmail, monthYear];
     }
 
+    if (category) {
+      updateQuery += " AND category = ?";
+      updateParams.push(category);
+    }
     if (empIds && empIds.length > 0) {
       updateQuery += ` AND emp_id IN (${empIds.map(() => '?').join(',')})`;
       updateParams.push(...empIds);
@@ -74,7 +85,8 @@ export async function onRequestPost(context) {
 
     const actionText = action === 'reject' ? 'Rejected' : 'Verified & Locked';
     const typeText = arrearType ? ` (${arrearType})` : '';
-    await logActivity(db, userEmail, 'Arrear Bill Action', `${actionText} arrear bill(s)${typeText} for ${monthYear}`);
+    const catText = category ? ` for ${category}` : '';
+    await logActivity(db, userEmail, 'Arrear Bill Action', `${actionText} arrear bill(s)${typeText}${catText} for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true, approved_on: action === 'reject' ? null : now, approved_by: action === 'reject' ? null : userEmail }), {
       headers: { 'Content-Type': 'application/json' }
@@ -91,6 +103,7 @@ export async function onRequestGet(context) {
 
     const url = new URL(context.request.url);
     const arrearType = url.searchParams.get('type');
+    const category = url.searchParams.get('category');
 
     let query = `
       SELECT is_approved, approved_on, approved_by 
@@ -102,6 +115,10 @@ export async function onRequestGet(context) {
     if (arrearType) {
       query += " AND arrear_type = ?";
       params.push(arrearType);
+    }
+    if (category) {
+      query += " AND category = ?";
+      params.push(category);
     }
 
     query += " LIMIT 1";

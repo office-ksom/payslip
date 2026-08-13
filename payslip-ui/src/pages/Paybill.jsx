@@ -21,7 +21,8 @@ const Paybill = (props) => {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
   }
 
-  const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting'
+  const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting', 'contract', 'daily_wage'
+  const [dailyWageMaxLimit, setDailyWageMaxLimit] = useState(20000);
   const [monthYear, setMonthYear] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -64,6 +65,28 @@ const Paybill = (props) => {
     }
   }, [monthYear, user, activeTab]);
 
+  const getTabEndpoints = (tab, targetMonth) => {
+    let earn, dedux, approve;
+    if (tab === 'permanent') {
+      earn = `/api/earnings/${targetMonth}`;
+      dedux = `/api/deductions/${targetMonth}`;
+      approve = `/api/approve/${targetMonth}`;
+    } else if (tab === 'visiting') {
+      earn = `/api/earnings/visiting/${targetMonth}`;
+      dedux = `/api/deductions/visiting/${targetMonth}`;
+      approve = `/api/approve/visiting/${targetMonth}`;
+    } else if (tab === 'contract') {
+      earn = `/api/earnings/contract/${targetMonth}`;
+      dedux = `/api/deductions/contract/${targetMonth}`;
+      approve = `/api/approve/contract/${targetMonth}`;
+    } else {
+      earn = `/api/earnings/daily_wage/${targetMonth}`;
+      dedux = `/api/deductions/daily_wage/${targetMonth}`;
+      approve = `/api/approve/daily_wage/${targetMonth}`;
+    }
+    return { earn, dedux, approve };
+  };
+
   const loadDataForMonth = async (targetMonth) => {
     setLoading(true);
     try {
@@ -72,6 +95,9 @@ const Paybill = (props) => {
         if (sysRes.ok) {
           const sysData = await sysRes.json();
           setRequireApproval(sysData.require_approval !== '0');
+          if (sysData.daily_wage_max_limit) {
+            setDailyWageMaxLimit(parseFloat(sysData.daily_wage_max_limit) || 20000);
+          }
         }
       } catch (e) {
         console.error("Failed to load system settings", e);
@@ -84,8 +110,7 @@ const Paybill = (props) => {
         setGlobalSettingsList([]);
       }
 
-      const earnEndpoint = activeTab === 'permanent' ? `/api/earnings/${targetMonth}` : `/api/earnings/visiting/${targetMonth}`;
-      const deduxEndpoint = activeTab === 'permanent' ? `/api/deductions/${targetMonth}` : `/api/deductions/visiting/${targetMonth}`;
+      const { earn: earnEndpoint, dedux: deduxEndpoint, approve: approveEndpoint } = getTabEndpoints(activeTab, targetMonth);
 
       const earnRes = await fetch(earnEndpoint);
       if (!earnRes.ok) throw new Error("Failed to load earnings");
@@ -95,7 +120,6 @@ const Paybill = (props) => {
       if (!deduxRes.ok) throw new Error("Failed to load deductions");
       const deduxData = await deduxRes.json();
 
-      const approveEndpoint = activeTab === 'permanent' ? `/api/approve/${targetMonth}` : `/api/approve/visiting/${targetMonth}`;
       try {
         const approvalRes = await fetch(approveEndpoint);
         if (approvalRes.ok) {
@@ -144,8 +168,39 @@ const Paybill = (props) => {
             onam_advance: d.onam_advance || 0,
             hra_recovery: d.hra_recovery || 0,
             other_deductions: d.other_deductions || 0,
-            other_earnings_breakdown: empEarn.other_earnings_breakdown ? JSON.parse(empEarn.other_earnings_breakdown) : [],
-            other_deductions_breakdown: d.other_deductions_breakdown ? JSON.parse(d.other_deductions_breakdown) : [],
+            other_earnings_breakdown: empEarn.other_earnings_breakdown ? (typeof empEarn.other_earnings_breakdown === 'string' ? JSON.parse(empEarn.other_earnings_breakdown) : empEarn.other_earnings_breakdown) : [],
+            other_deductions_breakdown: d.other_deductions_breakdown ? (typeof d.other_deductions_breakdown === 'string' ? JSON.parse(d.other_deductions_breakdown) : d.other_deductions_breakdown) : [],
+          };
+        } else if (activeTab === 'contract') {
+          return {
+            ...empEarn,
+            basic_pay: empEarn.basic_pay !== null && empEarn.basic_pay !== undefined ? empEarn.basic_pay : (empEarn.pay || 0),
+            income_tax: d.income_tax || 0,
+            hra: d.hra || 0,
+            epf: d.epf || 0,
+            other_earnings: empEarn.other_earnings || 0,
+            other_deductions: d.other_deductions || 0,
+            other_earnings_breakdown: empEarn.other_earnings_breakdown ? (typeof empEarn.other_earnings_breakdown === 'string' ? JSON.parse(empEarn.other_earnings_breakdown) : empEarn.other_earnings_breakdown) : [],
+            other_deductions_breakdown: d.other_deductions_breakdown ? (typeof d.other_deductions_breakdown === 'string' ? JSON.parse(d.other_deductions_breakdown) : d.other_deductions_breakdown) : [],
+          };
+        } else if (activeTab === 'daily_wage') {
+          const days = empEarn.days_worked !== null && empEarn.days_worked !== undefined ? empEarn.days_worked : 0;
+          const rate = empEarn.daily_wage !== null && empEarn.daily_wage !== undefined ? empEarn.daily_wage : (empEarn.pay || 0);
+          const limit = parseFloat(dailyWageMaxLimit) || 20000;
+          const totalWage = empEarn.total_wage !== null && empEarn.total_wage !== undefined ? empEarn.total_wage : Math.min(days * rate, limit);
+          return {
+            ...empEarn,
+            days_worked: days,
+            daily_wage: rate,
+            total_wage: totalWage,
+            basic_pay: totalWage,
+            income_tax: d.income_tax || 0,
+            hra: d.hra || 0,
+            epf: d.epf || 0,
+            other_earnings: empEarn.other_earnings || 0,
+            other_deductions: d.other_deductions || 0,
+            other_earnings_breakdown: empEarn.other_earnings_breakdown ? (typeof empEarn.other_earnings_breakdown === 'string' ? JSON.parse(empEarn.other_earnings_breakdown) : empEarn.other_earnings_breakdown) : [],
+            other_deductions_breakdown: d.other_deductions_breakdown ? (typeof d.other_deductions_breakdown === 'string' ? JSON.parse(d.other_deductions_breakdown) : d.other_deductions_breakdown) : [],
           };
         } else {
           return {
@@ -155,8 +210,8 @@ const Paybill = (props) => {
             hra: d.hra || 0,
             other_earnings: empEarn.other_earnings || 0,
             other_deductions: d.other_deductions || 0,
-            other_earnings_breakdown: empEarn.other_earnings_breakdown ? JSON.parse(empEarn.other_earnings_breakdown) : [],
-            other_deductions_breakdown: d.other_deductions_breakdown ? JSON.parse(d.other_deductions_breakdown) : [],
+            other_earnings_breakdown: empEarn.other_earnings_breakdown ? (typeof empEarn.other_earnings_breakdown === 'string' ? JSON.parse(empEarn.other_earnings_breakdown) : empEarn.other_earnings_breakdown) : [],
+            other_deductions_breakdown: d.other_deductions_breakdown ? (typeof d.other_deductions_breakdown === 'string' ? JSON.parse(d.other_deductions_breakdown) : d.other_deductions_breakdown) : [],
           };
         }
       });
@@ -174,13 +229,43 @@ const Paybill = (props) => {
   };
 
   const handleInputChange = (emp_id, field, value) => {
-    setEmployees(prev => prev.map(emp =>
-      emp.emp_id === emp_id ? { ...emp, [field]: parseFloat(value) || 0 } : emp
-    ));
+    setEmployees(prev => prev.map(emp => {
+      if (emp.emp_id === emp_id) {
+        const updatedEmp = { ...emp, [field]: parseFloat(value) || 0 };
+        if (activeTab === 'daily_wage' && (field === 'days_worked' || field === 'daily_wage')) {
+          const days = field === 'days_worked' ? (parseFloat(value) || 0) : (emp.days_worked || 0);
+          const rate = field === 'daily_wage' ? (parseFloat(value) || 0) : (emp.daily_wage || 0);
+          const limit = parseFloat(dailyWageMaxLimit) || 20000;
+          const totalWage = Math.min(days * rate, limit);
+          updatedEmp.total_wage = totalWage;
+          updatedEmp.basic_pay = totalWage;
+        }
+        return updatedEmp;
+      }
+      return emp;
+    }));
+  };
+
+  const handleMaxLimitChange = (newLimit) => {
+    const limit = parseFloat(newLimit) || 0;
+    setDailyWageMaxLimit(limit);
+    setEmployees(prev => prev.map(emp => {
+      if (activeTab === 'daily_wage') {
+        const days = emp.days_worked || 0;
+        const rate = emp.daily_wage || 0;
+        const totalWage = Math.min(days * rate, limit);
+        return {
+          ...emp,
+          total_wage: totalWage,
+          basic_pay: totalWage
+        };
+      }
+      return emp;
+    }));
   };
 
   const applyCalculations = () => {
-    if (activeTab === 'visiting') return;
+    if (activeTab !== 'permanent') return;
     const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
     setEmployees(prev => prev.map(emp => {
       const isState = emp.category === 'state';
@@ -201,7 +286,7 @@ const Paybill = (props) => {
   };
 
   const calculateEmp = (empId) => {
-    if (activeTab === 'visiting') return;
+    if (activeTab !== 'permanent') return;
     const activeRule = globalSettingsList.find(rule => rule.effective_from <= monthYear) || {};
     setEmployees(prev => prev.map(emp => {
       if (emp.emp_id !== empId) return emp;
@@ -230,8 +315,7 @@ const Paybill = (props) => {
     const prevMonth = `${py}-${String(pm).padStart(2, '0')}`;
     
     try {
-      const earnEndpoint = activeTab === 'permanent' ? `/api/earnings/${prevMonth}` : `/api/earnings/visiting/${prevMonth}`;
-      const deduxEndpoint = activeTab === 'permanent' ? `/api/deductions/${prevMonth}` : `/api/deductions/visiting/${prevMonth}`;
+      const { earn: earnEndpoint, dedux: deduxEndpoint } = getTabEndpoints(activeTab, prevMonth);
 
       const earnRes = await fetch(earnEndpoint);
       const earnData = await earnRes.json();
@@ -273,8 +357,23 @@ const Paybill = (props) => {
             onam_advance: prevD?.onam_advance || 0,
             hra_recovery: prevD?.hra_recovery || 0,
             other_deductions: prevD?.other_deductions || 0,
-            other_earnings_breakdown: prevE?.other_earnings_breakdown ? JSON.parse(prevE.other_earnings_breakdown) : [],
-            other_deductions_breakdown: prevD?.other_deductions_breakdown ? JSON.parse(prevD.other_deductions_breakdown) : [],
+            other_earnings_breakdown: prevE?.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD?.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
+          };
+        } else if (activeTab === 'daily_wage') {
+          return {
+            ...emp,
+            days_worked: prevE?.days_worked || 0,
+            daily_wage: prevE?.daily_wage || 0,
+            total_wage: prevE?.total_wage || 0,
+            basic_pay: prevE?.total_wage || 0,
+            other_earnings: prevE?.other_earnings || 0,
+            income_tax: prevD?.income_tax || 0,
+            hra: prevD?.hra || 0,
+            epf: prevD?.epf || 0,
+            other_deductions: prevD?.other_deductions || 0,
+            other_earnings_breakdown: prevE?.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD?.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
           };
         } else {
           return {
@@ -283,9 +382,10 @@ const Paybill = (props) => {
             other_earnings: prevE?.other_earnings || 0,
             income_tax: prevD?.income_tax || 0,
             hra: prevD?.hra || 0,
+            epf: prevD?.epf || 0,
             other_deductions: prevD?.other_deductions || 0,
-            other_earnings_breakdown: prevE?.other_earnings_breakdown ? JSON.parse(prevE.other_earnings_breakdown) : [],
-            other_deductions_breakdown: prevD?.other_deductions_breakdown ? JSON.parse(prevD.other_deductions_breakdown) : [],
+            other_earnings_breakdown: prevE?.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD?.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
           };
         }
       }));
@@ -298,9 +398,8 @@ const Paybill = (props) => {
   const handleDelete = async (empId) => {
     if (!window.confirm("Are you sure you want to delete the paybill record for this employee?")) return;
     try {
-      const endpoint = activeTab === 'permanent' 
-        ? `/api/earnings/${monthYear}?emp_id=${empId}` 
-        : `/api/earnings/visiting/${monthYear}?emp_id=${empId}`;
+      const { earn: earnEndpoint } = getTabEndpoints(activeTab, monthYear);
+      const endpoint = `${earnEndpoint}?emp_id=${empId}`;
       const res = await fetch(endpoint, {
         method: 'DELETE'
       });
@@ -329,8 +428,7 @@ const Paybill = (props) => {
     
     setLoading(true);
     try {
-      const earnEndpoint = activeTab === 'permanent' ? `/api/earnings/${prevMonth}` : `/api/earnings/visiting/${prevMonth}`;
-      const deduxEndpoint = activeTab === 'permanent' ? `/api/deductions/${prevMonth}` : `/api/deductions/visiting/${prevMonth}`;
+      const { earn: earnEndpoint, dedux: deduxEndpoint } = getTabEndpoints(activeTab, prevMonth);
 
       const earnRes = await fetch(earnEndpoint);
       const earnData = await earnRes.json();
@@ -360,13 +458,28 @@ const Paybill = (props) => {
             professional_tax: prevD.professional_tax || 0,
             income_tax: prevD.income_tax || 0,
             sli: prevD.sli || 0,
-            gis: prevD.gis || 0,
             lic: prevD.lic || 0,
+            gis: prevD.gis || 0,
             onam_advance: prevD.onam_advance || 0,
             hra_recovery: prevD.hra_recovery || 0,
             other_deductions: prevD.other_deductions || 0,
-            other_earnings_breakdown: prevE.other_earnings_breakdown ? JSON.parse(prevE.other_earnings_breakdown) : [],
-            other_deductions_breakdown: prevD.other_deductions_breakdown ? JSON.parse(prevD.other_deductions_breakdown) : [],
+            other_earnings_breakdown: prevE.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
+          };
+        } else if (activeTab === 'daily_wage') {
+          return {
+            ...emp,
+            days_worked: prevE.days_worked || 0,
+            daily_wage: prevE.daily_wage || 0,
+            total_wage: prevE.total_wage || 0,
+            basic_pay: prevE.total_wage || 0,
+            other_earnings: prevE.other_earnings || 0,
+            income_tax: prevD.income_tax || 0,
+            hra: prevD.hra || 0,
+            epf: prevD.epf || 0,
+            other_deductions: prevD.other_deductions || 0,
+            other_earnings_breakdown: prevE.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
           };
         } else {
           return {
@@ -375,9 +488,10 @@ const Paybill = (props) => {
             other_earnings: prevE.other_earnings || 0,
             income_tax: prevD.income_tax || 0,
             hra: prevD.hra || 0,
+            epf: prevD.epf || 0,
             other_deductions: prevD.other_deductions || 0,
-            other_earnings_breakdown: prevE.other_earnings_breakdown ? JSON.parse(prevE.other_earnings_breakdown) : [],
-            other_deductions_breakdown: prevD.other_deductions_breakdown ? JSON.parse(prevD.other_deductions_breakdown) : [],
+            other_earnings_breakdown: prevE.other_earnings_breakdown ? (typeof prevE.other_earnings_breakdown === 'string' ? JSON.parse(prevE.other_earnings_breakdown) : prevE.other_earnings_breakdown) : [],
+            other_deductions_breakdown: prevD.other_deductions_breakdown ? (typeof prevD.other_deductions_breakdown === 'string' ? JSON.parse(prevD.other_deductions_breakdown) : prevD.other_deductions_breakdown) : [],
           };
         }
       }));
@@ -392,8 +506,7 @@ const Paybill = (props) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const earnEndpoint = activeTab === 'permanent' ? `/api/earnings/${monthYear}` : `/api/earnings/visiting/${monthYear}`;
-      const deduxEndpoint = activeTab === 'permanent' ? `/api/deductions/${monthYear}` : `/api/deductions/visiting/${monthYear}`;
+      const { earn: earnEndpoint, dedux: deduxEndpoint } = getTabEndpoints(activeTab, monthYear);
 
       let earningsPayload, deductionsPayload;
 
@@ -417,18 +530,64 @@ const Paybill = (props) => {
           other_deductions: emp.other_deductions,
           other_deductions_breakdown: emp.other_deductions_breakdown
         }));
-      } else {
+      } else if (activeTab === 'daily_wage') {
         earningsPayload = employees.map(emp => ({
-          emp_id: emp.emp_id, basic_pay: emp.basic_pay,
-          other_earnings: emp.other_earnings,
+          emp_id: emp.emp_id, 
+          basic_pay: emp.total_wage || 0,
+          other_earnings: emp.other_earnings || 0,
+          other_earnings_breakdown: emp.other_earnings_breakdown,
+          days_worked: emp.days_worked || 0,
+          daily_wage: emp.daily_wage || 0,
+          total_wage: emp.total_wage || 0
+        }));
+
+        deductionsPayload = employees.map(emp => ({
+          emp_id: emp.emp_id, 
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          epf: emp.epf || 0,
+          other_deductions: emp.other_deductions || 0,
+          other_deductions_breakdown: emp.other_deductions_breakdown
+        }));
+      } else if (activeTab === 'contract') {
+        earningsPayload = employees.map(emp => ({
+          emp_id: emp.emp_id, 
+          basic_pay: emp.basic_pay || 0,
+          other_earnings: emp.other_earnings || 0,
           other_earnings_breakdown: emp.other_earnings_breakdown
         }));
 
         deductionsPayload = employees.map(emp => ({
-          emp_id: emp.emp_id, income_tax: emp.income_tax,
-          hra: emp.hra, other_deductions: emp.other_deductions,
+          emp_id: emp.emp_id, 
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          epf: emp.epf || 0,
+          other_deductions: emp.other_deductions || 0,
           other_deductions_breakdown: emp.other_deductions_breakdown
         }));
+      } else {
+        earningsPayload = employees.map(emp => ({
+          emp_id: emp.emp_id, 
+          basic_pay: emp.basic_pay || 0,
+          other_earnings: emp.other_earnings || 0,
+          other_earnings_breakdown: emp.other_earnings_breakdown
+        }));
+
+        deductionsPayload = employees.map(emp => ({
+          emp_id: emp.emp_id, 
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          other_deductions: emp.other_deductions || 0,
+          other_deductions_breakdown: emp.other_deductions_breakdown
+        }));
+      }
+
+      if (activeTab === 'daily_wage') {
+        await fetch('/api/settings/system', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ daily_wage_max_limit: String(dailyWageMaxLimit) })
+        });
       }
 
       const earnRes = await fetch(earnEndpoint, {
@@ -468,7 +627,16 @@ const Paybill = (props) => {
     if (!window.confirm(confirmMessage)) return;
     setApproving(true);
     try {
-      const endpoint = activeTab === 'permanent' ? `/api/approve/${monthYear}` : `/api/approve/visiting/${monthYear}`;
+      let endpoint = '';
+      if (activeTab === 'permanent') {
+        endpoint = `/api/approve/${monthYear}`;
+      } else if (activeTab === 'visiting') {
+        endpoint = `/api/approve/visiting/${monthYear}`;
+      } else if (activeTab === 'contract') {
+        endpoint = `/api/approve/contract/${monthYear}`;
+      } else if (activeTab === 'daily_wage') {
+        endpoint = `/api/approve/daily_wage/${monthYear}`;
+      }
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,7 +664,16 @@ const Paybill = (props) => {
     if (!window.confirm("Submit this month's paybill for verification/approval?")) return;
     setSaving(true);
     try {
-      const endpoint = activeTab === 'permanent' ? `/api/approve/${monthYear}` : `/api/approve/visiting/${monthYear}`;
+      let endpoint = '';
+      if (activeTab === 'permanent') {
+        endpoint = `/api/approve/${monthYear}`;
+      } else if (activeTab === 'visiting') {
+        endpoint = `/api/approve/visiting/${monthYear}`;
+      } else if (activeTab === 'contract') {
+        endpoint = `/api/approve/contract/${monthYear}`;
+      } else if (activeTab === 'daily_wage') {
+        endpoint = `/api/approve/daily_wage/${monthYear}`;
+      }
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -522,7 +699,16 @@ const Paybill = (props) => {
     if (!window.confirm("Are you sure you want to REJECT this paybill and return it to the admin?")) return;
     setApproving(true);
     try {
-      const endpoint = activeTab === 'permanent' ? `/api/approve/${monthYear}` : `/api/approve/visiting/${monthYear}`;
+      let endpoint = '';
+      if (activeTab === 'permanent') {
+        endpoint = `/api/approve/${monthYear}`;
+      } else if (activeTab === 'visiting') {
+        endpoint = `/api/approve/visiting/${monthYear}`;
+      } else if (activeTab === 'contract') {
+        endpoint = `/api/approve/contract/${monthYear}`;
+      } else if (activeTab === 'daily_wage') {
+        endpoint = `/api/approve/daily_wage/${monthYear}`;
+      }
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -594,6 +780,13 @@ const Paybill = (props) => {
 
   const inputStyle = { padding: '0.2rem 0.3rem', width: '65px' };
 
+  const getTabLabel = (tab) => {
+    if (tab === 'permanent') return 'Permanent Employees';
+    if (tab === 'visiting') return 'Visiting Faculty';
+    if (tab === 'contract') return 'Contract Staff';
+    return 'Daily Wage Staff';
+  };
+
   const [yr, mn] = (monthYear || '').split('-');
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
@@ -613,44 +806,34 @@ const Paybill = (props) => {
         </div>
 
         {/* Tabs inside Approvable section */}
-        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-          <button 
-            onClick={() => setActiveTab('permanent')}
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              color: activeTab === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '0.95rem'
-            }}
-          >
-            Permanent Employees
-          </button>
-          <button 
-            onClick={() => setActiveTab('visiting')}
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              color: activeTab === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '0.95rem'
-            }}
-          >
-            Visiting Professors & Assistant Professors
-          </button>
+        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+          {['permanent', 'visiting', 'contract', 'daily_wage'].map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '0.95rem'
+              }}
+            >
+              {tab === 'permanent' ? 'Permanent Employees' : 
+               tab === 'visiting' ? 'Visiting Professors & Assistant Professors' : 
+               tab === 'contract' ? 'Contract Staff' : 'Daily Wage Staff'}
+            </button>
+          ))}
         </div>
 
         <div className="card" style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
           <ShieldAlert size={48} style={{ color: '#d97706' }} />
           <h2 style={{ fontSize: '1.5rem', color: '#854d0e', margin: 0 }}>No Paybill Submitted</h2>
           <p style={{ color: 'var(--color-text-secondary)', maxWidth: '500px', margin: 0 }}>
-            The paybill for {activeTab === 'permanent' ? 'Permanent Employees' : 'Visiting Faculty'} for {monthDisplay} has not been submitted for approval yet. Once submitted by the Admin or Super Admin, it will appear here for review and approval.
+            The paybill for {getTabLabel(activeTab)} for {monthDisplay} has not been submitted for approval yet. Once submitted by the Admin or Super Admin, it will appear here for review and approval.
           </p>
         </div>
       </div>
@@ -676,41 +859,29 @@ const Paybill = (props) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-        <button 
-          onClick={() => setActiveTab('permanent')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: activeTab === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Permanent Employees
-        </button>
-        <button 
-          onClick={() => setActiveTab('visiting')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: activeTab === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Visiting Professors & Assistant Professors
-        </button>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        {['permanent', 'visiting', 'contract', 'daily_wage'].map(tab => (
+          <button 
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === tab ? '2px solid var(--color-primary)' : '2px solid transparent',
+              color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+          >
+            {tab === 'permanent' ? 'Permanent Employees' : 
+             tab === 'visiting' ? 'Visiting Professors & Assistant Professors' : 
+             tab === 'contract' ? 'Contract Staff' : 'Daily Wage Staff'}
+          </button>
+        ))}
       </div>
 
       {isRejected && (
@@ -926,6 +1097,25 @@ const Paybill = (props) => {
           </div>
         </div>
 
+        {activeTab === 'daily_wage' && (
+          <div style={{ 
+            display: 'flex', alignItems: 'center', gap: '1rem', 
+            marginBottom: '1.5rem', padding: '1rem', borderRadius: '8px', 
+            background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)',
+            width: 'fit-content'
+          }}>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Maximum Limit (Daily Wage Total):</span>
+            <input 
+              type="number" 
+              className="form-control" 
+              style={{ width: '120px', padding: '0.4rem 0.8rem' }} 
+              value={dailyWageMaxLimit} 
+              onChange={(e) => handleMaxLimitChange(e.target.value)} 
+              disabled={isApproved && (!isOverrideActive || user?.role !== 'super_admin')}
+            />
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>Loading...</div>
         ) : (
@@ -1107,8 +1297,293 @@ const Paybill = (props) => {
                   })}
                 </tbody>
               </table>
+            ) : activeTab === 'contract' ? (
+              <table className="table" style={{ fontSize: '0.85rem', minWidth: '1200px' }}>
+                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, boxShadow: '0 1px 0 var(--color-border)' }}>
+                  <tr>
+                    <th style={{ minWidth: '150px' }}>Employee</th>
+                    <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="3">
+                      ── ALLOWANCES ──
+                    </th>
+                    <th style={{ background: 'rgba(239,68,68,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="5">
+                      ── DEDUCTIONS ──
+                    </th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ minWidth: '100px' }}>Action</th>}
+                  </tr>
+                  <tr>
+                    <th></th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>Consolidated Salary</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>Others</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)', fontWeight: 'bold' }}>Gross</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>Income Tax</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>HRA</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>EPF</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>Others</th>
+                    <th style={{ fontWeight: 'bold' }}>Net Pay</th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.length === 0 && (
+                    <tr><td colSpan={(user?.role === 'admin' || user?.role === 'super_admin') ? 10 : 9} style={{ textAlign: 'center', padding: '2rem' }}>Add contract employees first.</td></tr>
+                  )}
+
+                  {employees.map(emp => {
+                    const gross = Math.round((emp.basic_pay || 0) + (emp.other_earnings || 0));
+                    const dedux = Math.round((emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0));
+                    const net = gross - dedux;
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
+
+                    const inp = (field) => {
+                      const val = emp[field] || 0;
+                      if (isReadOnly) {
+                        return (
+                          <div style={{ 
+                            padding: '0.2rem 0.3rem', 
+                            width: '100px',
+                            textAlign: 'right',
+                            fontWeight: '600',
+                            color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : '#fff')
+                          }}>
+                            {parseFloat(val).toFixed(2)}
+                          </div>
+                        );
+                      }
+                      return (
+                        <input type="number" className="form-control" 
+                          style={{ 
+                            ...inputStyle, 
+                            width: '100px',
+                            backgroundColor: isRowGrey ? 'rgba(229,231,235,0.2)' : '', 
+                            textAlign: 'right',
+                            fontWeight: 'normal',
+                            color: 'var(--color-text-primary)'
+                          }}
+                          value={emp[field] || ''} placeholder="0"
+                          onChange={(e) => handleInputChange(emp.emp_id, field, e.target.value)} />
+                      );
+                    };
+
+                    return (
+                      <tr key={emp.emp_id} style={{ 
+                        backgroundColor: isRowGrey 
+                        ? 'rgba(229, 231, 235, 0.05)'
+                        : (user?.role === 'approver' 
+                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                            : 'var(--color-bg-secondary)'),
+                        color: isRowGrey ? '#9ca3af' : ''
+                      }}>
+                        <td>
+                          <div 
+                            style={{ 
+                              fontWeight: 600, 
+                              color: isRowGrey 
+                                ? '#9ca3af' 
+                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              cursor: isReadOnly ? 'default' : 'pointer', 
+                              textDecoration: isReadOnly ? 'none' : 'underline' 
+                            }} 
+                            onClick={() => !isReadOnly && openModal(emp)}
+                          >
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                        </td>
+                        <td>{inp('basic_pay')}</td>
+                        <td>{inp('other_earnings')}</td>
+                        <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : '')) }}>
+                          ₹{gross.toFixed(2)}
+                        </td>
+                        <td>{inp('income_tax')}</td>
+                        <td>{inp('hra')}</td>
+                        <td>{inp('epf')}</td>
+                        <td>{inp('other_deductions')}</td>
+                        <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : (net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'))) }}>
+                          ₹{net.toFixed(2)}
+                        </td>
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button 
+                                className="btn btn-secondary" 
+                                onClick={() => copyFromPrevious(emp.emp_id)} 
+                                title="Copy from Previous" 
+                                style={{ padding: '0.25rem 0.5rem' }}
+                                disabled={isReadOnly}
+                              >
+                                <Copy size={14} />
+                              </button>
+                              {emp.earnings_id != null && (
+                                <button 
+                                  className="btn btn-danger" 
+                                  onClick={() => handleDelete(emp.emp_id)} 
+                                  title="Delete Paybill Record" 
+                                  style={{ padding: '0.25rem 0.5rem' }}
+                                  disabled={isReadOnly}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : activeTab === 'daily_wage' ? (
+              <table className="table" style={{ fontSize: '0.85rem', minWidth: '1400px' }}>
+                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, boxShadow: '0 1px 0 var(--color-border)' }}>
+                  <tr>
+                    <th style={{ minWidth: '150px' }}>Employee</th>
+                    <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="5">
+                      ── ALLOWANCES ──
+                    </th>
+                    <th style={{ background: 'rgba(239,68,68,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="5">
+                      ── DEDUCTIONS ──
+                    </th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ minWidth: '100px' }}>Action</th>}
+                  </tr>
+                  <tr>
+                    <th></th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>No. of Days Worked</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>Daily Wage Rate</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>Total Wage</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)' }}>Others</th>
+                    <th style={{ background: 'rgba(59,130,246,0.04)', fontWeight: 'bold' }}>Gross</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>Income Tax</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>HRA</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>EPF</th>
+                    <th style={{ background: 'rgba(239,68,68,0.04)' }}>Others</th>
+                    <th style={{ fontWeight: 'bold' }}>Net Pay</th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.length === 0 && (
+                    <tr><td colSpan={(user?.role === 'admin' || user?.role === 'super_admin') ? 12 : 11} style={{ textAlign: 'center', padding: '2rem' }}>Add daily wage employees first.</td></tr>
+                  )}
+
+                  {employees.map(emp => {
+                    const gross = Math.round((emp.total_wage || 0) + (emp.other_earnings || 0));
+                    const dedux = Math.round((emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0));
+                    const net = gross - dedux;
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
+
+                    const inp = (field) => {
+                      const val = emp[field] || 0;
+                      if (isReadOnly) {
+                        return (
+                          <div style={{ 
+                            padding: '0.2rem 0.3rem', 
+                            width: '100px',
+                            textAlign: 'right',
+                            fontWeight: '600',
+                            color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : '#fff')
+                          }}>
+                            {parseFloat(val).toFixed(2)}
+                          </div>
+                        );
+                      }
+                      return (
+                        <input type="number" className="form-control" 
+                          style={{ 
+                            ...inputStyle, 
+                            width: '100px',
+                            backgroundColor: isRowGrey ? 'rgba(229,231,235,0.2)' : '', 
+                            textAlign: 'right',
+                            fontWeight: 'normal',
+                            color: 'var(--color-text-primary)'
+                          }}
+                          value={emp[field] || ''} placeholder="0"
+                          onChange={(e) => handleInputChange(emp.emp_id, field, e.target.value)} />
+                      );
+                    };
+
+                    return (
+                      <tr key={emp.emp_id} style={{ 
+                        backgroundColor: isRowGrey 
+                        ? 'rgba(229, 231, 235, 0.05)'
+                        : (user?.role === 'approver' 
+                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                            : 'var(--color-bg-secondary)'),
+                        color: isRowGrey ? '#9ca3af' : ''
+                      }}>
+                        <td>
+                          <div 
+                            style={{ 
+                              fontWeight: 600, 
+                              color: isRowGrey 
+                                ? '#9ca3af' 
+                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              cursor: isReadOnly ? 'default' : 'pointer', 
+                              textDecoration: isReadOnly ? 'none' : 'underline' 
+                            }} 
+                            onClick={() => !isReadOnly && openModal(emp)}
+                          >
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                        </td>
+                        <td>{inp('days_worked')}</td>
+                        <td>{inp('daily_wage')}</td>
+                        <td>
+                          <div style={{ 
+                            padding: '0.2rem 0.3rem', 
+                            width: '100px',
+                            textAlign: 'right',
+                            fontWeight: '600',
+                            color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : '#fff')
+                          }}>
+                            {(emp.total_wage || 0).toFixed(2)}
+                          </div>
+                        </td>
+                        <td>{inp('other_earnings')}</td>
+                        <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : '')) }}>
+                          ₹{gross.toFixed(2)}
+                        </td>
+                        <td>{inp('income_tax')}</td>
+                        <td>{inp('hra')}</td>
+                        <td>{inp('epf')}</td>
+                        <td>{inp('other_deductions')}</td>
+                        <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : (net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'))) }}>
+                          ₹{net.toFixed(2)}
+                        </td>
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button 
+                                className="btn btn-secondary" 
+                                onClick={() => copyFromPrevious(emp.emp_id)} 
+                                title="Copy from Previous" 
+                                style={{ padding: '0.25rem 0.5rem' }}
+                                disabled={isReadOnly}
+                              >
+                                <Copy size={14} />
+                              </button>
+                              {emp.earnings_id != null && (
+                                <button 
+                                  className="btn btn-danger" 
+                                  onClick={() => handleDelete(emp.emp_id)} 
+                                  title="Delete Paybill Record" 
+                                  style={{ padding: '0.25rem 0.5rem' }}
+                                  disabled={isReadOnly}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             ) : (
-              // Visiting grid structure
               <table className="table" style={{ fontSize: '0.85rem', minWidth: '1000px' }}>
                 <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, boxShadow: '0 1px 0 var(--color-border)' }}>
                   <tr>
@@ -1319,10 +1794,59 @@ const Paybill = (props) => {
                       </div>
                     </div>
                   </div>
+                ) : activeTab === 'daily_wage' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Days Worked</label>
+                      <input type="number" name="days_worked" value={modalEmp.days_worked || ''} onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setModalEmp(prev => {
+                          const total = Math.min(val * (prev.daily_wage || 0), dailyWageMaxLimit);
+                          return { ...prev, days_worked: val, total_wage: total, basic_pay: total };
+                        });
+                      }} className="form-control" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Daily Wage Rate</label>
+                      <input type="number" name="daily_wage" value={modalEmp.daily_wage || ''} onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setModalEmp(prev => {
+                          const total = Math.min((prev.days_worked || 0) * val, dailyWageMaxLimit);
+                          return { ...prev, daily_wage: val, total_wage: total, basic_pay: total };
+                        });
+                      }} className="form-control" />
+                    </div>
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Total Wage (Capped at ₹{dailyWageMaxLimit})</label>
+                      <input type="number" name="total_wage" value={modalEmp.total_wage || 0} className="form-control" disabled />
+                    </div>
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Other Allowances Breakdown</span>
+                        <button type="button" onClick={() => addBreakdownItem('earnings')} className="btn" style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem', backgroundColor: 'var(--color-success)', color: '#fff' }}>+ Add Item</button>
+                      </label>
+                      <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '0.5rem', paddingRight: '4px' }}>
+                        {(modalEmp.other_earnings_breakdown || []).map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                            <input type="text" placeholder="Description" value={item.desc} onChange={(e) => updateBreakdownItem('earnings', idx, 'desc', e.target.value)} className="form-control" style={{ flex: 2, padding: '0.25rem 0.5rem' }} />
+                            <input type="number" placeholder="Amount" value={item.amount || ''} onChange={(e) => updateBreakdownItem('earnings', idx, 'amount', e.target.value)} className="form-control" style={{ flex: 1, padding: '0.25rem 0.5rem' }} />
+                            <button type="button" onClick={() => removeBreakdownItem('earnings', idx)} style={{ color: 'var(--color-danger)', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1.2rem', padding: '0 0.2rem' }}>&times;</button>
+                          </div>
+                        ))}
+                        {(!modalEmp.other_earnings_breakdown || modalEmp.other_earnings_breakdown.length === 0) && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontStyle: 'italic', padding: '0.25rem 0' }}>No specific items added.</div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>Total Other Earnings:</span>
+                        <input type="number" name="other_earnings" value={modalEmp.other_earnings || ''} onChange={handleModalInput} className="form-control" style={{ width: '80px', padding: '0.2rem 0.4rem' }} disabled={(modalEmp.other_earnings_breakdown || []).length > 0} title={(modalEmp.other_earnings_breakdown || []).length > 0 ? "Calculated from breakdown" : "Manual entry"} />
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Honorarium / Consolidated Salary</label>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>{activeTab === 'contract' ? 'Consolidated Salary' : 'Honorarium / Consolidated Salary'}</label>
                       <input type="number" name="basic_pay" value={modalEmp.basic_pay || ''} onChange={handleModalInput} className="form-control" />
                     </div>
                     <div className="form-group">
@@ -1416,7 +1940,7 @@ const Paybill = (props) => {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div className="form-group">
                       <label className="form-label" style={{ fontSize: '0.75rem' }}>Income Tax</label>
                       <input type="number" name="income_tax" value={modalEmp.income_tax || ''} onChange={handleModalInput} className="form-control" />
@@ -1425,7 +1949,13 @@ const Paybill = (props) => {
                       <label className="form-label" style={{ fontSize: '0.75rem' }}>HRA</label>
                       <input type="number" name="hra" value={modalEmp.hra || ''} onChange={handleModalInput} className="form-control" />
                     </div>
-                    <div className="form-group">
+                    {(activeTab === 'contract' || activeTab === 'daily_wage') && (
+                      <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>EPF</label>
+                        <input type="number" name="epf" value={modalEmp.epf || ''} onChange={handleModalInput} className="form-control" />
+                      </div>
+                    )}
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                       <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Other Deductions Breakdown</span>
                         <button type="button" onClick={() => addBreakdownItem('deductions')} className="btn" style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem', backgroundColor: 'var(--color-success)', color: '#fff' }}>+ Add Item</button>
@@ -1470,7 +2000,7 @@ const Paybill = (props) => {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Monthly Paybill Verification Sheet ({activeTab === 'permanent' ? 'Permanent' : 'Visiting'})</h1>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Monthly Paybill Verification Sheet ({getTabLabel(activeTab)})</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {formatMonthYear(monthYear)} | Status: Pending Approval</p>
             </div>
             <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
@@ -1503,6 +2033,26 @@ const Paybill = (props) => {
                 { key: 'hra_recovery', label: 'HRA.R' },
                 { key: 'other_deductions', label: 'Other Ded' },
                 { key: 'net', label: 'Net Pay', isBold: true }
+              ] : activeTab === 'daily_wage' ? [
+                { key: 'days_worked', label: 'Days Worked' },
+                { key: 'daily_wage', label: 'Daily Wage' },
+                { key: 'total_wage', label: 'Total Wage' },
+                { key: 'other_earnings', label: 'Other' },
+                { key: 'gross', label: 'Gross', isBold: true },
+                { key: 'income_tax', label: 'Income Tax' },
+                { key: 'hra', label: 'HRA' },
+                { key: 'epf', label: 'EPF' },
+                { key: 'other_deductions', label: 'Other Ded' },
+                { key: 'net', label: 'Net Pay', isBold: true }
+              ] : activeTab === 'contract' ? [
+                { key: 'basic_pay', label: 'Consolidated Salary' },
+                { key: 'other_earnings', label: 'Other' },
+                { key: 'gross', label: 'Gross', isBold: true },
+                { key: 'income_tax', label: 'Income Tax' },
+                { key: 'hra', label: 'HRA' },
+                { key: 'epf', label: 'EPF' },
+                { key: 'other_deductions', label: 'Other Ded' },
+                { key: 'net', label: 'Net Pay', isBold: true }
               ] : [
                 { key: 'basic_pay', label: 'Honorarium/Consolidated' },
                 { key: 'other_earnings', label: 'Other' },
@@ -1514,7 +2064,7 @@ const Paybill = (props) => {
               ];
 
               const activeCols = columns.filter(col => {
-                if (col.key === 'basic_pay' || col.key === 'gross' || col.key === 'net') return true;
+                if (col.key === 'basic_pay' || col.key === 'days_worked' || col.key === 'daily_wage' || col.key === 'total_wage' || col.key === 'gross' || col.key === 'net') return true;
                 return employees.some(emp => {
                   const val = col.calc ? col.calc(emp) : (emp[col.key] || 0);
                   return Math.abs(val) > 0.01;
@@ -1523,10 +2073,10 @@ const Paybill = (props) => {
 
               const earnCols = activeCols.filter(c => {
                 if (c.key === 'hra') return activeTab === 'permanent';
-                return ['basic_pay', 'dp_gp', 'da', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key);
+                return ['basic_pay', 'days_worked', 'daily_wage', 'total_wage', 'dp_gp', 'da', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key);
               });
               const deduxCols = activeCols.filter(c => {
-                if (c.key === 'hra') return activeTab === 'visiting';
+                if (c.key === 'hra') return activeTab !== 'permanent';
                 return ['epf', 'cpf', 'professional_tax', 'income_tax', 'sli', 'gis', 'lic', 'onam_advance', 'hra_recovery', 'other_deductions'].includes(c.key);
               });
 
@@ -1560,10 +2110,14 @@ const Paybill = (props) => {
                       const hra = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
                       const gross = activeTab === 'permanent' 
                         ? (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0)
-                        : (emp.basic_pay||0)+(emp.other_earnings||0);
+                        : activeTab === 'daily_wage'
+                          ? (emp.total_wage||0)+(emp.other_earnings||0)
+                          : (emp.basic_pay||0)+(emp.other_earnings||0);
                       const dedux = activeTab === 'permanent'
                         ? (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0)
-                        : (emp.income_tax||0)+(emp.hra||0)+(emp.other_deductions||0);
+                        : activeTab === 'contract' || activeTab === 'daily_wage'
+                          ? (emp.income_tax||0)+(emp.hra||0)+(emp.epf||0)+(emp.other_deductions||0)
+                          : (emp.income_tax||0)+(emp.hra||0)+(emp.other_deductions||0);
                       const net = gross - dedux;
                       
                       const getVal = (col) => {
@@ -1600,7 +2154,9 @@ const Paybill = (props) => {
                           const hra = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
                           const gross = activeTab === 'permanent'
                             ? (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0)
-                            : (emp.basic_pay||0)+(emp.other_earnings||0);
+                            : activeTab === 'daily_wage'
+                              ? (emp.total_wage||0)+(emp.other_earnings||0)
+                              : (emp.basic_pay||0)+(emp.other_earnings||0);
                           
                           if (c.key === 'da') return sum + da;
                           if (c.key === 'hra') return sum + (activeTab === 'permanent' ? hra : (emp.hra || 0));
@@ -1629,10 +2185,14 @@ const Paybill = (props) => {
                           const hra = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
                           const gross = activeTab === 'permanent'
                             ? (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0)
-                            : (emp.basic_pay||0)+(emp.other_earnings||0);
+                            : activeTab === 'daily_wage'
+                              ? (emp.total_wage||0)+(emp.other_earnings||0)
+                              : (emp.basic_pay||0)+(emp.other_earnings||0);
                           const dedux = activeTab === 'permanent'
                             ? (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0)
-                            : (emp.income_tax||0)+(emp.hra||0)+(emp.other_deductions||0);
+                            : activeTab === 'contract' || activeTab === 'daily_wage'
+                              ? (emp.income_tax||0)+(emp.hra||0)+(emp.epf||0)+(emp.other_deductions||0)
+                              : (emp.income_tax||0)+(emp.hra||0)+(emp.other_deductions||0);
                           return sum + (gross - dedux);
                         }, 0)).toFixed(2)}
                       </td>

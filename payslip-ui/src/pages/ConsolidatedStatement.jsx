@@ -31,7 +31,11 @@ const ConsolidatedStatement = () => {
     try {
       const endpoint = category === 'permanent' 
         ? `/api/employees?fy=${financialYear}` 
-        : `/api/employees/visiting`;
+        : category === 'visiting'
+          ? `/api/employees/visiting`
+          : category === 'contract'
+            ? `/api/employees/contract`
+            : `/api/employees/daily_wage`;
       const res = await fetch(endpoint);
       const data = await res.json();
       setEmployees(data);
@@ -70,7 +74,13 @@ const ConsolidatedStatement = () => {
     }
     setPreviewLoading(true);
     try {
-      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated' : '/api/reports/visiting/consolidated';
+      const endpoint = employeeCategory === 'permanent' 
+        ? '/api/reports/consolidated' 
+        : employeeCategory === 'visiting'
+          ? '/api/reports/visiting/consolidated'
+          : employeeCategory === 'contract'
+            ? '/api/reports/contract/consolidated'
+            : '/api/reports/daily_wage/consolidated';
       const url = `${endpoint}?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
       const res = await fetch(url);
       const data = await res.json();
@@ -101,7 +111,7 @@ const ConsolidatedStatement = () => {
     }
 
     if (employeeCategory === 'visiting') {
-      let grandTotals = Array(7).fill(0);
+      let grandTotals = Array(8).fill(0);
       const rows = months.map(my => {
         const e = earnings.find(x => x.month_year === my);
         const d = deductions.find(x => x.month_year === my) || {};
@@ -133,6 +143,108 @@ const ConsolidatedStatement = () => {
         const values = [
           basic, otherEarn, gross,
           it, hraVal, otherDed, totDed, net
+        ];
+
+        values.forEach((v, idx) => {
+          if (v !== null && v !== undefined) {
+            grandTotals[idx] += v;
+          }
+        });
+
+        return {
+          month: displayMonth,
+          values
+        };
+      });
+
+      return { rows, grandTotals };
+
+    } else if (employeeCategory === 'contract') {
+      let grandTotals = Array(9).fill(0);
+      const rows = months.map(my => {
+        const e = earnings.find(x => x.month_year === my);
+        const d = deductions.find(x => x.month_year === my) || {};
+        const isLocked = e && e.is_approved === 1;
+
+        const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (basic + otherEarn) : null;
+
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+        const totDed = isLocked ? (it + hraVal + epf + otherDed) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        const [yearStr, monthStr] = my.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        let receivedMonth = month + 1;
+        let receivedYear = year;
+        if (receivedMonth > 12) {
+          receivedMonth = 1;
+          receivedYear = year + 1;
+        }
+        const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
+
+        const values = [
+          basic, otherEarn, gross,
+          it, hraVal, epf, otherDed, totDed, net
+        ];
+
+        values.forEach((v, idx) => {
+          if (v !== null && v !== undefined) {
+            grandTotals[idx] += v;
+          }
+        });
+
+        return {
+          month: displayMonth,
+          values
+        };
+      });
+
+      return { rows, grandTotals };
+
+    } else if (employeeCategory === 'daily_wage') {
+      let grandTotals = Array(11).fill(0);
+      const rows = months.map(my => {
+        const e = earnings.find(x => x.month_year === my);
+        const d = deductions.find(x => x.month_year === my) || {};
+        const isLocked = e && e.is_approved === 1;
+
+        const daysWorked = isLocked ? Math.round(parseFloat(e.days_worked) || 0) : null;
+        const dailyWage = isLocked ? Math.round(parseFloat(e.daily_wage) || 0) : null;
+        const totalWage = isLocked ? Math.round(parseFloat(e.total_wage) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (totalWage + otherEarn) : null;
+
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+        const totDed = isLocked ? (it + hraVal + epf + otherDed) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        const [yearStr, monthStr] = my.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        let receivedMonth = month + 1;
+        let receivedYear = year;
+        if (receivedMonth > 12) {
+          receivedMonth = 1;
+          receivedYear = year + 1;
+        }
+        const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
+
+        const values = [
+          daysWorked, dailyWage, totalWage, otherEarn, gross,
+          it, hraVal, epf, otherDed, totDed, net
         ];
 
         values.forEach((v, idx) => {
@@ -303,7 +415,13 @@ const ConsolidatedStatement = () => {
   const handleDownload = async (format) => {
     setLoading(true);
     try {
-      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated' : '/api/reports/visiting/consolidated';
+      const endpoint = employeeCategory === 'permanent' 
+        ? '/api/reports/consolidated' 
+        : employeeCategory === 'visiting'
+          ? '/api/reports/visiting/consolidated'
+          : employeeCategory === 'contract'
+            ? '/api/reports/contract/consolidated'
+            : '/api/reports/daily_wage/consolidated';
       const url = `${endpoint}?fy=${fy}${isAdmin ? `&emp_id=${selectedEmpId}` : ''}`;
       const res = await fetch(url);
       const reportData = await res.json();
@@ -314,13 +432,13 @@ const ConsolidatedStatement = () => {
       }
 
       if (format === 'excel') {
-        if (employeeCategory === 'visiting') {
+        if (employeeCategory === 'visiting' || employeeCategory === 'contract' || employeeCategory === 'daily_wage') {
           await generateExcelVisiting(reportData, fy);
         } else {
           await generateExcel(reportData, fy);
         }
       } else {
-        if (employeeCategory === 'visiting') {
+        if (employeeCategory === 'visiting' || employeeCategory === 'contract' || employeeCategory === 'daily_wage') {
           await generatePDFVisiting(reportData, fy);
         } else {
           await generatePDF(reportData, fy);
@@ -336,21 +454,30 @@ const ConsolidatedStatement = () => {
 
   const generateExcelVisiting = async (reportData, fyStart) => {
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Visiting Consolidated Statement');
+    const sheet = workbook.addWorksheet('Consolidated Statement');
     const { employee, earnings, deductions } = reportData;
 
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
     const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
 
-    sheet.mergeCells('A1:J1');
+    const isVisiting = employeeCategory === 'visiting';
+    const isContract = employeeCategory === 'contract';
+    const isDailyWage = employeeCategory === 'daily_wage';
+
+    const earnColSpan = isDailyWage ? 4 : 2;
+    const dedColSpan = isVisiting ? 3 : 4;
+    const totalCols = 1 + earnColSpan + 1 + dedColSpan + 2; // month + allowances + gross + deductions + totDed + net
+
+    sheet.mergeCells(1, 1, 1, totalCols);
     const titleCell = sheet.getCell('A1');
     titleCell.value = 'KERALA SCHOOL OF MATHEMATICS';
     titleCell.font = { bold: true, size: 14 };
     titleCell.alignment = { horizontal: 'center' };
 
-    sheet.mergeCells('A2:J2');
+    sheet.mergeCells(2, 1, 2, totalCols);
     const subTitleCell = sheet.getCell('A2');
-    subTitleCell.value = `Visiting Faculty Consolidated Statement for FY ${fyDisplay}`;
+    const categoryTitle = isVisiting ? 'Visiting Faculty' : isContract ? 'Contract Staff' : 'Daily Wage Staff';
+    subTitleCell.value = `${categoryTitle} Consolidated Statement for FY ${fyDisplay}`;
     subTitleCell.font = { bold: true, size: 12 };
     subTitleCell.alignment = { horizontal: 'center' };
 
@@ -367,37 +494,51 @@ const ConsolidatedStatement = () => {
     const rowNum = 7;
 
     const superHeaderRow = sheet.getRow(rowNum);
-    superHeaderRow.values = [
-      'Payment received month', 'Allowances', '', 'Gross Pay', 'Deductions', '', '', 'Total Ded', 'Net Pay'
-    ];
+    
+    // Build super headers list
+    const superHeaders = ['Payment received month'];
+    for(let i=0; i<earnColSpan; i++) superHeaders.push(i === 0 ? 'Allowances' : '');
+    superHeaders.push('Gross Pay');
+    for(let i=0; i<dedColSpan; i++) superHeaders.push(i === 0 ? 'Deductions' : '');
+    superHeaders.push('Total Ded', 'Net Pay');
+
+    superHeaderRow.values = superHeaders;
     superHeaderRow.font = { bold: true };
 
-    sheet.mergeCells(`A${rowNum}:A${rowNum+1}`);
-    sheet.mergeCells(`B${rowNum}:C${rowNum}`); // Allowances
-    sheet.mergeCells(`D${rowNum}:D${rowNum+1}`); // Gross Pay
-    sheet.mergeCells(`E${rowNum}:G${rowNum}`); // Deductions
-    sheet.mergeCells(`H${rowNum}:H${rowNum+1}`); // Total Ded
-    sheet.mergeCells(`I${rowNum}:I${rowNum+1}`); // Net Pay
+    sheet.mergeCells(rowNum, 1, rowNum + 1, 1); // Month
+    sheet.mergeCells(rowNum, 2, rowNum, 2 + earnColSpan - 1); // Allowances
+    sheet.mergeCells(rowNum, 2 + earnColSpan, rowNum + 1, 2 + earnColSpan); // Gross Pay
+    sheet.mergeCells(rowNum, 2 + earnColSpan + 1, rowNum, 2 + earnColSpan + 1 + dedColSpan - 1); // Deductions
+    sheet.mergeCells(rowNum, 2 + earnColSpan + 1 + dedColSpan, rowNum + 1, 2 + earnColSpan + 1 + dedColSpan); // Total Ded
+    sheet.mergeCells(rowNum, 2 + earnColSpan + 1 + dedColSpan + 1, rowNum + 1, 2 + earnColSpan + 1 + dedColSpan + 1); // Net Pay
 
-    const headerRow = [
-      '', 'Honorarium / Consolidated', 'Others', '', 'Income Tax', 'HRA', 'Others', '', ''
-    ];
+    const earnHeaders = isDailyWage 
+      ? ['Days Worked', 'Daily Wage', 'Total Wage', 'Others']
+      : isContract
+        ? ['Consolidated Salary', 'Others']
+        : ['Honorarium / Consolidated', 'Others'];
+
+    const dedHeaders = isVisiting
+      ? ['Income Tax', 'HRA', 'Others']
+      : ['Income Tax', 'HRA', 'EPF', 'Others'];
+
+    const headerRow = ['', ...earnHeaders, '', ...dedHeaders, '', ''];
     const tableHeaderRow = sheet.getRow(rowNum + 1);
     tableHeaderRow.values = headerRow;
     tableHeaderRow.font = { bold: true };
 
     const getHeaderColor = (c) => {
       if (c === 1) return 'FFB0BEC5';
-      if (c >= 2 && c <= 3) return 'FFC8E6C9';
-      if (c === 4) return 'FFBBDEFB';
-      if (c >= 5 && c <= 7) return 'FFFFCCBC';
-      if (c === 8) return 'FFFFCCBC';
-      if (c === 9) return 'FFBBDEFB';
+      if (c >= 2 && c < 2 + earnColSpan) return 'FFC8E6C9';
+      if (c === 2 + earnColSpan) return 'FFBBDEFB';
+      if (c > 2 + earnColSpan && c < 2 + earnColSpan + 1 + dedColSpan) return 'FFFFCCBC';
+      if (c === 2 + earnColSpan + 1 + dedColSpan) return 'FFFFCCBC';
+      if (c === 2 + earnColSpan + 1 + dedColSpan + 1) return 'FFBBDEFB';
       return 'FFE0E0E0';
     };
 
     for (let r = rowNum; r <= rowNum + 1; r++) {
-      for (let c = 1; c <= 9; c++) {
+      for (let c = 1; c <= totalCols; c++) {
         const cell = sheet.getCell(r, c);
         cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         cell.fill = { type: 'pattern', pattern:'solid', fgColor: { argb: getHeaderColor(c) } };
@@ -412,7 +553,7 @@ const ConsolidatedStatement = () => {
       months.push(`${y}-${String(m).padStart(2, '0')}`);
     }
 
-    let grandTotals = Array(8).fill(0);
+    let grandTotals = Array(totalCols - 1).fill(0);
     let currentDataRow = 9;
 
     months.forEach(my => {
@@ -420,16 +561,43 @@ const ConsolidatedStatement = () => {
       const d = deductions.find(x => x.month_year === my) || {};
       const isLocked = e && e.is_approved === 1;
 
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
-      const gross = isLocked ? (basic + otherEarn) : null;
+      let rowValues = [];
+      if (isVisiting || isContract) {
+        const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (basic + otherEarn) : null;
 
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
-      const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : 0;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
 
-      const totDed = isLocked ? (it + hraVal + otherDed) : null;
-      const net = isLocked ? (gross - totDed) : null;
+        const totDed = isLocked ? (isVisiting ? (it + hraVal + otherDed) : (it + hraVal + epf + otherDed)) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        if (isVisiting) {
+          rowValues = [basic, otherEarn, gross, it, hraVal, otherDed, totDed, net];
+        } else {
+          rowValues = [basic, otherEarn, gross, it, hraVal, epf, otherDed, totDed, net];
+        }
+      } else {
+        // daily_wage
+        const daysWorked = isLocked ? Math.round(parseFloat(e.days_worked) || 0) : null;
+        const dailyWage = isLocked ? Math.round(parseFloat(e.daily_wage) || 0) : null;
+        const totalWage = isLocked ? Math.round(parseFloat(e.total_wage) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (totalWage + otherEarn) : null;
+
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+        const totDed = isLocked ? (it + hraVal + epf + otherDed) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        rowValues = [daysWorked, dailyWage, totalWage, otherEarn, gross, it, hraVal, epf, otherDed, totDed, net];
+      }
 
       const [yearStr, monthStr] = my.split('-');
       const year = parseInt(yearStr, 10);
@@ -443,19 +611,15 @@ const ConsolidatedStatement = () => {
       const calendarMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const displayMonth = `${calendarMonthNames[receivedMonth - 1]} ${receivedYear}`;
 
-      const rowValues = [
-        displayMonth,
-        basic, otherEarn, gross,
-        it, hraVal, otherDed, totDed, net
-      ];
+      const finalRowValues = [displayMonth, ...rowValues];
 
       const r = sheet.getRow(currentDataRow++);
-      r.values = rowValues;
+      r.values = finalRowValues;
       r.eachCell((cell, colNumber) => {
         cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
         if (colNumber > 1) {
           cell.numFmt = '0.00';
-          grandTotals[colNumber-2] += (rowValues[colNumber-1] || 0);
+          grandTotals[colNumber-2] += (rowValues[colNumber-2] || 0);
         }
       });
     });
@@ -711,15 +875,25 @@ const ConsolidatedStatement = () => {
   };
 
   const generatePDFVisiting = async (reportData, fyStart) => {
-    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
     const { employee, earnings, deductions } = reportData;
     const fyDisplay = `${fyStart}-${(fyStart + 1).toString().slice(-2)}`;
     const fullName = (employee.title ? `${employee.title} ` : '') + employee.name;
 
+    const isVisiting = employeeCategory === 'visiting';
+    const isContract = employeeCategory === 'contract';
+    const isDailyWage = employeeCategory === 'daily_wage';
+
+    const earnColSpan = isDailyWage ? 4 : 2;
+    const dedColSpan = isVisiting ? 3 : 4;
+    const totalsLength = earnColSpan + 1 + dedColSpan + 2; // gross + totDed + net + basic etc.
+
+    const categoryTitle = isVisiting ? 'Visiting Faculty' : isContract ? 'Contract Staff' : 'Daily Wage Staff';
+
     doc.setFontSize(16);
     doc.text('KERALA SCHOOL OF MATHEMATICS', doc.internal.pageSize.width / 2, 15, { align: 'center' });
     doc.setFontSize(12);
-    doc.text(`Consolidated Visiting Faculty Salary Statement for FY ${fyDisplay}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+    doc.text(`${categoryTitle} Consolidated Statement for FY ${fyDisplay}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
 
     doc.setFontSize(10);
     doc.text(`Name: ${fullName}`, 14, 32);
@@ -735,23 +909,50 @@ const ConsolidatedStatement = () => {
     }
 
     const body = [];
-    let totals = Array(8).fill(0);
+    let totals = Array(totalsLength).fill(0);
 
     months.forEach(my => {
       const e = earnings.find(x => x.month_year === my);
       const d = deductions.find(x => x.month_year === my) || {};
       const isLocked = e && e.is_approved === 1;
 
-      const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
-      const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
-      const gross = isLocked ? (basic + otherEarn) : null;
+      let rowValues = [];
+      if (isVisiting || isContract) {
+        const basic = isLocked ? Math.round(parseFloat(e.basic_pay) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (basic + otherEarn) : null;
 
-      const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
-      const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
-      const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : 0;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
 
-      const totDed = isLocked ? (it + hraVal + otherDed) : null;
-      const net = isLocked ? (gross - totDed) : null;
+        const totDed = isLocked ? (isVisiting ? (it + hraVal + otherDed) : (it + hraVal + epf + otherDed)) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        if (isVisiting) {
+          rowValues = [basic, otherEarn, gross, it, hraVal, otherDed, totDed, net];
+        } else {
+          rowValues = [basic, otherEarn, gross, it, hraVal, epf, otherDed, totDed, net];
+        }
+      } else {
+        // daily wage
+        const daysWorked = isLocked ? Math.round(parseFloat(e.days_worked) || 0) : null;
+        const dailyWage = isLocked ? Math.round(parseFloat(e.daily_wage) || 0) : null;
+        const totalWage = isLocked ? Math.round(parseFloat(e.total_wage) || 0) : null;
+        const otherEarn = isLocked ? Math.round(parseFloat(e.other_earnings) || 0) : null;
+        const gross = isLocked ? (totalWage + otherEarn) : null;
+
+        const it = isLocked ? Math.round(parseFloat(d.income_tax) || 0) : null;
+        const hraVal = isLocked ? Math.round(parseFloat(d.hra) || 0) : null;
+        const epf = isLocked ? Math.round(parseFloat(d.epf) || 0) : null;
+        const otherDed = isLocked ? Math.round(parseFloat(d.other_deductions) || 0) : null;
+
+        const totDed = isLocked ? (it + hraVal + epf + otherDed) : null;
+        const net = isLocked ? (gross - totDed) : null;
+
+        rowValues = [daysWorked, dailyWage, totalWage, otherEarn, gross, it, hraVal, epf, otherDed, totDed, net];
+      }
 
       const [, monthStr] = my.split('-');
       const month = parseInt(monthStr, 10);
@@ -762,29 +963,38 @@ const ConsolidatedStatement = () => {
 
       body.push([
         displayMonth,
-        fmt(basic), fmt(otherEarn), fmt(gross),
-        fmt(it), fmt(hraVal), fmt(otherDed), fmt(totDed), fmt(net)
+        ...rowValues.map(v => fmt(v))
       ]);
 
-      [basic, otherEarn, gross, it, hraVal, otherDed, totDed, net].forEach((v, idx) => totals[idx] += (v || 0));
+      rowValues.forEach((v, idx) => totals[idx] += (v || 0));
     });
 
     body.push([{ content: 'TOTAL', styles: { fontStyle: 'bold' } }, ...totals.map(v => ({ content: fmt(v), styles: { fontStyle: 'bold' } }))]);
+
+    const earnHeaders = isDailyWage 
+      ? ['Days Worked', 'Daily Wage', 'Total Wage', 'Others']
+      : isContract
+        ? ['Consolidated Salary', 'Others']
+        : ['Honorarium / Consolidated', 'Others'];
+
+    const dedHeaders = isVisiting
+      ? ['Income Tax', 'HRA', 'Others']
+      : ['Income Tax', 'HRA', 'EPF', 'Others'];
 
     autoTable(doc, {
       startY: 45,
       head: [
         [
           { content: 'Payment received month', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [176, 190, 197] } },
-          { content: 'Allowances', colSpan: 2, styles: { halign: 'center', fillColor: [200, 230, 201] } },
+          { content: 'Allowances', colSpan: earnColSpan, styles: { halign: 'center', fillColor: [200, 230, 201] } },
           { content: 'Gross', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [187, 222, 251] } },
-          { content: 'Deductions', colSpan: 3, styles: { halign: 'center', fillColor: [255, 204, 188] } },
+          { content: 'Deductions', colSpan: dedColSpan, styles: { halign: 'center', fillColor: [255, 204, 188] } },
           { content: 'TotDed', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [255, 204, 188] } },
           { content: 'NetPay', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [187, 222, 251] } }
         ],
         [
-          ...['Honorarium / Consolidated', 'Others'].map(c => ({ content: c, styles: { fillColor: [200, 230, 201], halign: 'center' } })),
-          ...['Income Tax', 'HRA', 'Others'].map(c => ({ content: c, styles: { fillColor: [255, 204, 188], halign: 'center' } }))
+          ...earnHeaders.map(c => ({ content: c, styles: { fillColor: [200, 230, 201], halign: 'center' } })),
+          ...dedHeaders.map(c => ({ content: c, styles: { fillColor: [255, 204, 188], halign: 'center' } }))
         ]
       ],
       body: body,
@@ -993,7 +1203,28 @@ const ConsolidatedStatement = () => {
       const preview = getPreviewRows();
       if (!preview) return null;
 
-      if (employeeCategory === 'visiting') {
+      if (employeeCategory === 'visiting' || employeeCategory === 'contract' || employeeCategory === 'daily_wage') {
+        const isVisiting = employeeCategory === 'visiting';
+        const isContract = employeeCategory === 'contract';
+        const isDailyWage = employeeCategory === 'daily_wage';
+
+        const earnColSpan = isDailyWage ? 4 : 2;
+        const dedColSpan = isVisiting ? 3 : 4;
+
+        const earnHeaders = isDailyWage 
+          ? ['Days Worked', 'Daily Wage', 'Total Wage', 'Others']
+          : isContract
+            ? ['Consolidated Salary', 'Others']
+            : ['Honorarium / Consolidated', 'Others'];
+
+        const dedHeaders = isVisiting
+          ? ['Income Tax', 'HRA', 'Others']
+          : ['Income Tax', 'HRA', 'EPF', 'Others'];
+
+        const grossIdx = isDailyWage ? 4 : 2;
+        const totDedIdx = isDailyWage ? 9 : isContract ? 7 : 6;
+        const netIdx = isDailyWage ? 10 : isContract ? 8 : 7;
+
         return (
           <div className="card" style={{ marginTop: '2rem', animation: 'fadeIn var(--transition-normal)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -1019,19 +1250,19 @@ const ConsolidatedStatement = () => {
                 <thead>
                   <tr style={{ background: 'var(--color-bg-primary)' }}>
                     <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center', width: '100px', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-primary)', zIndex: 2 }}>Month</th>
-                    <th colSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Allowances</th>
+                    <th colSpan={earnColSpan} style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', textAlign: 'center', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>Allowances</th>
                     <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Gross Pay</th>
-                    <th colSpan="3" style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
+                    <th colSpan={dedColSpan} style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Deductions</th>
                     <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-danger)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>Total Ded</th>
                     <th rowSpan="2" style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-accent-primary)', textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>Net Pay</th>
                   </tr>
                   <tr style={{ background: 'var(--color-bg-primary)' }}>
                     {/* Allowances sub-headers */}
-                    {['Honorarium / Consolidated', 'Others'].map((h, i) => (
+                    {earnHeaders.map((h, i) => (
                       <th key={`earn-${i}`} style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
                     ))}
                     {/* Deductions sub-headers */}
-                    {['Income Tax', 'HRA', 'Others'].map((h, i) => (
+                    {dedHeaders.map((h, i) => (
                       <th key={`ded-${i}`} style={{ padding: '0.6rem 0.8rem', borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>{h}</th>
                     ))}
                   </tr>
@@ -1041,7 +1272,7 @@ const ConsolidatedStatement = () => {
                     <tr key={rIdx} style={{ borderBottom: '1px solid var(--color-border)' }}>
                       <td style={{ padding: '0.6rem 0.8rem', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.month}</td>
                       {row.values.map((val, vIdx) => {
-                        const isHighlight = vIdx === 2 || vIdx === 6 || vIdx === 7; // Gross, TotDed, Net
+                        const isHighlight = vIdx === grossIdx || vIdx === totDedIdx || vIdx === netIdx;
                         return (
                           <td 
                             key={vIdx} 
@@ -1050,7 +1281,7 @@ const ConsolidatedStatement = () => {
                               textAlign: 'center', 
                               fontWeight: isHighlight ? 'bold' : 'normal',
                               color: isHighlight 
-                                ? (vIdx === 6 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                                ? (vIdx === totDedIdx ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
                                 : (val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)')
                             }}
                           >
@@ -1064,7 +1295,7 @@ const ConsolidatedStatement = () => {
                   <tr style={{ background: 'rgba(255, 255, 255, 0.02)', fontWeight: 'bold', borderTop: '2px solid var(--color-border)' }}>
                     <td style={{ padding: '0.6rem 0.8rem', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, color: 'var(--color-text-primary)' }}>TOTAL</td>
                     {preview.grandTotals.map((tot, idx) => {
-                      const isHighlight = idx === 2 || idx === 6 || idx === 7; // Gross, TotDed, Net
+                      const isHighlight = idx === grossIdx || idx === totDedIdx || idx === netIdx;
                       return (
                         <td 
                           key={idx} 
@@ -1072,7 +1303,7 @@ const ConsolidatedStatement = () => {
                             padding: '0.6rem 0.8rem', 
                             textAlign: 'center', 
                             color: isHighlight 
-                              ? (idx === 6 ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
+                              ? (idx === totDedIdx ? 'var(--color-danger)' : 'var(--color-accent-primary)') 
                               : 'var(--color-text-primary)' 
                           }}
                         >
@@ -1207,41 +1438,30 @@ const ConsolidatedStatement = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-        <button 
-          onClick={() => handleCategoryChange('permanent')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Permanent Employees
-        </button>
-        <button 
-          onClick={() => handleCategoryChange('visiting')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Visiting Professors & Assistant Professors
-        </button>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
+          <button 
+            key={cat}
+            onClick={() => handleCategoryChange(cat)}
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: employeeCategory === cat ? '2px solid var(--color-primary)' : '2px solid transparent',
+              color: employeeCategory === cat ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+          >
+            {cat === 'permanent' && 'Permanent Employees'}
+            {cat === 'visiting' && 'Visiting Faculty'}
+            {cat === 'contract' && 'Contract Staff'}
+            {cat === 'daily_wage' && 'Daily Wage Staff'}
+          </button>
+        ))}
       </div>
 
       <div className="card" style={{ maxWidth: '600px' }}>

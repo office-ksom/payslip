@@ -165,7 +165,13 @@ const ConsolidatedStatementAll = () => {
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated-all' : '/api/reports/visiting/consolidated-all';
+      const endpoint = employeeCategory === 'permanent' 
+        ? '/api/reports/consolidated-all' 
+        : employeeCategory === 'visiting'
+          ? '/api/reports/visiting/consolidated-all'
+          : employeeCategory === 'contract'
+            ? '/api/reports/contract/consolidated-all'
+            : '/api/reports/daily_wage/consolidated-all';
       const res = await fetch(`${endpoint}?fy=${fy}`);
       const data = await res.json();
 
@@ -190,7 +196,13 @@ const ConsolidatedStatementAll = () => {
     }
     setPreviewLoading(true);
     try {
-      const endpoint = employeeCategory === 'permanent' ? '/api/reports/consolidated-all' : '/api/reports/visiting/consolidated-all';
+      const endpoint = employeeCategory === 'permanent' 
+        ? '/api/reports/consolidated-all' 
+        : employeeCategory === 'visiting'
+          ? '/api/reports/visiting/consolidated-all'
+          : employeeCategory === 'contract'
+            ? '/api/reports/contract/consolidated-all'
+            : '/api/reports/daily_wage/consolidated-all';
       const res = await fetch(`${endpoint}?fy=${fy}`);
       const data = await res.json();
 
@@ -647,6 +659,40 @@ const ConsolidatedStatementAll = () => {
         ' Name /\r\nNet salary received in.'
       );
 
+    } else if (employeeCategory === 'contract' || employeeCategory === 'daily_wage') {
+      const categoryTitle = employeeCategory === 'contract' ? 'Contract Staff' : 'Daily Wage Staff';
+      generateSheet(
+        `Gross Salary ${fyStart}-${fyStart + 1}`,
+        `${categoryTitle} Gross Salary Details for the FY ${fyStart} -${fyStart + 1}`,
+        null,
+        'gross',
+        ' Name /\r\nPayment received in the month'
+      );
+
+      generateSheet(
+        'TDS',
+        'Kerala School of Mathematics',
+        `${categoryTitle} Tax Deducted for the FY ${fyStart} -${fyStart + 1} `,
+        'tds',
+        ' Name /\r\nTDS from the salary received in.'
+      );
+
+      generateSheet(
+        'EPF',
+        'Kerala School of Mathematics',
+        `${categoryTitle} EPF Deducted for the FY ${fyStart} -${fyStart + 1}`,
+        'epf',
+        ' Name /\r\nEPF recovery from the salary received in.'
+      );
+
+      generateSheet(
+        'Net Salary',
+        'Kerala School of Mathematics',
+        `${categoryTitle} Net Salary Payout for the FY ${fyStart} -${fyStart + 1}`,
+        'net',
+        ' Name /\r\nNet salary received in.'
+      );
+
     } else {
       // Permanent sheets: Gross, TDS, EPF, SLI, GIS, GPAIS
       generateSheet(
@@ -728,41 +774,30 @@ const ConsolidatedStatementAll = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-        <button 
-          onClick={() => handleCategoryChange('permanent')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Permanent Employees
-        </button>
-        <button 
-          onClick={() => handleCategoryChange('visiting')}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Visiting Professors & Assistant Professors
-        </button>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
+          <button 
+            key={cat}
+            onClick={() => handleCategoryChange(cat)}
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: employeeCategory === cat ? '2px solid var(--color-primary)' : '2px solid transparent',
+              color: employeeCategory === cat ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+          >
+            {cat === 'permanent' && 'Permanent Employees'}
+            {cat === 'visiting' && 'Visiting Faculty'}
+            {cat === 'contract' && 'Contract Staff'}
+            {cat === 'daily_wage' && 'Daily Wage Staff'}
+          </button>
+        ))}
       </div>
 
       <div className="card" style={{ maxWidth: '600px' }}>
@@ -804,17 +839,22 @@ const ConsolidatedStatementAll = () => {
         const preview = getPreviewContent();
         if (!preview) return null;
 
-        const tabsList = employeeCategory === 'visiting' ? [
+        const tabsList = employeeCategory === 'permanent' ? [
           { key: 'gross', label: 'Gross Salary' },
           { key: 'tds', label: 'TDS' },
+          { key: 'epf', label: 'EPF / GPF' },
+          { key: 'sli', label: 'SLI' },
+          { key: 'gis', label: 'GIS' },
+          { key: 'gpais', label: 'GPAIS' }
+        ] : (employeeCategory === 'contract' || employeeCategory === 'daily_wage') ? [
+          { key: 'gross', label: 'Gross Salary' },
+          { key: 'tds', label: 'TDS' },
+          { key: 'epf', label: 'EPF' },
           { key: 'net', label: 'Net Salary' }
         ] : [
           { key: 'gross', label: 'Gross Salary' },
           { key: 'tds', label: 'TDS' },
-          { key: 'epf', label: 'EPF' },
-          { key: 'sli', label: 'SLI' },
-          { key: 'gis', label: 'GIS' },
-          { key: 'gpais', label: 'GPAIS' }
+          { key: 'net', label: 'Net Salary' }
         ];
 
         return (
@@ -923,7 +963,8 @@ const ConsolidatedStatementAll = () => {
         <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--color-primary)' }}>Export Details</h4>
         <ul style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem' }}>
           <li>Produces a multi-sheet Excel file tailored to the selected employee category.</li>
-          <li>For Permanent Employees: includes sheets for Gross Salary, TDS, EPF, SLI, GIS, and GPAIS.</li>
+          <li>For Permanent Employees: includes sheets for Gross Salary, TDS, EPF / GPF, SLI, GIS, and GPAIS.</li>
+          <li>For Contract & Daily Wage Staff: includes sheets for Gross Salary, TDS, EPF, and Net Salary.</li>
           <li>For Visiting Faculty: includes sheets for Gross Salary, TDS, and Net Salary.</li>
           <li>Data is calculated for the payment received months (April to March), which maps to salary months March to February.</li>
           <li>All amounts are rounded to the nearest integer and formatted with two decimal places (e.g. <code>.00</code>).</li>

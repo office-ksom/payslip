@@ -9,40 +9,26 @@ export async function onRequestPost(context) {
     const db = context.env.ksom_payslip_db;
     const now = new Date().toISOString();
 
-    const url = new URL(context.request.url);
-    const category = url.searchParams.get('category') || 'permanent';
-
-    let tableName = 'employees';
-    if (category === 'visiting') {
-      tableName = 'visiting_employees';
-    } else if (category === 'contract') {
-      tableName = 'contract_employees';
-    } else if (category === 'daily_wage') {
-      tableName = 'daily_wage_employees';
-    }
-
     const body = await context.request.json().catch(() => ({}));
-    const action = body.action || 'approve'; // 'submit', 'reject', 'approve'
+    const action = body.action || 'approve';
 
-    // Fetch the require_approval system setting
     const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first('value');
     const requireApproval = settingsCheck !== '0';
 
     if (action === 'submit') {
       if (userRole !== 'admin' && userRole !== 'super_admin') {
-        return new Response(JSON.stringify({ error: 'Only admins or super admins can submit supplementary paybills.' }), { status: 403 });
+        return new Response(JSON.stringify({ error: 'Only admins or super admins can submit paybills.' }), { status: 403 });
       }
     } else if (action === 'approve' || action === 'reject') {
       const isAllowed = userRole === 'approver' || userRole === 'super_admin' || (!requireApproval && userRole === 'admin');
       if (!isAllowed) {
-        return new Response(JSON.stringify({ error: 'Only approvers, super admins (or admins under current settings) can approve/reject supplementary paybills.' }), { status: 403 });
+        return new Response(JSON.stringify({ error: 'Only approvers, super admins (or admins under current settings) can approve/reject paybills.' }), { status: 403 });
       }
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action.' }), { status: 400 });
     }
 
-    // Check if any records exist for this month and category
-    const exists = await db.prepare(`SELECT count(*) as count FROM supplementary_earnings WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})`).bind(monthYear).first('count');
+    const exists = await db.prepare("SELECT count(*) as count FROM daily_wage_monthly_earnings WHERE month_year = ?").bind(monthYear).first('count');
     if (exists === 0) {
       return new Response(JSON.stringify({ error: 'No data found for this month to process.' }), { status: 400 });
     }
@@ -62,13 +48,13 @@ export async function onRequestPost(context) {
     }
 
     await db.prepare(`
-      UPDATE supplementary_earnings 
+      UPDATE daily_wage_monthly_earnings 
       SET is_approved = ?, approved_on = ?, approved_by = ?
-      WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
+      WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
 
     const actionMap = { 'submit': 'Submitted', 'reject': 'Rejected', 'approve': 'Verified & Locked' };
-    await logActivity(db, userEmail, 'Supplementary Paybill Action', `${actionMap[action] || action} ${category} supplementary paybill for ${monthYear}`);
+    await logActivity(db, userEmail, 'Daily Wage Paybill Action', `${actionMap[action] || action} daily wage paybill for ${monthYear}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -88,22 +74,10 @@ export async function onRequestGet(context) {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
 
-    const url = new URL(context.request.url);
-    const category = url.searchParams.get('category') || 'permanent';
-
-    let tableName = 'employees';
-    if (category === 'visiting') {
-      tableName = 'visiting_employees';
-    } else if (category === 'contract') {
-      tableName = 'contract_employees';
-    } else if (category === 'daily_wage') {
-      tableName = 'daily_wage_employees';
-    }
-
     const approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
-      FROM supplementary_earnings 
-      WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
+      FROM daily_wage_monthly_earnings 
+      WHERE month_year = ?
       ORDER BY is_approved DESC
       LIMIT 1
     `).bind(monthYear).first();

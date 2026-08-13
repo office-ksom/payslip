@@ -9,11 +9,27 @@ export async function onRequestGet(context) {
     const isYearOnly = monthYear.length === 4;
     const dateLen = isYearOnly ? 4 : 7;
 
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category') || 'permanent';
+
+    let tableName = 'employees';
+    if (category === 'visiting') {
+      tableName = 'visiting_employees';
+    } else if (category === 'contract') {
+      tableName = 'contract_employees';
+    } else if (category === 'daily_wage') {
+      tableName = 'daily_wage_employees';
+    }
+
+    const isPerm = tableName === 'employees';
+    const payColumn = isPerm ? 'e.scale_of_pay' : 'e.pay_type as scale_of_pay';
+    const catColumn = isPerm ? 'e.category' : `'${category}' as category`;
+
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
              s.id as bill_id, s.bill_date, s.financial_year, s.basic_pay, s.da, s.hra, s.num_els, s.total_amount,
              s.is_approved, s.approved_on, s.approved_by, s.is_terminal
-      FROM employees e
+      FROM ${tableName} e
       LEFT JOIN surrender_bills s ON e.emp_id = s.emp_id AND substr(s.bill_date, 1, ${dateLen}) = ?
     `;
     let params = [monthYear];

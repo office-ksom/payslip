@@ -1,11 +1,29 @@
+import { onRequestGet as __api_reports_contract_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\contract\\consolidated.js"
+import { onRequestGet as __api_reports_contract_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\contract\\consolidated-all.js"
+import { onRequestGet as __api_reports_daily_wage_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\daily_wage\\consolidated.js"
+import { onRequestGet as __api_reports_daily_wage_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\daily_wage\\consolidated-all.js"
 import { onRequestGet as __api_reports_visiting_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\visiting\\consolidated.js"
 import { onRequestGet as __api_reports_visiting_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\visiting\\consolidated-all.js"
+import { onRequestGet as __api_approve_contract__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\contract\\[month_year].js"
+import { onRequestPost as __api_approve_contract__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\contract\\[month_year].js"
+import { onRequestGet as __api_approve_daily_wage__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\daily_wage\\[month_year].js"
+import { onRequestPost as __api_approve_daily_wage__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\daily_wage\\[month_year].js"
 import { onRequestGet as __api_approve_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\visiting\\[month_year].js"
 import { onRequestPost as __api_approve_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\approve\\visiting\\[month_year].js"
 import { onRequestGet as __api_arrears_approve__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\arrears\\approve\\[month_year].js"
 import { onRequestPost as __api_arrears_approve__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\arrears\\approve\\[month_year].js"
+import { onRequestGet as __api_deductions_contract__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\contract\\[month_year].js"
+import { onRequestPost as __api_deductions_contract__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\contract\\[month_year].js"
+import { onRequestGet as __api_deductions_daily_wage__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\daily_wage\\[month_year].js"
+import { onRequestPost as __api_deductions_daily_wage__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\daily_wage\\[month_year].js"
 import { onRequestGet as __api_deductions_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\visiting\\[month_year].js"
 import { onRequestPost as __api_deductions_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\deductions\\visiting\\[month_year].js"
+import { onRequestDelete as __api_earnings_contract__month_year__js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\contract\\[month_year].js"
+import { onRequestGet as __api_earnings_contract__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\contract\\[month_year].js"
+import { onRequestPost as __api_earnings_contract__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\contract\\[month_year].js"
+import { onRequestDelete as __api_earnings_daily_wage__month_year__js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\daily_wage\\[month_year].js"
+import { onRequestGet as __api_earnings_daily_wage__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\daily_wage\\[month_year].js"
+import { onRequestPost as __api_earnings_daily_wage__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\daily_wage\\[month_year].js"
 import { onRequestDelete as __api_earnings_visiting__month_year__js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
 import { onRequestGet as __api_earnings_visiting__month_year__js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
 import { onRequestPost as __api_earnings_visiting__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\earnings\\visiting\\[month_year].js"
@@ -19,6 +37,12 @@ import { onRequestPost as __api_auth_login_js_onRequestPost } from "D:\\KSOM\\We
 import { onRequestGet as __api_auth_logout_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\logout.js"
 import { onRequestPost as __api_auth_reset_confirm_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\reset-confirm.js"
 import { onRequestPost as __api_auth_reset_request_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\auth\\reset-request.js"
+import { onRequestGet as __api_employees_contract_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\contract.js"
+import { onRequestPost as __api_employees_contract_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\contract.js"
+import { onRequestPut as __api_employees_contract_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\contract.js"
+import { onRequestGet as __api_employees_daily_wage_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\daily_wage.js"
+import { onRequestPost as __api_employees_daily_wage_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\daily_wage.js"
+import { onRequestPut as __api_employees_daily_wage_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\daily_wage.js"
 import { onRequestGet as __api_employees_visiting_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
 import { onRequestPost as __api_employees_visiting_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
 import { onRequestPut as __api_employees_visiting_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
@@ -63,6 +87,34 @@ import { onRequest as ___middleware_js_onRequest } from "D:\\KSOM\\Website\\Web 
 
 export const routes = [
     {
+      routePath: "/api/reports/contract/consolidated",
+      mountPath: "/api/reports/contract",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_contract_consolidated_js_onRequestGet],
+    },
+  {
+      routePath: "/api/reports/contract/consolidated-all",
+      mountPath: "/api/reports/contract",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_contract_consolidated_all_js_onRequestGet],
+    },
+  {
+      routePath: "/api/reports/daily_wage/consolidated",
+      mountPath: "/api/reports/daily_wage",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_daily_wage_consolidated_js_onRequestGet],
+    },
+  {
+      routePath: "/api/reports/daily_wage/consolidated-all",
+      mountPath: "/api/reports/daily_wage",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_reports_daily_wage_consolidated_all_js_onRequestGet],
+    },
+  {
       routePath: "/api/reports/visiting/consolidated",
       mountPath: "/api/reports/visiting",
       method: "GET",
@@ -75,6 +127,34 @@ export const routes = [
       method: "GET",
       middlewares: [],
       modules: [__api_reports_visiting_consolidated_all_js_onRequestGet],
+    },
+  {
+      routePath: "/api/approve/contract/:month_year",
+      mountPath: "/api/approve/contract",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_approve_contract__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/approve/contract/:month_year",
+      mountPath: "/api/approve/contract",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_approve_contract__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/approve/daily_wage/:month_year",
+      mountPath: "/api/approve/daily_wage",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_approve_daily_wage__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/approve/daily_wage/:month_year",
+      mountPath: "/api/approve/daily_wage",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_approve_daily_wage__month_year__js_onRequestPost],
     },
   {
       routePath: "/api/approve/visiting/:month_year",
@@ -105,6 +185,34 @@ export const routes = [
       modules: [__api_arrears_approve__month_year__js_onRequestPost],
     },
   {
+      routePath: "/api/deductions/contract/:month_year",
+      mountPath: "/api/deductions/contract",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_deductions_contract__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/deductions/contract/:month_year",
+      mountPath: "/api/deductions/contract",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_deductions_contract__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/deductions/daily_wage/:month_year",
+      mountPath: "/api/deductions/daily_wage",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_deductions_daily_wage__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/deductions/daily_wage/:month_year",
+      mountPath: "/api/deductions/daily_wage",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_deductions_daily_wage__month_year__js_onRequestPost],
+    },
+  {
       routePath: "/api/deductions/visiting/:month_year",
       mountPath: "/api/deductions/visiting",
       method: "GET",
@@ -117,6 +225,48 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_deductions_visiting__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/earnings/contract/:month_year",
+      mountPath: "/api/earnings/contract",
+      method: "DELETE",
+      middlewares: [],
+      modules: [__api_earnings_contract__month_year__js_onRequestDelete],
+    },
+  {
+      routePath: "/api/earnings/contract/:month_year",
+      mountPath: "/api/earnings/contract",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_earnings_contract__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/earnings/contract/:month_year",
+      mountPath: "/api/earnings/contract",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_earnings_contract__month_year__js_onRequestPost],
+    },
+  {
+      routePath: "/api/earnings/daily_wage/:month_year",
+      mountPath: "/api/earnings/daily_wage",
+      method: "DELETE",
+      middlewares: [],
+      modules: [__api_earnings_daily_wage__month_year__js_onRequestDelete],
+    },
+  {
+      routePath: "/api/earnings/daily_wage/:month_year",
+      mountPath: "/api/earnings/daily_wage",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_earnings_daily_wage__month_year__js_onRequestGet],
+    },
+  {
+      routePath: "/api/earnings/daily_wage/:month_year",
+      mountPath: "/api/earnings/daily_wage",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_earnings_daily_wage__month_year__js_onRequestPost],
     },
   {
       routePath: "/api/earnings/visiting/:month_year",
@@ -208,6 +358,48 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_auth_reset_request_js_onRequestPost],
+    },
+  {
+      routePath: "/api/employees/contract",
+      mountPath: "/api/employees",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_employees_contract_js_onRequestGet],
+    },
+  {
+      routePath: "/api/employees/contract",
+      mountPath: "/api/employees",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_employees_contract_js_onRequestPost],
+    },
+  {
+      routePath: "/api/employees/contract",
+      mountPath: "/api/employees",
+      method: "PUT",
+      middlewares: [],
+      modules: [__api_employees_contract_js_onRequestPut],
+    },
+  {
+      routePath: "/api/employees/daily_wage",
+      mountPath: "/api/employees",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_employees_daily_wage_js_onRequestGet],
+    },
+  {
+      routePath: "/api/employees/daily_wage",
+      mountPath: "/api/employees",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_employees_daily_wage_js_onRequestPost],
+    },
+  {
+      routePath: "/api/employees/daily_wage",
+      mountPath: "/api/employees",
+      method: "PUT",
+      middlewares: [],
+      modules: [__api_employees_daily_wage_js_onRequestPut],
     },
   {
       routePath: "/api/employees/visiting",

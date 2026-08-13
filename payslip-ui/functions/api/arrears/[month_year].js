@@ -6,32 +6,66 @@ export async function onRequestGet(context) {
 
     const url = new URL(context.request.url);
     const arrearType = url.searchParams.get('type');
+    const category = url.searchParams.get('category') || 'state';
+
+    let tableName = 'employees';
+    let categoryFilter = '';
+
+    if (category === 'state') {
+      tableName = 'employees';
+      categoryFilter = "e.category = 'state'";
+    } else if (category === 'ugc/csir' || category === 'ugc') {
+      tableName = 'employees';
+      categoryFilter = "(e.category = 'ugc/csir' OR e.category = 'ugc')";
+    } else if (category === 'permanent') {
+      tableName = 'employees';
+      categoryFilter = "";
+    } else if (category === 'visiting') {
+      tableName = 'visiting_employees';
+    } else if (category === 'contract') {
+      tableName = 'contract_employees';
+    } else if (category === 'daily_wage') {
+      tableName = 'daily_wage_employees';
+    }
+
+    const isPerm = tableName === 'employees';
+    const payColumn = isPerm ? 'e.scale_of_pay' : 'e.pay_type as scale_of_pay';
+    const catColumn = isPerm ? 'e.category' : `'${category}' as category`;
 
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
              a.id as bill_id, a.arrear_type, a.arrear_type_other, a.arrear_amount, a.income_tax, a.net_amount, a.bill_date, a.description,
              a.is_approved, a.approved_on, a.approved_by
-      FROM employees e
+      FROM ${tableName} e
       LEFT JOIN arrear_bills a ON e.emp_id = a.emp_id AND substr(a.bill_date, 1, 7) = ?
     `;
     let params = [monthYear];
 
     if (arrearType) {
       query = `
-        SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.email_id, e.title, e.sort_order,
+        SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
                a.id as bill_id, a.arrear_type, a.arrear_type_other, a.arrear_amount, a.income_tax, a.net_amount, a.bill_date, a.description,
                a.is_approved, a.approved_on, a.approved_by
-        FROM employees e
+        FROM ${tableName} e
         LEFT JOIN arrear_bills a ON e.emp_id = a.emp_id AND substr(a.bill_date, 1, 7) = ? AND a.arrear_type = ?
       `;
       params.push(arrearType);
     }
 
+    let whereClauses = [];
+    if (categoryFilter) {
+      whereClauses.push(categoryFilter);
+    }
+
     if (userRole === 'viewer' && userEmail) {
-      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
+      whereClauses.push("LOWER(e.email_id) = LOWER(?)");
       params.push(userEmail);
     } else {
-      query += ` WHERE e.is_active = 1 OR a.id IS NOT NULL`;
+      whereClauses.push("(e.is_active = 1 OR a.id IS NOT NULL)");
+    }
+
+    if (whereClauses.length > 0) {
+      query += " WHERE " + whereClauses.join(" AND ");
     }
 
     query += ` ORDER BY e.sort_order ASC, e.name ASC`;

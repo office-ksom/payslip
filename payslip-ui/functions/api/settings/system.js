@@ -19,8 +19,8 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const userRole = context.request.headers.get('X-User-Role');
   const userEmail = context.request.headers.get('X-User-Email');
-  if (userRole !== 'super_admin') {
-    return new Response(JSON.stringify({ error: 'Forbidden. Only super admin can change system settings.' }), { status: 403 });
+  if (userRole !== 'super_admin' && userRole !== 'admin') {
+    return new Response(JSON.stringify({ error: 'Forbidden. Only admin or super admin can change system settings.' }), { status: 403 });
   }
 
   try {

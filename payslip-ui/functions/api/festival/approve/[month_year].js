@@ -8,6 +8,9 @@ export async function onRequestPost(context) {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
 
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category');
+
     // Fetch require_approval setting
     const settingsCheck = await db.prepare("SELECT value FROM system_settings WHERE key = 'require_approval'").first('value');
     const requireApproval = settingsCheck !== '0';
@@ -29,6 +32,10 @@ export async function onRequestPost(context) {
     if (empIds && empIds.length > 0) {
       existsQuery += ` AND emp_id IN (${empIds.map(() => '?').join(',')})`;
       existsParams.push(...empIds);
+    }
+    if (category) {
+      existsQuery += " AND category = ?";
+      existsParams.push(category);
     }
 
     const exists = await db.prepare(existsQuery).bind(...existsParams).first('count');
@@ -56,6 +63,10 @@ export async function onRequestPost(context) {
       updateParams = [now, userEmail, monthYear];
     }
 
+    if (category) {
+      updateQuery += " AND category = ?";
+      updateParams.push(category);
+    }
     if (empIds && empIds.length > 0) {
       updateQuery += ` AND emp_id IN (${empIds.map(() => '?').join(',')})`;
       updateParams.push(...empIds);
@@ -64,7 +75,8 @@ export async function onRequestPost(context) {
     await db.prepare(updateQuery).bind(...updateParams).run();
 
     const actionText = action === 'reject' ? 'Rejected' : 'Verified & Locked';
-    await logActivity(db, userEmail, 'Festival Allowance Bill Action', `${actionText} festival allowance bill(s) for ${monthYear}`);
+    const catText = category ? ` (${category})` : '';
+    await logActivity(db, userEmail, 'Festival Allowance Bill Action', `${actionText} festival allowance bill(s)${catText} for ${monthYear}`);
 
     return new Response(JSON.stringify({ success: true, approved_on: action === 'reject' ? null : now, approved_by: action === 'reject' ? null : userEmail }), {
       headers: { 'Content-Type': 'application/json' }
@@ -79,12 +91,24 @@ export async function onRequestGet(context) {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
 
-    const approvalInfo = await db.prepare(`
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category');
+
+    let query = `
       SELECT is_approved, approved_on, approved_by 
       FROM festival_allowance_bills 
       WHERE substr(bill_date, 1, 7) = ? AND is_approved = 1
-      LIMIT 1
-    `).bind(monthYear).first();
+    `;
+    let params = [monthYear];
+
+    if (category) {
+      query += " AND category = ?";
+      params.push(category);
+    }
+
+    query += " LIMIT 1";
+
+    const approvalInfo = await db.prepare(query).bind(...params).first();
 
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { 'Content-Type': 'application/json' }

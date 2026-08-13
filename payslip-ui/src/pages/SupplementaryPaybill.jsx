@@ -32,6 +32,8 @@ const SupplementaryPaybill = (props) => {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  const [activeTab, setActiveTab] = useState('permanent');
+
   const [employees, setEmployees] = useState([]);
   const [allEmployeesList, setAllEmployeesList] = useState([]);
   const [selectedAddEmpId, setSelectedAddEmpId] = useState('');
@@ -59,22 +61,29 @@ const SupplementaryPaybill = (props) => {
       .then(res => res.json())
       .then(data => setUsersList(Array.isArray(data) ? data : []))
       .catch(err => console.error("Failed to load users in SupplementaryPaybill", err));
-
-    fetch('/api/employees')
-      .then(res => res.json())
-      .then(data => setAllEmployeesList(Array.isArray(data) ? data.filter(e => e.is_active === 1) : []))
-      .catch(err => console.error("Failed to load employees list", err));
   }, []);
 
   useEffect(() => {
+    let endpoint = '/api/employees';
+    if (activeTab === 'visiting') endpoint = '/api/employees/visiting';
+    else if (activeTab === 'contract') endpoint = '/api/employees/contract';
+    else if (activeTab === 'daily_wage') endpoint = '/api/employees/daily_wage';
+
+    fetch(endpoint)
+      .then(res => res.json())
+      .then(data => setAllEmployeesList(Array.isArray(data) ? data.filter(e => e.is_active === 1) : []))
+      .catch(err => console.error("Failed to load employees list", err));
+  }, [activeTab]);
+
+  useEffect(() => {
     setIsOverrideActive(false);
-  }, [monthYear]);
+  }, [monthYear, activeTab]);
 
   useEffect(() => {
     if (user) {
       loadDataForMonth(monthYear);
     }
-  }, [monthYear, user]);
+  }, [monthYear, user, activeTab]);
 
   const loadDataForMonth = async (targetMonth) => {
     setLoading(true);
@@ -97,7 +106,7 @@ const SupplementaryPaybill = (props) => {
       const settingsData = await settingsRes.json();
       setGlobalSettingsList(settingsData);
 
-      const suppRes = await fetch(`/api/supplementary/${targetMonth}`);
+      const suppRes = await fetch(`/api/supplementary/${targetMonth}?category=${activeTab}`);
       if (!suppRes.ok) {
         const err = await suppRes.json();
         throw new Error(err.error || "Failed to load supplementary paybill");
@@ -105,7 +114,7 @@ const SupplementaryPaybill = (props) => {
       const suppData = await suppRes.json();
 
       try {
-        const approvalRes = await fetch(`/api/supplementary/approve/${targetMonth}`);
+        const approvalRes = await fetch(`/api/supplementary/approve/${targetMonth}?category=${activeTab}`);
         if (approvalRes.ok) {
           const approvalData = await approvalRes.json();
           setIsApproved(approvalData.is_approved === 1);
@@ -171,32 +180,41 @@ const SupplementaryPaybill = (props) => {
     const fullEmp = allEmployeesList.find(e => e.emp_id === selectedAddEmpId);
     if (!fullEmp) return;
 
-    let defaultBasic = 0;
+    let defaultBasic = fullEmp.pay || 0;
     try {
       // 1. Check current month's regular paybill
-      const currRes = await fetch(`/api/earnings/${monthYear}`);
+      let earnEndpoint = `/api/earnings/${monthYear}`;
+      if (activeTab === 'visiting') earnEndpoint = `/api/earnings/visiting/${monthYear}`;
+      else if (activeTab === 'contract') earnEndpoint = `/api/earnings/contract/${monthYear}`;
+      else if (activeTab === 'daily_wage') earnEndpoint = `/api/earnings/daily_wage/${monthYear}`;
+
+      const currRes = await fetch(earnEndpoint);
       if (currRes.ok) {
         const currData = await currRes.json();
         const found = currData.find(x => x.emp_id === selectedAddEmpId);
-        if (found && found.basic_pay) {
-          defaultBasic = found.basic_pay;
+        if (found) {
+          defaultBasic = found.basic_pay || found.daily_wage || found.pay || defaultBasic;
         }
       }
       
       // 2. Check previous month's regular paybill if not found in current
-      if (defaultBasic === 0) {
-        const [year, month] = monthYear.split('-');
-        let py = parseInt(year);
-        let pm = parseInt(month) - 1;
-        if (pm === 0) { pm = 12; py -= 1; }
-        const prevMonth = `${py}-${String(pm).padStart(2, '0')}`;
-        const prevRes = await fetch(`/api/earnings/${prevMonth}`);
-        if (prevRes.ok) {
-          const prevData = await prevRes.json();
-          const found = prevData.find(x => x.emp_id === selectedAddEmpId);
-          if (found && found.basic_pay) {
-            defaultBasic = found.basic_pay;
-          }
+      const [year, month] = monthYear.split('-');
+      let py = parseInt(year);
+      let pm = parseInt(month) - 1;
+      if (pm === 0) { pm = 12; py -= 1; }
+      const prevMonth = `${py}-${String(pm).padStart(2, '0')}`;
+
+      let prevEarnEndpoint = `/api/earnings/${prevMonth}`;
+      if (activeTab === 'visiting') prevEarnEndpoint = `/api/earnings/visiting/${prevMonth}`;
+      else if (activeTab === 'contract') prevEarnEndpoint = `/api/earnings/contract/${prevMonth}`;
+      else if (activeTab === 'daily_wage') prevEarnEndpoint = `/api/earnings/daily_wage/${prevMonth}`;
+
+      const prevRes = await fetch(prevEarnEndpoint);
+      if (prevRes.ok) {
+        const prevData = await prevRes.json();
+        const found = prevData.find(x => x.emp_id === selectedAddEmpId);
+        if (found) {
+          defaultBasic = found.basic_pay || found.daily_wage || found.pay || defaultBasic;
         }
       }
     } catch (e) {
@@ -232,7 +250,10 @@ const SupplementaryPaybill = (props) => {
       other_earnings_breakdown: [],
       other_deductions_breakdown: [],
       is_approved: 0,
-      has_saved_bill: false
+      has_saved_bill: false,
+      days_worked: 0,
+      daily_wage: activeTab === 'daily_wage' ? defaultBasic : 0,
+      total_wage: 0
     };
 
     setEmployees(prev => [...prev, newRow]);
@@ -264,6 +285,12 @@ const SupplementaryPaybill = (props) => {
         updated.da_ugc = isUGC ? da : 0;
         updated.hra_state = isState ? hra : 0;
         updated.hra_ugc = isUGC ? hra : 0;
+      }
+
+      if (field === 'days_worked' || field === 'daily_wage') {
+        const daysWorked = field === 'days_worked' ? parseFloat(value) || 0 : emp.days_worked || 0;
+        const dailyWage = field === 'daily_wage' ? parseFloat(value) || 0 : emp.daily_wage || 0;
+        updated.total_wage = Math.round(daysWorked * dailyWage);
       }
 
       return updated;
@@ -314,7 +341,7 @@ const SupplementaryPaybill = (props) => {
   const handleDelete = async (empId) => {
     if (!window.confirm("Are you sure you want to delete the supplementary paybill record for this employee?")) return;
     try {
-      const res = await fetch(`/api/supplementary/${monthYear}?emp_id=${empId}`, {
+      const res = await fetch(`/api/supplementary/${monthYear}?emp_id=${empId}&category=${activeTab}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -359,10 +386,13 @@ const SupplementaryPaybill = (props) => {
         onam_advance: emp.onam_advance,
         hra_recovery: emp.hra_recovery,
         other_deductions: emp.other_deductions,
-        other_deductions_breakdown: emp.other_deductions_breakdown
+        other_deductions_breakdown: emp.other_deductions_breakdown,
+        days_worked: emp.days_worked || 0,
+        daily_wage: emp.daily_wage || 0,
+        total_wage: emp.total_wage || 0
       }));
 
-      const res = await fetch(`/api/supplementary/${monthYear}`, {
+      const res = await fetch(`/api/supplementary/${monthYear}?category=${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: payload })
@@ -392,7 +422,11 @@ const SupplementaryPaybill = (props) => {
     
     setApproving(true);
     try {
-      const res = await fetch(`/api/supplementary/approve/${monthYear}`, { method: 'POST' });
+      const res = await fetch(`/api/supplementary/approve/${monthYear}?category=${activeTab}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' })
+      });
       const data = await res.json();
       if (res.ok) {
         alert('Supplementary paybill approved successfully!');
@@ -415,7 +449,7 @@ const SupplementaryPaybill = (props) => {
     
     setSaving(true);
     try {
-      const res = await fetch(`/api/supplementary/approve/${monthYear}`, {
+      const res = await fetch(`/api/supplementary/approve/${monthYear}?category=${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'submit' })
@@ -442,7 +476,7 @@ const SupplementaryPaybill = (props) => {
     
     setApproving(true);
     try {
-      const res = await fetch(`/api/supplementary/approve/${monthYear}`, {
+      const res = await fetch(`/api/supplementary/approve/${monthYear}?category=${activeTab}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject' })
@@ -518,32 +552,35 @@ const SupplementaryPaybill = (props) => {
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
 
 
-  if (user?.role === 'approver' && !isSubmitted && !isApproved) {
-    return (
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Supplementary Paybill</h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-              Verify earnings and deductions, then approve or reject the submitted supplementary paybill.
-            </p>
-          </div>
-          <input type="month" className="form-control" value={monthYear}
-            onChange={(e) => setMonthYear(e.target.value)} />
-        </div>
-
-        <div className="card" style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-          <ShieldAlert size={48} style={{ color: '#d97706' }} />
-          <h2 style={{ fontSize: '1.5rem', color: '#854d0e', margin: 0 }}>No Supplementary Paybill Submitted</h2>
-          <p style={{ color: 'var(--color-text-secondary)', maxWidth: '500px', margin: 0 }}>
-            The supplementary salary paybill for {monthDisplay} has not been submitted for approval yet. Once submitted by the Admin or Super Admin, it will appear here for your review and approval.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const isReadOnly = isApproved && (!isOverrideActive || user?.role !== 'super_admin');
+
+  const renderCategoryTabs = () => (
+    <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      {[
+        { id: 'permanent', label: 'Permanent Staff' },
+        { id: 'visiting', label: 'Visiting Faculty' },
+        { id: 'contract', label: 'Contract Staff' },
+        { id: 'daily_wage', label: 'Daily Wage Staff' }
+      ].map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id)}
+          style={{
+            padding: '0.6rem 1.2rem',
+            border: 'none',
+            background: 'none',
+            borderBottom: activeTab === tab.id ? '2px solid var(--color-accent-primary)' : '2px solid transparent',
+            color: activeTab === tab.id ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
+            fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+            cursor: 'pointer',
+            marginBottom: '-1px'
+          }}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div>
@@ -553,7 +590,7 @@ const SupplementaryPaybill = (props) => {
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
             Generate supplementary salary paybills for employees for a certain number of days.
           </p>
-          {globalSettingsList.length > 0 && (
+          {globalSettingsList.length > 0 && activeTab === 'permanent' && (
             <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-primary)', background: 'rgba(59,130,246,0.1)', padding: '0.4rem 0.8rem', borderRadius: '4px', display: 'inline-block' }}>
               <strong>Active Rules for {formatMonthYear(monthYear)}:</strong> State (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_state_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_state_percentage || 0}%) | UGC/CSIR (DA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).da_ugc_percentage || 0}%, HRA: {(globalSettingsList.find(r => r.effective_from <= monthYear) || {}).hra_ugc_percentage || 0}%)
             </div>
@@ -563,7 +600,19 @@ const SupplementaryPaybill = (props) => {
           onChange={(e) => setMonthYear(e.target.value)} style={{ width: '150px' }} />
       </div>
 
-      {isRejected && (
+      {renderCategoryTabs()}
+
+      {user?.role === 'approver' && !isSubmitted && !isApproved ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', marginTop: '1.5rem' }}>
+          <ShieldAlert size={48} style={{ color: '#d97706' }} />
+          <h2 style={{ fontSize: '1.5rem', color: '#854d0e', margin: 0 }}>No Supplementary Paybill Submitted</h2>
+          <p style={{ color: 'var(--color-text-secondary)', maxWidth: '500px', margin: 0 }}>
+            The supplementary salary paybill for {monthDisplay} ({activeTab.replace('_', ' ')}) has not been submitted for approval yet. Once submitted by the Admin or Super Admin, it will appear here for your review and approval.
+          </p>
+        </div>
+      ) : (
+        <>
+          {isRejected && (
         <div style={{ 
           marginBottom: '2rem', padding: '1.5rem', borderRadius: '12px', 
           backgroundColor: 'rgba(239, 68, 68, 0.1)', 
@@ -670,7 +719,7 @@ const SupplementaryPaybill = (props) => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {(user?.role === 'admin' || user?.role === 'super_admin') && (
+            {(user?.role === 'admin' || user?.role === 'super_admin') && activeTab === 'permanent' && (
               <button className="btn btn-secondary" onClick={applyCalculations} disabled={isReadOnly}>
                 <Calculator size={18} /> Auto Calculate DA & HRA
               </button>
@@ -806,63 +855,111 @@ const SupplementaryPaybill = (props) => {
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>Loading...</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ fontSize: '0.78rem', minWidth: '2000px' }}>
+            <table className="table" style={{ fontSize: '0.78rem', minWidth: activeTab === 'permanent' ? '2000px' : '1000px' }}>
               <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1, boxShadow: '0 1px 0 var(--color-border)' }}>
-                <tr>
-                  <th style={{ minWidth: '130px' }}>Employee</th>
-                  <th style={{ minWidth: '70px', background: 'rgba(59,130,246,0.02)' }}>Days</th>
-                  <th style={{ minWidth: '95px', background: 'rgba(59,130,246,0.02)' }}>Reg. Basic</th>
-                  <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="11">
-                    ── EARNINGS ──
-                  </th>
-                  <th style={{ background: 'rgba(239,68,68,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="10">
-                    ── DEDUCTIONS ──
-                  </th>
-                  <th>Net Pay</th>
-                  {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ minWidth: '80px' }}>Action</th>}
-                </tr>
-                <tr>
-                  <th style={{ top: '30px' }}>Name / ID / Scale</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.02)' }}>Days Worked</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.02)' }}>Reference Basic</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.06)' }}>Basic Pay</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DP/GP</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DA (State)</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DA (UGC)</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>HRA (State)</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>HRA (UGC)</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>CCA</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Spl Pay</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Tr Allow</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Spl Allow</th>
-                  <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Other Earn</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>EPF</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>CPF</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Prof Tax</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Income Tax</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>SLI</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>GIS</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>LIC</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Onam Adv</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>HRA Rec</th>
-                  <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Other Ded</th>
-                  <th style={{ top: '30px' }}>Net Pay Amount</th>
-                  {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ top: '30px' }}></th>}
-                </tr>
+                {activeTab === 'permanent' ? (
+                  <>
+                    <tr>
+                      <th style={{ minWidth: '130px' }}>Employee</th>
+                      <th style={{ minWidth: '70px', background: 'rgba(59,130,246,0.02)' }}>Days</th>
+                      <th style={{ minWidth: '95px', background: 'rgba(59,130,246,0.02)' }}>Reg. Basic</th>
+                      <th style={{ background: 'rgba(59,130,246,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="11">
+                        ── EARNINGS ──
+                      </th>
+                      <th style={{ background: 'rgba(239,68,68,0.06)', textAlign:'center', padding:'0.5rem 0' }} colSpan="10">
+                        ── DEDUCTIONS ──
+                      </th>
+                      <th>Net Pay</th>
+                      {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ minWidth: '80px' }}>Action</th>}
+                    </tr>
+                    <tr>
+                      <th style={{ top: '30px' }}>Name / ID / Scale</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.02)' }}>Days Worked</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.02)' }}>Reference Basic</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.06)' }}>Basic Pay</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DP/GP</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DA (State)</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>DA (UGC)</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>HRA (State)</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>HRA (UGC)</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>CCA</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Spl Pay</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Tr Allow</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Spl Allow</th>
+                      <th style={{ top: '30px', background: 'rgba(59,130,246,0.04)' }}>Other Earn</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>EPF</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>CPF</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Prof Tax</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Income Tax</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>SLI</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>GIS</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>LIC</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Onam Adv</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>HRA Rec</th>
+                      <th style={{ top: '30px', background: 'rgba(239,68,68,0.04)' }}>Other Ded</th>
+                      <th style={{ top: '30px' }}>Net Pay Amount</th>
+                      {(user?.role === 'admin' || user?.role === 'super_admin') && <th style={{ top: '30px' }}></th>}
+                    </tr>
+                  </>
+                ) : activeTab === 'daily_wage' ? (
+                  <tr>
+                    <th>Employee Name / ID</th>
+                    <th>Days Worked</th>
+                    <th>Daily Wage Rate</th>
+                    <th>Total Wage</th>
+                    <th>Other Earn</th>
+                    <th>Gross Pay</th>
+                    <th>EPF</th>
+                    <th>Income Tax</th>
+                    <th>Other Ded</th>
+                    <th>Total Ded</th>
+                    <th>Net Pay Amount</th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th>Action</th>}
+                  </tr>
+                ) : (
+                  <tr>
+                    <th>Employee Name / ID</th>
+                    <th>Days</th>
+                    <th>{activeTab === 'visiting' ? 'Honorarium / Consolidated' : 'Consolidated Salary'}</th>
+                    <th>Other Earn</th>
+                    <th>Gross Pay</th>
+                    {activeTab === 'contract' && <th>EPF</th>}
+                    <th>Income Tax</th>
+                    <th>Other Ded</th>
+                    <th>Total Ded</th>
+                    <th>Net Pay Amount</th>
+                    {(user?.role === 'admin' || user?.role === 'super_admin') && <th>Action</th>}
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {employees.length === 0 && (
                   <tr>
-                    <td colSpan={27} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
+                    <td colSpan={30} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
                       No employees added to this supplementary paybill yet. Use the dropdown above to add employees.
                     </td>
                   </tr>
                 )}
                 {employees.map(emp => {
-                  const da = (parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0);
-                  const hra = (parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0);
-                  const gross = Math.round((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0));
-                  const dedux = Math.round((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0));
+                  const isPermanent = activeTab === 'permanent';
+                  const isVisiting = activeTab === 'visiting';
+                  const isContract = activeTab === 'contract';
+                  const isDailyWage = activeTab === 'daily_wage';
+
+                  const da = isPermanent ? ((parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0)) : 0;
+                  const hra = isPermanent ? ((parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0)) : 0;
+                  const gross = Math.round(
+                    isPermanent 
+                      ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                      : isDailyWage
+                        ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                        : ((emp.basic_pay||0)+(emp.other_earnings||0))
+                  );
+                  const dedux = Math.round(
+                    isPermanent
+                      ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                      : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
+                  );
                   const net = gross - dedux;
 
                   const inp = (field, type = 'number') => (
@@ -878,116 +975,278 @@ const SupplementaryPaybill = (props) => {
                     />
                   );
 
-                  return (
-                    <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td>
-                        <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                          {emp.title ? `${emp.title} ` : ''}{emp.name}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>
-                          {emp.category === 'ugc/csir' ? 'UGC' : emp.category} | {emp.designation}
-                        </div>
-                      </td>
-                      <td style={{ background: 'rgba(59,130,246,0.02)' }}>
-                        <input
-                          type="number"
-                          value={emp.num_days || ''}
-                          onChange={(e) => handleInputChange(emp.emp_id, 'num_days', parseInt(e.target.value) || 0)}
-                          disabled={isReadOnly || user?.role === 'approver'}
-                          style={{
-                            ...inputStyle,
-                            width: '55px',
-                            fontWeight: 'bold',
-                            border: '1px solid var(--color-accent-primary)'
-                          }}
-                        />
-                      </td>
-                      <td style={{ background: 'rgba(59,130,246,0.02)' }}>
-                        <input
-                          type="number"
-                          value={emp.regular_basic || ''}
-                          onChange={(e) => handleInputChange(emp.emp_id, 'regular_basic', parseFloat(e.target.value) || 0)}
-                          disabled={isReadOnly || user?.role === 'approver'}
-                          style={{
-                            ...inputStyle,
-                            width: '80px',
-                            fontWeight: 'bold',
-                            border: '1px solid var(--color-accent-primary)'
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={emp.basic_pay || ''}
-                          disabled
-                          style={{
-                            ...inputStyle,
-                            background: '#f3f4f6',
-                            fontWeight: 'bold'
-                          }}
-                        />
-                      </td>
-                      <td>{inp('dp_gp')}</td>
-                      <td>{inp('da_state')}</td>
-                      <td>{inp('da_ugc')}</td>
-                      <td>{inp('hra_state')}</td>
-                      <td>{inp('hra_ugc')}</td>
-                      <td>{inp('cca')}</td>
-                      <td>{inp('spl_pay')}</td>
-                      <td>{inp('tr_allow')}</td>
-                      <td>{inp('spl_allow')}</td>
-                      <td>
-                        <button 
-                          className="btn btn-sm btn-secondary" 
-                          onClick={() => openModal(emp)}
-                          style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
-                        >
-                          Details (₹{Math.round(emp.other_earnings)})
-                        </button>
-                      </td>
-                      <td>{inp('epf')}</td>
-                      <td>{inp('cpf')}</td>
-                      <td>{inp('professional_tax')}</td>
-                      <td>{inp('income_tax')}</td>
-                      <td>{inp('sli')}</td>
-                      <td>{inp('gis')}</td>
-                      <td>{inp('lic')}</td>
-                      <td>{inp('onam_advance')}</td>
-                      <td>{inp('hra_recovery')}</td>
-                      <td>
-                        <button 
-                          className="btn btn-sm btn-secondary" 
-                          onClick={() => openModal(emp)}
-                          style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
-                        >
-                          Details (₹{Math.round(emp.other_deductions)})
-                        </button>
-                      </td>
-                      <td style={{ fontWeight: 800, color: 'var(--color-success)' }}>
-                        ₹ {net.toLocaleString('en-IN')}
-                      </td>
-                      {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                  if (isPermanent) {
+                    return (
+                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>
+                            {emp.category === 'ugc/csir' ? 'UGC' : emp.category} | {emp.designation}
+                          </div>
+                        </td>
+                        <td style={{ background: 'rgba(59,130,246,0.02)' }}>
+                          <input
+                            type="number"
+                            value={emp.num_days || ''}
+                            onChange={(e) => handleInputChange(emp.emp_id, 'num_days', parseInt(e.target.value) || 0)}
+                            disabled={isReadOnly || user?.role === 'approver'}
+                            style={{
+                              ...inputStyle,
+                              width: '55px',
+                              fontWeight: 'bold',
+                              border: '1px solid var(--color-accent-primary)'
+                            }}
+                          />
+                        </td>
+                        <td style={{ background: 'rgba(59,130,246,0.02)' }}>
+                          <input
+                            type="number"
+                            value={emp.regular_basic || ''}
+                            onChange={(e) => handleInputChange(emp.emp_id, 'regular_basic', parseFloat(e.target.value) || 0)}
+                            disabled={isReadOnly || user?.role === 'approver'}
+                            style={{
+                              ...inputStyle,
+                              width: '80px',
+                              fontWeight: 'bold',
+                              border: '1px solid var(--color-accent-primary)'
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={emp.basic_pay || ''}
+                            disabled
+                            style={{
+                              ...inputStyle,
+                              background: '#f3f4f6',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                        </td>
+                        <td>{inp('dp_gp')}</td>
+                        <td>{inp('da_state')}</td>
+                        <td>{inp('da_ugc')}</td>
+                        <td>{inp('hra_state')}</td>
+                        <td>{inp('hra_ugc')}</td>
+                        <td>{inp('cca')}</td>
+                        <td>{inp('spl_pay')}</td>
+                        <td>{inp('tr_allow')}</td>
+                        <td>{inp('spl_allow')}</td>
                         <td>
                           <button 
-                            className="btn btn-danger btn-sm" 
-                            disabled={isReadOnly}
-                            onClick={() => {
-                              if (emp.has_saved_bill) {
-                                handleDelete(emp.emp_id);
-                              } else {
-                                setEmployees(prev => prev.filter(x => x.emp_id !== emp.emp_id));
-                              }
-                            }}
-                            style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            <Trash2 size={14} />
+                            Details (₹{Math.round(emp.other_earnings)})
                           </button>
                         </td>
-                      )}
-                    </tr>
-                  );
+                        <td>{inp('epf')}</td>
+                        <td>{inp('cpf')}</td>
+                        <td>{inp('professional_tax')}</td>
+                        <td>{inp('income_tax')}</td>
+                        <td>{inp('sli')}</td>
+                        <td>{inp('gis')}</td>
+                        <td>{inp('lic')}</td>
+                        <td>{inp('onam_advance')}</td>
+                        <td>{inp('hra_recovery')}</td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
+                          >
+                            Details (₹{Math.round(emp.other_deductions)})
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 800, color: 'var(--color-success)' }}>
+                          ₹ {net.toLocaleString('en-IN')}
+                        </td>
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <td>
+                            <button 
+                              className="btn btn-danger btn-sm" 
+                              disabled={isReadOnly}
+                              onClick={() => {
+                                if (emp.has_saved_bill) {
+                                  handleDelete(emp.emp_id);
+                                } else {
+                                  setEmployees(prev => prev.filter(x => x.emp_id !== emp.emp_id));
+                                }
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  } else if (isDailyWage) {
+                    return (
+                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                            {emp.designation}
+                          </div>
+                        </td>
+                        <td>{inp('days_worked')}</td>
+                        <td>{inp('daily_wage')}</td>
+                        <td>
+                          <input 
+                            type="number" 
+                            value={emp.total_wage || ''} 
+                            disabled 
+                            style={{ ...inputStyle, background: '#f3f4f6', fontWeight: 'bold' }} 
+                          />
+                        </td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
+                          >
+                            Details (₹{Math.round(emp.other_earnings)})
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          ₹{gross.toLocaleString('en-IN')}
+                        </td>
+                        <td>{inp('epf')}</td>
+                        <td>{inp('income_tax')}</td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
+                          >
+                            Details (₹{Math.round(emp.other_deductions)})
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          ₹{dedux.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ fontWeight: 800, color: 'var(--color-success)' }}>
+                          ₹ {net.toLocaleString('en-IN')}
+                        </td>
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <td>
+                            <button 
+                              className="btn btn-danger btn-sm" 
+                              disabled={isReadOnly}
+                              onClick={() => {
+                                if (emp.has_saved_bill) {
+                                  handleDelete(emp.emp_id);
+                                } else {
+                                  setEmployees(prev => prev.filter(x => x.emp_id !== emp.emp_id));
+                                }
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  } else {
+                    return (
+                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                            {emp.designation}
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={emp.num_days || ''}
+                            onChange={(e) => handleInputChange(emp.emp_id, 'num_days', parseInt(e.target.value) || 0)}
+                            disabled={isReadOnly || user?.role === 'approver'}
+                            style={{
+                              ...inputStyle,
+                              width: '55px',
+                              fontWeight: 'bold',
+                              border: '1px solid var(--color-accent-primary)'
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={emp.basic_pay || ''}
+                            onChange={(e) => handleInputChange(emp.emp_id, 'basic_pay', parseFloat(e.target.value) || 0)}
+                            disabled={isReadOnly || user?.role === 'approver'}
+                            style={{
+                              ...inputStyle,
+                              width: '90px',
+                              fontWeight: 'bold',
+                              border: '1px solid var(--color-accent-primary)'
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
+                          >
+                            Details (₹{Math.round(emp.other_earnings)})
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          ₹{gross.toLocaleString('en-IN')}
+                        </td>
+                        {isContract && <td>{inp('epf')}</td>}
+                        <td>{inp('income_tax')}</td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={() => openModal(emp)}
+                            style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
+                          >
+                            Details (₹{Math.round(emp.other_deductions)})
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 'bold' }}>
+                          ₹{dedux.toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ fontWeight: 800, color: 'var(--color-success)' }}>
+                          ₹ {net.toLocaleString('en-IN')}
+                        </td>
+                        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <td>
+                            <button 
+                              className="btn btn-danger btn-sm" 
+                              disabled={isReadOnly}
+                              onClick={() => {
+                                if (emp.has_saved_bill) {
+                                  handleDelete(emp.emp_id);
+                                } else {
+                                  setEmployees(prev => prev.filter(x => x.emp_id !== emp.emp_id));
+                                }
+                              }}
+                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  }
                 })}
               </tbody>
             </table>
@@ -1089,6 +1348,9 @@ const SupplementaryPaybill = (props) => {
         </div>
       )}
 
+        </>
+      )}
+
       {/* Full Screen Preview Overlay */}
       {showFullPreview && (
         <div style={{
@@ -1107,40 +1369,79 @@ const SupplementaryPaybill = (props) => {
           
           <div style={{ overflowX: 'auto', backgroundColor: '#fff', width: '100%' }}>
             {(() => {
-              const columns = [
-                { key: 'basic_pay', label: 'Basic' },
-                { key: 'dp_gp', label: 'DP/GP' },
-                { key: 'da', label: 'DA', calc: (e) => (e.category === 'ugc/csir' || e.category === 'ugc') ? (e.da_ugc || 0) : (e.da_state || 0) },
-                { key: 'hra', label: 'HRA', calc: (e) => (e.category === 'ugc/csir' || e.category === 'ugc') ? (e.hra_ugc || 0) : (e.hra_state || 0) },
-                { key: 'cca', label: 'CCA' },
-                { key: 'spl_pay', label: 'Spl.P' },
-                { key: 'tr_allow', label: 'Tr.A' },
-                { key: 'spl_allow', label: 'Spl.A' },
-                { key: 'fest_allow', label: 'Fest.' },
-                { key: 'other_earnings', label: 'Other' },
-                { key: 'gross', label: 'Gross', isBold: true },
-                { key: 'epf', label: 'EPF' },
-                { key: 'cpf', label: 'CPF' },
-                { key: 'professional_tax', label: 'Prof.T' },
-                { key: 'income_tax', label: 'Inc.T' },
-                { key: 'sli', label: 'SLI' },
-                { key: 'gis', label: 'GIS' },
-                { key: 'lic', label: 'LIC' },
-                { key: 'onam_advance', label: 'Onam' },
-                { key: 'hra_recovery', label: 'HRA.R' },
-                { key: 'other_deductions', label: 'Other Ded' },
-                { key: 'net', label: 'Net Pay', isBold: true }
-              ];
+              const isPermanent = activeTab === 'permanent';
+              const isVisiting = activeTab === 'visiting';
+              const isContract = activeTab === 'contract';
+              const isDailyWage = activeTab === 'daily_wage';
+
+              let columns = [];
+              if (isPermanent) {
+                columns = [
+                  { key: 'basic_pay', label: 'Basic' },
+                  { key: 'dp_gp', label: 'DP/GP' },
+                  { key: 'da', label: 'DA', calc: (e) => (e.category === 'ugc/csir' || e.category === 'ugc') ? (e.da_ugc || 0) : (e.da_state || 0) },
+                  { key: 'hra', label: 'HRA', calc: (e) => (e.category === 'ugc/csir' || e.category === 'ugc') ? (e.hra_ugc || 0) : (e.hra_state || 0) },
+                  { key: 'cca', label: 'CCA' },
+                  { key: 'spl_pay', label: 'Spl.P' },
+                  { key: 'tr_allow', label: 'Tr.A' },
+                  { key: 'spl_allow', label: 'Spl.A' },
+                  { key: 'fest_allow', label: 'Fest.' },
+                  { key: 'other_earnings', label: 'Other' },
+                  { key: 'gross', label: 'Gross', isBold: true },
+                  { key: 'epf', label: 'EPF' },
+                  { key: 'cpf', label: 'CPF' },
+                  { key: 'professional_tax', label: 'Prof.T' },
+                  { key: 'income_tax', label: 'Inc.T' },
+                  { key: 'sli', label: 'SLI' },
+                  { key: 'gis', label: 'GIS' },
+                  { key: 'lic', label: 'LIC' },
+                  { key: 'onam_advance', label: 'Onam' },
+                  { key: 'hra_recovery', label: 'HRA.R' },
+                  { key: 'other_deductions', label: 'Other Ded' },
+                  { key: 'net', label: 'Net Pay', isBold: true }
+                ];
+              } else if (isVisiting) {
+                columns = [
+                  { key: 'basic_pay', label: 'Honorarium' },
+                  { key: 'other_earnings', label: 'Other Earn' },
+                  { key: 'gross', label: 'Gross', isBold: true },
+                  { key: 'income_tax', label: 'Income Tax' },
+                  { key: 'other_deductions', label: 'Other Ded' },
+                  { key: 'net', label: 'Net Pay', isBold: true }
+                ];
+              } else if (isContract) {
+                columns = [
+                  { key: 'basic_pay', label: 'Consolidated Salary' },
+                  { key: 'other_earnings', label: 'Other Earn' },
+                  { key: 'gross', label: 'Gross', isBold: true },
+                  { key: 'epf', label: 'EPF' },
+                  { key: 'income_tax', label: 'Income Tax' },
+                  { key: 'other_deductions', label: 'Other Ded' },
+                  { key: 'net', label: 'Net Pay', isBold: true }
+                ];
+              } else if (isDailyWage) {
+                columns = [
+                  { key: 'days_worked', label: 'Days Worked' },
+                  { key: 'daily_wage', label: 'Daily Wage' },
+                  { key: 'total_wage', label: 'Total Wage' },
+                  { key: 'other_earnings', label: 'Other Earn' },
+                  { key: 'gross', label: 'Gross', isBold: true },
+                  { key: 'epf', label: 'EPF' },
+                  { key: 'income_tax', label: 'Income Tax' },
+                  { key: 'other_deductions', label: 'Other Ded' },
+                  { key: 'net', label: 'Net Pay', isBold: true }
+                ];
+              }
 
               const activeCols = columns.filter(col => {
-                if (col.key === 'basic_pay' || col.key === 'gross' || col.key === 'net') return true;
+                if (col.key === 'basic_pay' || col.key === 'gross' || col.key === 'net' || col.key === 'total_wage') return true;
                 return employees.some(emp => {
                   const val = col.calc ? col.calc(emp) : (emp[col.key] || 0);
                   return Math.abs(val) > 0.01;
                 });
               });
 
-              const earnCols = activeCols.filter(c => ['basic_pay', 'dp_gp', 'da', 'hra', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key));
+              const earnCols = activeCols.filter(c => ['basic_pay', 'days_worked', 'daily_wage', 'total_wage', 'dp_gp', 'da', 'hra', 'cca', 'spl_pay', 'tr_allow', 'spl_allow', 'fest_allow', 'other_earnings', 'gross'].includes(c.key));
               const deduxCols = activeCols.filter(c => ['epf', 'cpf', 'professional_tax', 'income_tax', 'sli', 'gis', 'lic', 'onam_advance', 'hra_recovery', 'other_deductions'].includes(c.key));
 
               return (
@@ -1154,8 +1455,9 @@ const SupplementaryPaybill = (props) => {
                   <thead>
                     <tr style={{ backgroundColor: '#e5e7eb', borderBottom: '2px solid #000' }}>
                       <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'left' }}>Employee Name</th>
-                      <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'center' }}>Days</th>
-                      <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'right' }}>Ref. Basic</th>
+                      {isPermanent && <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'center' }}>Days</th>}
+                      {isPermanent && <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'right' }}>Ref. Basic</th>}
+                      {(!isPermanent && !isDailyWage) && <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'center' }}>Days</th>}
                       <th colSpan={earnCols.length} style={{ textAlign: 'center', border: '1px solid #000', padding: '6px' }}>EARNINGS</th>
                       <th colSpan={deduxCols.length} style={{ textAlign: 'center', border: '1px solid #000', padding: '6px' }}>DEDUCTIONS</th>
                       <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px' }}>Net Pay</th>
@@ -1171,10 +1473,20 @@ const SupplementaryPaybill = (props) => {
                   </thead>
                   <tbody>
                     {employees.map((emp, idx) => {
-                      const da = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0);
-                      const hra = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0);
-                      const gross = (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0);
-                      const dedux = (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0);
+                      const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
+                      const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
+                      const gross = Math.round(
+                        isPermanent 
+                          ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                          : isDailyWage
+                            ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                            : ((emp.basic_pay||0)+(emp.other_earnings||0))
+                      );
+                      const dedux = Math.round(
+                        isPermanent
+                          ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                          : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
+                      );
                       const net = gross - dedux;
                       
                       const getVal = (col) => {
@@ -1188,8 +1500,9 @@ const SupplementaryPaybill = (props) => {
                       return (
                         <tr key={emp.emp_id} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb' }}>
                           <td style={{ fontWeight: 'bold', border: '1px solid #000', padding: '8px', color: '#000' }}>{emp.name}</td>
-                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>
-                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', color: '#000' }}>{Math.round(emp.regular_basic).toFixed(2)}</td>
+                          {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}
+                          {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', color: '#000' }}>{Math.round(emp.regular_basic).toFixed(2)}</td>}
+                          {(!isPermanent && !isDailyWage) && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}
                           {earnCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000', fontWeight: c.isBold ? 'bold' : 'normal' }}>
                               {Math.round(getVal(c)).toFixed(2)}
@@ -1207,17 +1520,32 @@ const SupplementaryPaybill = (props) => {
                     {/* Grand Total Row */}
                     <tr style={{ backgroundColor: '#e5e7eb', fontWeight: 'bold', borderTop: '2px solid #000', borderBottom: '2px solid #000' }}>
                       <td style={{ border: '1px solid #000', padding: '10px 8px', color: '#000' }}>Grand Total</td>
-                      <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'center', color: '#000' }}>
-                        {employees.reduce((sum, emp) => sum + (emp.num_days || 0), 0)}
-                      </td>
-                      <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
-                        {Math.round(employees.reduce((sum, emp) => sum + (emp.regular_basic || 0), 0)).toFixed(2)}
-                      </td>
+                      {isPermanent && (
+                        <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'center', color: '#000' }}>
+                          {employees.reduce((sum, emp) => sum + (emp.num_days || 0), 0)}
+                        </td>
+                      )}
+                      {isPermanent && (
+                        <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
+                          {Math.round(employees.reduce((sum, emp) => sum + (emp.regular_basic || 0), 0)).toFixed(2)}
+                        </td>
+                      )}
+                      {(!isPermanent && !isDailyWage) && (
+                        <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'center', color: '#000' }}>
+                          {employees.reduce((sum, emp) => sum + (emp.num_days || 0), 0)}
+                        </td>
+                      )}
                       {earnCols.map(c => {
                         const total = employees.reduce((sum, emp) => {
-                          const da = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0);
-                          const hra = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0);
-                          const gross = (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0);
+                          const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
+                          const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
+                          const gross = Math.round(
+                            isPermanent 
+                              ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                              : isDailyWage
+                                ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                                : ((emp.basic_pay||0)+(emp.other_earnings||0))
+                          );
                           
                           if (c.key === 'da') return sum + da;
                           if (c.key === 'hra') return sum + hra;
@@ -1242,10 +1570,20 @@ const SupplementaryPaybill = (props) => {
                       })}
                       <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
                         ₹{Math.round(employees.reduce((sum, emp) => {
-                          const da = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0);
-                          const hra = (emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0);
-                          const gross = (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0);
-                          const dedux = (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0);
+                          const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
+                          const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
+                          const gross = Math.round(
+                            isPermanent 
+                              ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                              : isDailyWage
+                                ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                                : ((emp.basic_pay||0)+(emp.other_earnings||0))
+                          );
+                          const dedux = Math.round(
+                            isPermanent
+                              ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                              : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
+                          );
                           return sum + (gross - dedux);
                         }, 0)).toFixed(2)}
                       </td>

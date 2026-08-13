@@ -24,6 +24,8 @@ const FestivalAllowanceBill = (props) => {
     return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
   }
 
+  const [staffCategory, setStaffCategory] = useState('permanent');
+
   const [monthYear, setMonthYear] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -49,12 +51,12 @@ const FestivalAllowanceBill = (props) => {
   const [selectedEmps, setSelectedEmps] = useState(new Set());
   const [requireApproval, setRequireApproval] = useState(true);
 
-  // Load festival allowance bills when monthYear changes
+  // Load festival allowance bills when monthYear or category changes
   useEffect(() => {
     if (monthYear) {
       loadFestivalData(monthYear);
     }
-  }, [monthYear]);
+  }, [monthYear, staffCategory]);
 
   const loadFestivalData = async (targetMonth) => {
     setLoading(true);
@@ -68,7 +70,7 @@ const FestivalAllowanceBill = (props) => {
       } catch (e) {
         console.error("Failed to load system settings", e);
       }
-      const res = await fetch(`/api/festival/${targetMonth}`);
+      const res = await fetch(`/api/festival/${targetMonth}?category=${staffCategory}`);
       const data = await res.json();
 
       // Combine employees list with active/saved festival allowance records
@@ -86,7 +88,7 @@ const FestivalAllowanceBill = (props) => {
       setSelectedEmps(new Set());
 
       // Fetch approval status
-      const approvalRes = await fetch(`/api/festival/approve/${targetMonth}`);
+      const approvalRes = await fetch(`/api/festival/approve/${targetMonth}?category=${staffCategory}`);
       if (approvalRes.ok) {
         const approvalData = await approvalRes.json();
         setIsApproved(approvalData.is_approved === 1);
@@ -114,7 +116,7 @@ const FestivalAllowanceBill = (props) => {
         }]
       };
 
-      const res = await fetch(`/api/festival/${monthYear}`, {
+      const res = await fetch(`/api/festival/${monthYear}?category=${staffCategory}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -188,12 +190,13 @@ const FestivalAllowanceBill = (props) => {
       emp_id: emp.emp_id,
       amount: emp.amount,
       bill_date: emp.bill_date || bulkDate,
-      description: emp.description
+      description: emp.description,
+      category: staffCategory
     }));
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/festival/${monthYear}`, {
+      const res = await fetch(`/api/festival/${monthYear}?category=${staffCategory}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: validRecords })
@@ -228,7 +231,7 @@ const FestivalAllowanceBill = (props) => {
     
     setApproving(true);
     try {
-      const res = await fetch(`/api/festival/approve/${monthYear}`, { 
+      const res = await fetch(`/api/festival/approve/${monthYear}?category=${staffCategory}`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emp_ids: Array.from(selectedEmps) })
@@ -262,7 +265,7 @@ const FestivalAllowanceBill = (props) => {
     
     setRejecting(true);
     try {
-      const res = await fetch(`/api/festival/approve/${monthYear}`, { 
+      const res = await fetch(`/api/festival/approve/${monthYear}?category=${staffCategory}`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emp_ids: Array.from(selectedEmps), action: 'reject' })
@@ -305,6 +308,32 @@ const FestivalAllowanceBill = (props) => {
           <input type="month" className="form-control" value={monthYear}
             onChange={(e) => setMonthYear(e.target.value)} style={{ width: '150px' }} />
         </div>
+      </div>
+
+      {/* Category Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {[
+          { value: 'permanent', label: 'Permanent Staff' },
+          { value: 'visiting', label: 'Visiting Faculty' },
+          { value: 'contract', label: 'Contract Staff' },
+          { value: 'daily_wage', label: 'Daily Wage Staff' }
+        ].map(tab => (
+          <button
+            key={tab.value}
+            className={`btn ${staffCategory === tab.value ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setStaffCategory(tab.value)}
+            disabled={saving || approving}
+            style={{
+              padding: '0.5rem 1.25rem',
+              fontSize: '0.85rem',
+              fontWeight: staffCategory === tab.value ? 700 : 500,
+              borderRadius: '8px',
+              opacity: staffCategory === tab.value ? 1 : 0.7
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {hasApprovedBills && (

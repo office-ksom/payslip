@@ -385,10 +385,24 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
       otherEarnRows = [['Others', fmt(employee.other_earnings)]];
     }
     
-    earningsRows = [
-      [employee.pay_type === 'Consolidated Salary' ? 'Consolidated Salary' : 'Honorarium', fmt(employee.basic_pay)],
-      ...otherEarnRows
-    ].filter(item => parseFloat(item[1]) > 0);
+    if (employee.category === 'daily_wage') {
+      earningsRows = [
+        ['Days Worked', String(employee.days_worked || 0)],
+        ['Daily Wage Rate', fmt(employee.daily_wage || 0)],
+        ['Total Wage', fmt(employee.total_wage || 0)],
+        ...otherEarnRows
+      ].filter(item => parseFloat(item[1]) > 0 || item[0] === 'Days Worked');
+    } else if (employee.category === 'contract') {
+      earningsRows = [
+        ['Consolidated Salary', fmt(employee.basic_pay)],
+        ...otherEarnRows
+      ].filter(item => parseFloat(item[1]) > 0);
+    } else {
+      earningsRows = [
+        [employee.pay_type === 'Consolidated Salary' ? 'Consolidated Salary' : 'Honorarium', fmt(employee.basic_pay)],
+        ...otherEarnRows
+      ].filter(item => parseFloat(item[1]) > 0);
+    }
 
     let otherDeduxRows = [];
     try {
@@ -402,11 +416,20 @@ const generatePDFPayslip = async (employee, monthYear, activeRule = {}, returnBa
       otherDeduxRows = [['Others', fmt(employee.other_deductions)]];
     }
 
-    deductionsRows = [
-      ['Income Tax', fmt(employee.income_tax)],
-      ['HRA.R', fmt(employee.hra)],
-      ...otherDeduxRows
-    ].filter(item => parseFloat(item[1]) > 0);
+    if (employee.category === 'contract' || employee.category === 'daily_wage') {
+      deductionsRows = [
+        ['Income Tax', fmt(employee.income_tax)],
+        ['HRA.R', fmt(employee.hra)],
+        ['EPF', fmt(employee.epf)],
+        ...otherDeduxRows
+      ].filter(item => parseFloat(item[1]) > 0);
+    } else {
+      deductionsRows = [
+        ['Income Tax', fmt(employee.income_tax)],
+        ['HRA.R', fmt(employee.hra)],
+        ...otherDeduxRows
+      ].filter(item => parseFloat(item[1]) > 0);
+    }
 
   } else {
     const da = (parseFloat(employee.da_state) || 0) + (parseFloat(employee.da_ugc) || 0);
@@ -1306,8 +1329,21 @@ const Reports = () => {
       setGlobalSettingsList(Array.isArray(settingsData) ? settingsData : []);
 
       if (type === 'regular') {
-        const earnEndpoint = employeeCategory === 'permanent' ? `/api/earnings/${targetMonth}` : `/api/earnings/visiting/${targetMonth}`;
-        const deduxEndpoint = employeeCategory === 'permanent' ? `/api/deductions/${targetMonth}` : `/api/deductions/visiting/${targetMonth}`;
+        let earnEndpoint = '';
+        let deduxEndpoint = '';
+        if (employeeCategory === 'permanent') {
+          earnEndpoint = `/api/earnings/${targetMonth}`;
+          deduxEndpoint = `/api/deductions/${targetMonth}`;
+        } else if (employeeCategory === 'visiting') {
+          earnEndpoint = `/api/earnings/visiting/${targetMonth}`;
+          deduxEndpoint = `/api/deductions/visiting/${targetMonth}`;
+        } else if (employeeCategory === 'contract') {
+          earnEndpoint = `/api/earnings/contract/${targetMonth}`;
+          deduxEndpoint = `/api/deductions/contract/${targetMonth}`;
+        } else if (employeeCategory === 'daily_wage') {
+          earnEndpoint = `/api/earnings/daily_wage/${targetMonth}`;
+          deduxEndpoint = `/api/deductions/daily_wage/${targetMonth}`;
+        }
         
         const [earnRes, deduxRes] = await Promise.all([
           fetch(earnEndpoint),
@@ -1324,6 +1360,14 @@ const Reports = () => {
             const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
             const dedux = (d.epf||0)+(d.cpf||0)+(d.professional_tax||0)+(d.income_tax||0)+(d.sli||0)+(d.gis||0)+(d.lic||0)+(d.onam_advance||0)+(d.hra_recovery||0)+(d.other_deductions||0);
             return { ...e, ...d, da, hra, gross, dedux, net: gross - dedux };
+          } else if (employeeCategory === 'daily_wage') {
+            const gross = (e.total_wage||0)+(e.other_earnings||0);
+            const dedux = (d.income_tax||0)+(d.hra||0)+(d.epf||0)+(d.other_deductions||0);
+            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
+          } else if (employeeCategory === 'contract') {
+            const gross = (e.basic_pay||0)+(e.other_earnings||0);
+            const dedux = (d.income_tax||0)+(d.hra||0)+(d.epf||0)+(d.other_deductions||0);
+            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
           } else {
             const gross = (e.basic_pay||0)+(e.other_earnings||0);
             const dedux = (d.income_tax||0)+(d.hra||0)+(d.other_deductions||0);
@@ -1335,32 +1379,46 @@ const Reports = () => {
         setData(approved.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
 
       } else if (type === 'surrender') {
-        const res = await fetch(`/api/surrender/${targetMonth}`);
+        const res = await fetch(`/api/surrender/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
+        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
         setData(approved);
 
       } else if (type === 'arrears') {
-        const res = await fetch(`/api/arrears/${targetMonth}`);
+        const res = await fetch(`/api/arrears/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
+        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
         setData(approved);
 
       } else if (type === 'festival') {
-        const res = await fetch(`/api/festival/${targetMonth}`);
+        const res = await fetch(`/api/festival/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = list.filter(bill => bill.bill_id !== null && bill.is_approved === 1);
+        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
         setData(approved);
       } else if (type === 'supplementary') {
-        const res = await fetch(`/api/supplementary/${targetMonth}`);
+        const res = await fetch(`/api/supplementary/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = list.filter(bill => bill.earnings_id !== null && bill.is_approved === 1);
+        const approved = Array.isArray(list) ? list.filter(bill => bill.earnings_id !== null && bill.is_approved === 1) : [];
         const combined = approved.map(e => {
-          const da = (e.da_state||0) + (e.da_ugc||0);
-          const hra = (e.hra_state||0) + (e.hra_ugc||0);
-          const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
-          const dedux = (e.epf||0)+(e.cpf||0)+(e.professional_tax||0)+(e.income_tax||0)+(e.sli||0)+(e.gis||0)+(e.lic||0)+(e.onam_advance||0)+(e.hra_recovery||0)+(e.other_deductions||0);
-          return { ...e, da, hra, gross, dedux, net: gross - dedux };
+          if (employeeCategory === 'permanent') {
+            const da = (e.da_state||0) + (e.da_ugc||0);
+            const hra = (e.hra_state||0) + (e.hra_ugc||0);
+            const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
+            const dedux = (e.epf||0)+(e.cpf||0)+(e.professional_tax||0)+(e.income_tax||0)+(e.sli||0)+(e.gis||0)+(e.lic||0)+(e.onam_advance||0)+(e.hra_recovery||0)+(e.other_deductions||0);
+            return { ...e, da, hra, gross, dedux, net: gross - dedux };
+          } else if (employeeCategory === 'daily_wage') {
+            const gross = (e.total_wage||0)+(e.other_earnings||0);
+            const dedux = (e.income_tax||0)+(e.hra||0)+(e.epf||0)+(e.other_deductions||0);
+            return { ...e, gross, dedux, net: gross - dedux, da: 0, hra: e.hra || 0, epf: e.epf || 0 };
+          } else if (employeeCategory === 'contract') {
+            const gross = (e.basic_pay||0)+(e.other_earnings||0);
+            const dedux = (e.income_tax||0)+(e.hra||0)+(e.epf||0)+(e.other_deductions||0);
+            return { ...e, gross, dedux, net: gross - dedux, da: 0, hra: e.hra || 0, epf: e.epf || 0 };
+          } else {
+            const gross = (e.basic_pay||0)+(e.other_earnings||0);
+            const dedux = (e.income_tax||0)+(e.hra||0)+(e.other_deductions||0);
+            return { ...e, gross, dedux, net: gross - dedux, da: 0, hra: e.hra || 0 };
+          }
         });
         setData(combined.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
       }
@@ -2126,11 +2184,40 @@ const Reports = () => {
         try { sheet.mergeCells(range); } catch(e) {}
       };
 
+      const isPermanent = employeeCategory === 'permanent';
       const isVisiting = employeeCategory === 'visiting';
+      const isContract = employeeCategory === 'contract';
+      const isDailyWage = employeeCategory === 'daily_wage';
 
-      const eHeaders = isVisiting 
-        ? ['Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'Honorarium / Consolidated', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow']
-        : ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow'];
+      const filteredData = isPermanent 
+        ? data 
+        : data.filter(emp => {
+            const basic = Math.round(parseFloat(emp.basic_pay) || 0);
+            let eArr = [];
+            try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
+            let dynamicEarnSum = 0;
+            if (dynamicEarnKeys.length > 0) {
+              dynamicEarnKeys.forEach(k => {
+                const item = eArr.find(x => x.desc === k);
+                if (item) dynamicEarnSum += Math.round(parseFloat(item.amount) || 0);
+              });
+            } else {
+              dynamicEarnSum = Math.round(parseFloat(emp.other_earnings) || 0);
+            }
+            const gross = isDailyWage
+              ? (Math.round(parseFloat(emp.total_wage) || 0) + dynamicEarnSum)
+              : (basic + dynamicEarnSum);
+            return gross > 0;
+          });
+
+      const eHeaders = isPermanent 
+        ? ['Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'Basic', 'GP/DP', 'DA', 'HRA', 'CCA', 'Spl.Pay/Deput.Allow', 'Tr. Allow+DA', 'Fest. Allow']
+        : isDailyWage
+          ? ['Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'Days Worked', 'Daily Wage Rate', 'Total Wage']
+          : isContract
+            ? ['Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'Consolidated Salary']
+            : ['Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'Honorarium / Consolidated'];
+
       if (dynamicEarnKeys.length > 0) {
         eHeaders.push(...dynamicEarnKeys);
       } else {
@@ -2138,9 +2225,12 @@ const Reports = () => {
       }
       eHeaders.push('Gross Pay');
 
-      const dedHeaders = isVisiting
-        ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA.R']
-        : [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam'];
+      const dedHeaders = isPermanent
+        ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Scale of Pay', 'EPF/GPF', 'CPF', 'IT', 'GIS', 'SLI/GSLI', 'LIC', 'Profession Tax', 'HRA/Onam']
+        : (isContract || isDailyWage)
+          ? [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'EPF', 'IT', 'HRA.R']
+          : [null, 'Sl.No.', 'Name of Employee', 'Designation', 'Pay Type', 'IT', 'HRA.R'];
+
       if (dynamicDeduxKeys.length > 0) {
         dedHeaders.push(...dynamicDeduxKeys);
       } else {
@@ -2150,12 +2240,19 @@ const Reports = () => {
 
       const earnColCount = eHeaders.length;
       const maxColCount = Math.max(earnColCount, dedHeaders.length - 1);
+
+      // Delete any unwanted template columns beyond maxColCount
+      const totalColumns = sheet.columnCount || 50;
+      if (totalColumns > maxColCount) {
+        sheet.spliceColumns(maxColCount + 1, totalColumns - maxColCount);
+      }
+
       const lastColLetter = sheet.getColumn(maxColCount).letter;
 
       const r4 = sheet.getRow(4);
       const r5 = sheet.getRow(5);
       
-      for(let i=1; i<=20; i++) r4.getCell(i).value = null;
+      for(let i=1; i<=25; i++) r4.getCell(i).value = null;
       r4.getCell(1).value = 'EARNINGS';
 
       for (let col = 1; col <= maxColCount; col++) {
@@ -2169,7 +2266,7 @@ const Reports = () => {
       r5.commit();
 
       safeMerge(`A4:${lastColLetter}4`);
-      sheet.getCell('A3').value = (isVisiting ? 'Visiting Faculty Pay Bill Statement for the Month of ' : 'Pay Bill Statement for the Month of ') + monthDisplay;
+      sheet.getCell('A3').value = (isPermanent ? 'Pay Bill Statement for the Month of ' : isDailyWage ? 'Daily Wage Staff Pay Bill Statement for the Month of ' : isContract ? 'Contract Staff Pay Bill Statement for the Month of ' : 'Visiting Faculty Pay Bill Statement for the Month of ') + monthDisplay;
       safeMerge(`A3:${lastColLetter}3`);
       sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -2191,15 +2288,15 @@ const Reports = () => {
       let sumBasic = 0, sumGP = 0, sumDA = 0, sumHRA = 0, sumCCA = 0, sumSpl = 0, sumTr = 0, sumFest = 0, sumOther = 0, sumGross = 0;
       let sumDynamicE = {};
 
-      data.forEach((emp, i) => {
+      filteredData.forEach((emp, i) => {
         const basic = Math.round(parseFloat(emp.basic_pay) || 0);
-        const gp = isVisiting ? 0 : Math.round(parseFloat(emp.dp_gp) || 0);
-        const da = isVisiting ? 0 : Math.round(parseFloat(emp.da) || 0);
-        const hra = isVisiting ? 0 : Math.round(parseFloat(emp.hra) || 0);
-        const cca = isVisiting ? 0 : Math.round(parseFloat(emp.cca) || 0);
-        const spl = isVisiting ? 0 : Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0));
-        const tr = isVisiting ? 0 : Math.round(parseFloat(emp.tr_allow) || 0);
-        const fest = isVisiting ? 0 : Math.round(parseFloat(emp.fest_allow) || 0);
+        const gp = isPermanent ? Math.round(parseFloat(emp.dp_gp) || 0) : 0;
+        const da = isPermanent ? Math.round(parseFloat(emp.da) || 0) : 0;
+        const hra = isPermanent ? Math.round(parseFloat(emp.hra) || 0) : 0;
+        const cca = isPermanent ? Math.round(parseFloat(emp.cca) || 0) : 0;
+        const spl = isPermanent ? Math.round((parseFloat(emp.spl_pay) || 0) + (parseFloat(emp.spl_allow) || 0)) : 0;
+        const tr = isPermanent ? Math.round(parseFloat(emp.tr_allow) || 0) : 0;
+        const fest = isPermanent ? Math.round(parseFloat(emp.fest_allow) || 0) : 0;
 
         let eArr = [];
         try { eArr = typeof emp.other_earnings_breakdown === 'string' ? JSON.parse(emp.other_earnings_breakdown) : (emp.other_earnings_breakdown || []); } catch(e){}
@@ -2219,7 +2316,11 @@ const Reports = () => {
         } else {
           dynamicEarnSum = Math.round(parseFloat(emp.other_earnings) || 0);
         }
-        const gross = basic + gp + da + hra + cca + spl + tr + fest + dynamicEarnSum;
+        const gross = isPermanent 
+          ? (basic + gp + da + hra + cca + spl + tr + fest + dynamicEarnSum)
+          : isDailyWage
+            ? ((emp.total_wage || 0) + dynamicEarnSum)
+            : (basic + dynamicEarnSum);
         emp.roundedGross = gross;
 
         sumBasic += basic; sumGP += gp; sumDA += da; sumHRA += hra; sumCCA += cca; sumSpl += spl; sumTr += tr; sumFest += fest; 
@@ -2232,8 +2333,17 @@ const Reports = () => {
 
         const row = sheet.getRow(currentRow);
         const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
-        const scaleOrPayType = isVisiting ? (emp.pay_type || '') : (emp.scale_of_pay || '');
-        const values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, basic, gp, da, hra, cca, spl, tr, fest];
+        const scaleOrPayType = isPermanent ? (emp.scale_of_pay || '') : (emp.pay_type || '');
+        
+        let values = [];
+        if (isPermanent) {
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, basic, gp, da, hra, cca, spl, tr, fest];
+        } else if (isDailyWage) {
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, emp.days_worked || 0, emp.daily_wage || 0, emp.total_wage || 0];
+        } else {
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, basic];
+        }
+
         if (dynamicEarnKeys.length > 0) {
           dynamicEarnKeys.forEach(k => values.push(dynE[k] || 0));
         } else {
@@ -2269,7 +2379,19 @@ const Reports = () => {
       totalRow.getCell(1).style = totalLabelStyle;
       safeMerge(`A${currentRow}:D${currentRow}`);
       
-      const sumsEarn = [sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest];
+      const sumsEarn = [];
+      if (isPermanent) {
+        sumsEarn.push(sumBasic, sumGP, sumDA, sumHRA, sumCCA, sumSpl, sumTr, sumFest);
+      } else if (isDailyWage) {
+        sumsEarn.push(
+          filteredData.reduce((sum, e) => sum + (e.days_worked || 0), 0),
+          filteredData.reduce((sum, e) => sum + (e.daily_wage || 0), 0),
+          filteredData.reduce((sum, e) => sum + (e.total_wage || 0), 0)
+        );
+      } else {
+        sumsEarn.push(sumBasic);
+      }
+
       if (dynamicEarnKeys.length > 0) {
         dynamicEarnKeys.forEach(k => sumsEarn.push(sumDynamicE[k] || 0));
       } else {
@@ -2312,15 +2434,15 @@ const Reports = () => {
 
       let sumEPF = 0, sumCPF = 0, sumIT = 0, sumGIS = 0, sumSLI = 0, sumLIC = 0, sumPT = 0, sumHRAOnam = 0, sumOtherDed = 0, sumTotDed = 0, sumNet = 0;
       let sumDynamicD = {};
-      data.forEach((emp, i) => {
-        const epf = isVisiting ? 0 : Math.round(parseFloat(emp.epf) || 0);
-        const cpf = isVisiting ? 0 : Math.round(parseFloat(emp.cpf) || 0);
+      filteredData.forEach((emp, i) => {
+        const epf = (isContract || isDailyWage) ? Math.round(parseFloat(emp.epf) || 0) : (isPermanent ? Math.round(parseFloat(emp.epf) || 0) : 0);
+        const cpf = isPermanent ? Math.round(parseFloat(emp.cpf) || 0) : 0;
         const it = Math.round(parseFloat(emp.income_tax) || 0);
-        const gis = isVisiting ? 0 : Math.round(parseFloat(emp.gis) || 0);
-        const sli = isVisiting ? 0 : Math.round(parseFloat(emp.sli) || 0);
-        const lic = isVisiting ? 0 : Math.round(parseFloat(emp.lic) || 0);
-        const pt = isVisiting ? 0 : Math.round(parseFloat(emp.professional_tax) || 0);
-        const hraOnam = isVisiting ? Math.round(parseFloat(emp.hra) || 0) : Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0));
+        const gis = isPermanent ? Math.round(parseFloat(emp.gis) || 0) : 0;
+        const sli = isPermanent ? Math.round(parseFloat(emp.sli) || 0) : 0;
+        const lic = isPermanent ? Math.round(parseFloat(emp.lic) || 0) : 0;
+        const pt = isPermanent ? Math.round(parseFloat(emp.professional_tax) || 0) : 0;
+        const hraOnam = isPermanent ? Math.round((parseFloat(emp.hra_recovery) || 0) + (parseFloat(emp.onam_advance) || 0)) : Math.round(parseFloat(emp.hra) || 0);
 
         let dArr = [];
         try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
@@ -2341,7 +2463,11 @@ const Reports = () => {
           dynamicDeduxSum = Math.round(parseFloat(emp.other_deductions) || 0);
         }
 
-        const dedux = epf + cpf + it + gis + sli + lic + pt + hraOnam + dynamicDeduxSum;
+        const dedux = isPermanent
+          ? (epf + cpf + it + gis + sli + lic + pt + hraOnam + dynamicDeduxSum)
+          : (isContract || isDailyWage)
+            ? (epf + it + hraOnam + dynamicDeduxSum)
+            : (it + hraOnam + dynamicDeduxSum);
         const net = (emp.roundedGross || 0) - dedux;
 
         sumEPF += epf; sumCPF += cpf; sumIT += it; sumGIS += gis; sumSLI += sli; sumLIC += lic; sumPT += pt; sumHRAOnam += hraOnam;
@@ -2353,8 +2479,17 @@ const Reports = () => {
         sumTotDed += dedux; sumNet += net;
 
         const row = sheet.getRow(currentRow);
-        const scaleOrPayType = isVisiting ? (emp.pay_type || '') : (emp.scale_of_pay || '');
-        const values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, cpf, it, gis, sli, lic, pt, hraOnam];
+        const scaleOrPayType = isPermanent ? (emp.scale_of_pay || '') : (emp.pay_type || '');
+        
+        let values = [];
+        if (isPermanent) {
+          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, cpf, it, gis, sli, lic, pt, hraOnam];
+        } else if (isContract || isDailyWage) {
+          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, it, hraOnam];
+        } else {
+          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, it, hraOnam];
+        }
+
         if (dynamicDeduxKeys.length > 0) {
           dynamicDeduxKeys.forEach(k => values.push(dynD[k] || 0));
         } else {
@@ -2390,7 +2525,15 @@ const Reports = () => {
       dedTotalRow.getCell(1).style = totalLabelStyle;
       safeMerge(`A${currentRow}:D${currentRow}`);
 
-      const sumsDedux = [sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam];
+      const sumsDedux = [];
+      if (isPermanent) {
+        sumsDedux.push(sumEPF, sumCPF, sumIT, sumGIS, sumSLI, sumLIC, sumPT, sumHRAOnam);
+      } else if (isContract || isDailyWage) {
+        sumsDedux.push(sumEPF, sumIT, sumHRAOnam);
+      } else {
+        sumsDedux.push(sumIT, sumHRAOnam);
+      }
+
       if (dynamicDeduxKeys.length > 0) {
         dynamicDeduxKeys.forEach(k => sumsDedux.push(sumDynamicD[k] || 0));
       } else {
@@ -2412,10 +2555,7 @@ const Reports = () => {
 
       currentRow++;
 
-      const bottomRows = isVisiting ? [
-        ['Gross Pay', sumGross],
-        ['Net Pay', sumNet]
-      ] : [
+      const bottomRows = isPermanent ? [
         ['UGC/CSIR - DA Rate (%) 7th CPC', activeRule.da_ugc_percentage || ''],
         ['State DA (%) 11th Pay', activeRule.da_state_percentage || ''],
         ['UGC - HRA (%) 7th CPC', activeRule.hra_ugc_percentage || ''],
@@ -2425,6 +2565,9 @@ const Reports = () => {
         ['7th CPC Travel Allowance', 3600],
         ['7th CPC Deputation Allowance', 6800],
         [],
+        ['Gross Pay', sumGross],
+        ['Net Pay', sumNet]
+      ] : [
         ['Gross Pay', sumGross],
         ['Net Pay', sumNet]
       ];
@@ -2463,7 +2606,7 @@ const Reports = () => {
       sigRow.commit();
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const prefix = isVisiting ? 'KSoM_Visiting_Paybill_' : 'KSoM_Paybill_';
+      const prefix = isPermanent ? 'KSoM_Paybill_' : isDailyWage ? 'KSoM_DailyWage_Paybill_' : isContract ? 'KSoM_Contract_Paybill_' : 'KSoM_Visiting_Paybill_';
       saveAs(new Blob([buffer]), `${prefix}${formatMonthYear(monthYear)}.xlsx`);
     } catch (err) {
       console.error("Error generating Excel:", err);
@@ -2472,8 +2615,7 @@ const Reports = () => {
   };
 
   const handleExportMaster = () => {
-    if (employeeCategory === 'visiting') exportExcel();
-    else if (billType === 'regular') exportExcel();
+    if (billType === 'regular') exportExcel();
     else if (billType === 'supplementary') exportSupplementaryExcel();
     else if (billType === 'surrender') exportSurrenderExcel();
     else if (billType === 'arrears') exportArrearExcel();
@@ -2637,41 +2779,30 @@ const Reports = () => {
   return (
     <div>
       {/* Category Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-        <button 
-          onClick={() => { setEmployeeCategory('permanent'); setBillType('regular'); }}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'permanent' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'permanent' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Permanent Employees
-        </button>
-        <button 
-          onClick={() => { setEmployeeCategory('visiting'); setBillType('regular'); }}
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'none',
-            border: 'none',
-            borderBottom: employeeCategory === 'visiting' ? '2px solid var(--color-primary)' : '2px solid transparent',
-            color: employeeCategory === 'visiting' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s',
-            outline: 'none'
-          }}
-        >
-          Visiting Professors & Assistant Professors
-        </button>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
+          <button 
+            key={cat}
+            onClick={() => setEmployeeCategory(cat)}
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: employeeCategory === cat ? '2px solid var(--color-primary)' : '2px solid transparent',
+              color: employeeCategory === cat ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+          >
+            {cat === 'permanent' && 'Permanent Employees'}
+            {cat === 'visiting' && 'Visiting Faculty'}
+            {cat === 'contract' && 'Contract Staff'}
+            {cat === 'daily_wage' && 'Daily Wage Staff'}
+          </button>
+        ))}
       </div>
 
       {/* Page Header */}
@@ -2687,7 +2818,7 @@ const Reports = () => {
           {/* Bill Type Selector */}
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Bill Type:</label>
-            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }} disabled={employeeCategory === 'visiting'}>
+            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }}>
               <option value="regular">Regular Paybill</option>
               <option value="supplementary">Supplementary Paybill</option>
               <option value="surrender">Leave Surrender Bill</option>
@@ -2752,19 +2883,46 @@ const Reports = () => {
                   <th>Employee</th>
                   {billType === 'regular' && (
                     <>
-                      {employeeCategory === 'permanent' ? (
+                      {employeeCategory === 'permanent' && (
                         <>
                           <th>Gross Pay</th>
                           <th>Deductions</th>
                           <th>Net Pay</th>
                         </>
-                      ) : (
+                      )}
+                      {employeeCategory === 'visiting' && (
                         <>
                           <th>Honorarium/Consolidated</th>
                           <th>Others (Earn)</th>
                           <th>Gross Pay</th>
                           <th>Income Tax</th>
                           <th>HRA.R</th>
+                          <th>Others (Ded)</th>
+                          <th>Net Pay</th>
+                        </>
+                      )}
+                      {employeeCategory === 'contract' && (
+                        <>
+                          <th>Consolidated Salary</th>
+                          <th>Others (Earn)</th>
+                          <th>Gross Pay</th>
+                          <th>Income Tax</th>
+                          <th>HRA.R</th>
+                          <th>EPF</th>
+                          <th>Others (Ded)</th>
+                          <th>Net Pay</th>
+                        </>
+                      )}
+                      {employeeCategory === 'daily_wage' && (
+                        <>
+                          <th>Days Worked</th>
+                          <th>Daily Wage</th>
+                          <th>Total Wage</th>
+                          <th>Others (Earn)</th>
+                          <th>Gross Pay</th>
+                          <th>Income Tax</th>
+                          <th>HRA.R</th>
+                          <th>EPF</th>
                           <th>Others (Ded)</th>
                           <th>Net Pay</th>
                         </>
@@ -2781,7 +2939,7 @@ const Reports = () => {
               <tbody>
                 {data.length === 0 && (
                   <tr>
-                    <td colSpan={isViewer ? (employeeCategory === 'permanent' ? "5" : "9") : (employeeCategory === 'permanent' ? "6" : "10")} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
+                    <td colSpan={isViewer ? (employeeCategory === 'permanent' ? "5" : employeeCategory === 'daily_wage' ? "12" : employeeCategory === 'contract' ? "10" : "9") : (employeeCategory === 'permanent' ? "6" : employeeCategory === 'daily_wage' ? "13" : employeeCategory === 'contract' ? "11" : "10")} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                         <AlertTriangle size={24} style={{ color: 'var(--color-warning)' }} />
                         <span>No approved {getBillTypeTitle()} records found for this month.</span>
@@ -2808,19 +2966,46 @@ const Reports = () => {
                     {/* Regular Paybill Row */}
                     {billType === 'regular' && (
                       <>
-                        {employeeCategory === 'permanent' ? (
+                        {employeeCategory === 'permanent' && (
                           <>
                             <td>₹ {fmt(emp.gross)}</td>
                             <td>₹ {fmt(emp.dedux)}</td>
                             <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
                           </>
-                        ) : (
+                        )}
+                        {employeeCategory === 'visiting' && (
                           <>
                             <td>₹ {fmt(emp.basic_pay)}</td>
                             <td>₹ {fmt(emp.other_earnings)}</td>
                             <td>₹ {fmt(emp.gross)}</td>
                             <td>₹ {fmt(emp.income_tax)}</td>
                             <td>₹ {fmt(emp.hra)}</td>
+                            <td>₹ {fmt(emp.other_deductions)}</td>
+                            <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                          </>
+                        )}
+                        {employeeCategory === 'contract' && (
+                          <>
+                            <td>₹ {fmt(emp.basic_pay)}</td>
+                            <td>₹ {fmt(emp.other_earnings)}</td>
+                            <td>₹ {fmt(emp.gross)}</td>
+                            <td>₹ {fmt(emp.income_tax)}</td>
+                            <td>₹ {fmt(emp.hra)}</td>
+                            <td>₹ {fmt(emp.epf)}</td>
+                            <td>₹ {fmt(emp.other_deductions)}</td>
+                            <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
+                          </>
+                        )}
+                        {employeeCategory === 'daily_wage' && (
+                          <>
+                            <td>{emp.days_worked || 0}</td>
+                            <td>₹ {fmt(emp.daily_wage)}</td>
+                            <td>₹ {fmt(emp.total_wage)}</td>
+                            <td>₹ {fmt(emp.other_earnings)}</td>
+                            <td>₹ {fmt(emp.gross)}</td>
+                            <td>₹ {fmt(emp.income_tax)}</td>
+                            <td>₹ {fmt(emp.hra)}</td>
+                            <td>₹ {fmt(emp.epf)}</td>
                             <td>₹ {fmt(emp.other_deductions)}</td>
                             <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>₹ {fmt(emp.net)}</td>
                           </>

@@ -6,13 +6,33 @@ export async function onRequestGet(context) {
     const userRole = context.request.headers.get('X-User-Role');
     const userEmail = context.request.headers.get('X-User-Email');
 
+    const url = new URL(context.request.url);
+    const category = url.searchParams.get('category') || 'permanent';
+
+    let tableName = 'employees';
+    if (category === 'visiting') {
+      tableName = 'visiting_employees';
+    } else if (category === 'contract') {
+      tableName = 'contract_employees';
+    } else if (category === 'daily_wage') {
+      tableName = 'daily_wage_employees';
+    }
+
+    const isPerm = tableName === 'employees';
+    const payColumn = isPerm ? 'e.scale_of_pay' : 'e.pay_type as scale_of_pay';
+    const catColumn = isPerm ? 'e.category' : `'${category}' as category`;
+    const uanColumn = isPerm ? 'e.epf_uan' : 'NULL as epf_uan';
+    const joinEpfColumn = isPerm ? 'm.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca' : 'NULL as dp_gp, NULL as da_state, NULL as da_ugc, NULL as hra_state, NULL as hra_ugc, NULL as cca';
+    const dailyWageCols = 'm.days_worked, m.daily_wage, m.total_wage';
+
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.scale_of_pay, e.category, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.epf_uan, e.title, e.sort_order,
-             m.id as earnings_id, m.num_days, m.regular_basic, m.basic_pay, m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca, m.other_earnings,
+      SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, ${uanColumn}, e.title, e.sort_order,
+             m.id as earnings_id, m.num_days, m.regular_basic, m.basic_pay, ${joinEpfColumn}, m.other_earnings,
              m.spl_pay, m.tr_allow, m.spl_allow, m.fest_allow, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
+             ${dailyWageCols},
              d.id as deductions_id, d.epf, d.professional_tax, d.sli, d.gis, d.lic, d.income_tax, d.onam_advance, d.other_deductions,
              d.cpf, d.hra_recovery, d.other_deductions_breakdown
-      FROM employees e
+      FROM ${tableName} e
       INNER JOIN supplementary_earnings m ON e.emp_id = m.emp_id AND m.month_year = ?
       LEFT JOIN supplementary_deductions d ON e.emp_id = d.emp_id AND d.month_year = ?
     `;
@@ -61,8 +81,8 @@ export async function onRequestPost(context) {
         db.prepare(`
           INSERT INTO supplementary_earnings (
             emp_id, month_year, num_days, regular_basic, basic_pay, dp_gp, da_state, da_ugc, hra_state, hra_ugc, cca, other_earnings,
-            spl_pay, tr_allow, spl_allow, fest_allow, other_earnings_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            spl_pay, tr_allow, spl_allow, fest_allow, other_earnings_breakdown, days_worked, daily_wage, total_wage
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(emp_id, month_year) DO UPDATE SET
             num_days = excluded.num_days,
             regular_basic = excluded.regular_basic,
@@ -78,7 +98,10 @@ export async function onRequestPost(context) {
             tr_allow = excluded.tr_allow,
             spl_allow = excluded.spl_allow,
             fest_allow = excluded.fest_allow,
-            other_earnings_breakdown = excluded.other_earnings_breakdown
+            other_earnings_breakdown = excluded.other_earnings_breakdown,
+            days_worked = excluded.days_worked,
+            daily_wage = excluded.daily_wage,
+            total_wage = excluded.total_wage
         `).bind(
           record.emp_id,
           monthYear,
@@ -96,7 +119,10 @@ export async function onRequestPost(context) {
           record.tr_allow || 0,
           record.spl_allow || 0,
           record.fest_allow || 0,
-          record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
+          record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null,
+          record.days_worked || 0,
+          record.daily_wage || 0,
+          record.total_wage || 0
         )
       );
 

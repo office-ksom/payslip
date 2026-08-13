@@ -73,7 +73,7 @@ const ArrearBill = (props) => {
       } catch (e) {
         console.error("Failed to load system settings", e);
       }
-      const res = await fetch(`/api/arrears/${targetMonth}?type=${arrearType}`);
+      const res = await fetch(`/api/arrears/${targetMonth}?type=${arrearType}&category=${category}`);
       const data = await res.json();
  
       // Combine employees of the selected category with their existing arrear records if available
@@ -103,7 +103,7 @@ const ArrearBill = (props) => {
       setSelectedEmps(new Set());
  
       // Check approval status
-      const approvalRes = await fetch(`/api/arrears/approve/${targetMonth}?type=${arrearType}`);
+      const approvalRes = await fetch(`/api/arrears/approve/${targetMonth}?type=${arrearType}&category=${category}`);
       if (approvalRes.ok) {
         const approvalData = await approvalRes.json();
         setIsApproved(approvalData.is_approved === 1);
@@ -227,7 +227,7 @@ const ArrearBill = (props) => {
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/arrears/${monthYear}`, {
+      const res = await fetch(`/api/arrears/${monthYear}?category=${staffCategory}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: validRecords })
@@ -262,7 +262,7 @@ const ArrearBill = (props) => {
     
     setApproving(true);
     try {
-      const res = await fetch(`/api/arrears/approve/${monthYear}`, { 
+      const res = await fetch(`/api/arrears/approve/${monthYear}?category=${staffCategory}`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emp_ids: Array.from(selectedEmps), arrear_type: arrearType })
@@ -296,7 +296,7 @@ const ArrearBill = (props) => {
     
     setRejecting(true);
     try {
-      const res = await fetch(`/api/arrears/approve/${monthYear}`, { 
+      const res = await fetch(`/api/arrears/approve/${monthYear}?category=${staffCategory}`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emp_ids: Array.from(selectedEmps), arrear_type: arrearType, action: 'reject' })
@@ -420,15 +420,31 @@ const ArrearBill = (props) => {
           {/* Category of Staff */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Category of Staff</label>
-            <select 
-              className="form-control" 
-              value={staffCategory} 
-              onChange={(e) => setStaffCategory(e.target.value)}
-              disabled={saving || approving}
-            >
-              <option value="state">State</option>
-              <option value="ugc/csir">UGC / CSIR</option>
-            </select>
+            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+              {[
+                { value: 'state', label: 'Permanent (State)' },
+                { value: 'ugc/csir', label: 'Permanent (UGC)' },
+                { value: 'visiting', label: 'Visiting Faculty' },
+                { value: 'contract', label: 'Contract Staff' },
+                { value: 'daily_wage', label: 'Daily Wage Staff' }
+              ].map(tab => (
+                <button
+                  key={tab.value}
+                  className={`btn btn-sm ${staffCategory === tab.value ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setStaffCategory(tab.value)}
+                  disabled={saving || approving}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.8rem',
+                    fontWeight: staffCategory === tab.value ? 700 : 500,
+                    borderRadius: '6px',
+                    opacity: staffCategory === tab.value ? 1 : 0.7
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
