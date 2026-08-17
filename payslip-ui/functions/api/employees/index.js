@@ -52,14 +52,15 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order, appointment_type } = data;
     const activeVal = typeof is_active !== 'undefined' ? Number(is_active) : 1;
     const sOrder = typeof sort_order !== 'undefined' ? Number(sort_order) : 0;
+    const appType = appointment_type || 'Permanent';
     
     await context.env.ksom_payslip_db.prepare(
-      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, epf_uan || null, title || null, sOrder).run();
+      `INSERT INTO employees (emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order, appointment_type) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, epf_uan || null, title || null, sOrder, appType).run();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
@@ -73,16 +74,17 @@ export async function onRequestPost(context) {
 export async function onRequestPut(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order, appointment_type } = data;
     const activeVal = typeof is_active !== 'undefined' ? Number(is_active) : 1;
     const sOrder = typeof sort_order !== 'undefined' ? Number(sort_order) : 0;
+    const appType = appointment_type || 'Permanent';
 
     await context.env.ksom_payslip_db.prepare(
       `UPDATE employees 
        SET name = ?, designation = ?, date_of_birth = ?, date_of_joining = ?, 
-           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?, is_active = ?, epf_uan = ?, title = ?, sort_order = ?
+           scale_of_pay = ?, category = ?, email_id = ?, mob_no = ?, is_active = ?, epf_uan = ?, title = ?, sort_order = ?, appointment_type = ?
        WHERE emp_id = ?`
-    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, epf_uan || null, title || null, sOrder, emp_id).run();
+    ).bind(name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id || null, mob_no || null, activeVal, epf_uan || null, title || null, sOrder, appType, emp_id).run();
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

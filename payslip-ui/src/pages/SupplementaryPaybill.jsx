@@ -584,7 +584,8 @@ const SupplementaryPaybill = (props) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="supplementary-main-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Supplementary Paybill Generation</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -1350,10 +1351,11 @@ const SupplementaryPaybill = (props) => {
 
         </>
       )}
+      </div>
 
       {/* Full Screen Preview Overlay */}
       {showFullPreview && (
-        <div style={{
+        <div className="supplementary-preview-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
@@ -1362,9 +1364,14 @@ const SupplementaryPaybill = (props) => {
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Supplementary Salary Verification Sheet</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {formatMonthYear(monthYear)} | Status: {isApproved ? 'Approved & Locked' : isSubmitted ? 'Pending Approval' : 'Draft'}</p>
             </div>
-            <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
-              <X size={20} /> Close Preview
-            </button>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
+                Print Sheet
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
+                <X size={20} /> Close Preview
+              </button>
+            </div>
           </div>
           
           <div style={{ overflowX: 'auto', backgroundColor: '#fff', width: '100%' }}>

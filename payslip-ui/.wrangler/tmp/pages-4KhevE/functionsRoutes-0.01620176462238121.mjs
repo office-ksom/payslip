@@ -46,6 +46,7 @@ import { onRequestPut as __api_employees_daily_wage_js_onRequestPut } from "D:\\
 import { onRequestGet as __api_employees_visiting_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
 import { onRequestPost as __api_employees_visiting_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
 import { onRequestPut as __api_employees_visiting_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\visiting.js"
+import { onRequestPost as __api_epf_entries_approve_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\epf-entries\\approve.js"
 import { onRequestPost as __api_me_password_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\me\\password.js"
 import { onRequestGet as __api_reports_consolidated_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated.js"
 import { onRequestGet as __api_reports_consolidated_all_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\reports\\consolidated-all.js"
@@ -78,6 +79,8 @@ import { onRequestPost as __api_email_index_js_onRequestPost } from "D:\\KSOM\\W
 import { onRequestGet as __api_employees_index_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\index.js"
 import { onRequestPost as __api_employees_index_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\index.js"
 import { onRequestPut as __api_employees_index_js_onRequestPut } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\index.js"
+import { onRequestGet as __api_epf_entries_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\epf-entries.js"
+import { onRequestPost as __api_epf_entries_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\epf-entries.js"
 import { onRequestGet as __api_settings_index_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\index.js"
 import { onRequestPost as __api_settings_index_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\settings\\index.js"
 import { onRequestDelete as __api_users_index_js_onRequestDelete } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\users\\index.js"
@@ -423,6 +426,13 @@ export const routes = [
       modules: [__api_employees_visiting_js_onRequestPut],
     },
   {
+      routePath: "/api/epf-entries/approve",
+      mountPath: "/api/epf-entries",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_epf_entries_approve_js_onRequestPost],
+    },
+  {
       routePath: "/api/me/password",
       mountPath: "/api/me",
       method: "POST",
@@ -645,6 +655,20 @@ export const routes = [
       method: "PUT",
       middlewares: [],
       modules: [__api_employees_index_js_onRequestPut],
+    },
+  {
+      routePath: "/api/epf-entries",
+      mountPath: "/api",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_epf_entries_js_onRequestGet],
+    },
+  {
+      routePath: "/api/epf-entries",
+      mountPath: "/api",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_epf_entries_js_onRequestPost],
     },
   {
       routePath: "/api/settings",

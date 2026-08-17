@@ -17,7 +17,8 @@ CREATE TABLE employees (
     sort_order INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     email_id TEXT,
-    mob_no TEXT
+    mob_no TEXT,
+    appointment_type TEXT DEFAULT 'Permanent'
 );
 
 -- 2. Allowances Settings (Global Rules/Percentages)

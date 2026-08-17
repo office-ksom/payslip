@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle } from 'lucide-react';
+import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 const getFinancialYear = (dateStr) => {
@@ -75,6 +75,7 @@ const SurrenderBill = (props) => {
   // Selected employee IDs for selective approval
   const [selectedEmpIds, setSelectedEmpIds] = useState(new Set());
   const [requireApproval, setRequireApproval] = useState(true);
+  const [showFullPreview, setShowFullPreview] = useState(false);
 
   // Dropdown search term
   const [searchTerm, setSearchTerm] = useState('');
@@ -444,7 +445,8 @@ const SurrenderBill = (props) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div className="surrender-main-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Earned Leave Surrender Bill</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -797,7 +799,17 @@ const SurrenderBill = (props) => {
             </p>
           </div>
 
-          <div>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {filteredBills.length > 0 && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowFullPreview(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Search size={16} /> Preview Full Sheet
+              </button>
+            )}
             {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredBills.length > 0 && (
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button 
@@ -1034,6 +1046,80 @@ const SurrenderBill = (props) => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Full Screen Preview Overlay */}
+      {showFullPreview && (
+        <div className="surrender-preview-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Earned Leave Surrender Bill Verification Sheet</h1>
+              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month/Year: {formatMonthYear(monthYear)} | Total Records: {filteredBills.length}</p>
+            </div>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
+                Print Sheet
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
+                <X size={20} /> Close Preview
+              </button>
+            </div>
+          </div>
+          
+          <div className="table-container" style={{ backgroundColor: '#fff', width: '100%' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Bill Date</th>
+                  <th style={{ textAlign: 'right' }}>Basic Pay</th>
+                  <th style={{ textAlign: 'right' }}>DA</th>
+                  <th style={{ textAlign: 'right' }}>HRA</th>
+                  <th style={{ textAlign: 'center' }}>ELs Surrendered</th>
+                  <th style={{ textAlign: 'center' }}>FY</th>
+                  <th style={{ textAlign: 'right' }}>Total Amount</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBills.map(bill => (
+                  <tr key={bill.emp_id}>
+                    <td style={{ fontWeight: 600 }}>{bill.emp_id}</td>
+                    <td>{bill.title ? `${bill.title} ` : ''}{bill.name}</td>
+                    <td>{bill.category?.toUpperCase()}</td>
+                    <td>{bill.bill_date}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmt(bill.basic_pay)}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmt(bill.da)}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmt(bill.hra)}</td>
+                    <td style={{ textAlign: 'center' }}>{bill.num_els} days {bill.is_terminal === 1 && '(Terminal)'}</td>
+                    <td style={{ textAlign: 'center' }}>{bill.financial_year}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹ {Math.round(bill.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {bill.is_approved === 1 ? 'Approved' : bill.is_approved === 3 ? 'Rejected' : bill.is_approved === 2 ? 'Submitted' : 'Draft'}
+                    </td>
+                  </tr>
+                ))}
+                {/* Total Row */}
+                <tr style={{ fontWeight: 'bold', background: '#f9f9f9' }}>
+                  <td colSpan="4">Total ({filteredBills.length} Bills)</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredBills.reduce((sum, b) => sum + (b.basic_pay || 0), 0))}</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredBills.reduce((sum, b) => sum + (b.da || 0), 0))}</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredBills.reduce((sum, b) => sum + (b.hra || 0), 0))}</td>
+                  <td style={{ textAlign: 'center' }}>{filteredBills.reduce((sum, b) => sum + (b.num_els || 0), 0)} days</td>
+                  <td></td>
+                  <td style={{ textAlign: 'right' }}>₹ {Math.round(filteredBills.reduce((sum, b) => sum + (b.total_amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldCheck, Copy, Calendar, FileText, XCircle, Trash2 } from 'lucide-react';
+import { Save, ShieldCheck, Copy, Calendar, FileText, XCircle, Trash2, Search, X } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 
@@ -50,6 +50,7 @@ const FestivalAllowanceBill = (props) => {
   // Checked employees for bulk actions
   const [selectedEmps, setSelectedEmps] = useState(new Set());
   const [requireApproval, setRequireApproval] = useState(true);
+  const [showFullPreview, setShowFullPreview] = useState(false);
 
   // Load festival allowance bills when monthYear or category changes
   useEffect(() => {
@@ -295,7 +296,8 @@ const FestivalAllowanceBill = (props) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="festival-main-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Festival Allowance Bill</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -421,7 +423,17 @@ const FestivalAllowanceBill = (props) => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {filteredEmployees.length > 0 && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowFullPreview(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Search size={16} /> Preview Full Sheet
+              </button>
+            )}
             {((user?.role === 'admin' && approvedCount < totalCount) || (user?.role === 'super_admin')) && (
               <button className="btn btn-primary" onClick={handleSave} disabled={saving || approving}>
                 <Save size={18} /> {saving ? 'Saving...' : 'Save Allowances'}
@@ -662,6 +674,69 @@ const FestivalAllowanceBill = (props) => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Full Screen Preview Overlay */}
+      {showFullPreview && (
+        <div className="festival-preview-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Festival Allowance Verification Sheet</h1>
+              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month/Year: {formatMonthYear(monthYear)} | Category: {staffCategory?.toUpperCase()} | Total Records: {filteredEmployees.length}</p>
+            </div>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
+                Print Sheet
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
+                <X size={20} /> Close Preview
+              </button>
+            </div>
+          </div>
+          
+          <div className="table-container" style={{ backgroundColor: '#fff', width: '100%' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th style={{ textAlign: 'right' }}>Allowance Amount</th>
+                  <th>Allowance Date</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map(emp => (
+                  <tr key={emp.emp_id}>
+                    <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
+                    <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
+                    <td>{emp.category?.toUpperCase()}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {(emp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td>{emp.allowance_date || '—'}</td>
+                    <td>{emp.description || '—'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {emp.is_approved === 1 ? 'Approved' : emp.is_approved === 3 ? 'Rejected' : emp.is_approved === 2 ? 'Submitted' : 'Draft'}
+                    </td>
+                  </tr>
+                ))}
+                {/* Total Row */}
+                <tr style={{ fontWeight: 'bold', background: '#f9f9f9' }}>
+                  <td colSpan="3">Total ({filteredEmployees.length} Records)</td>
+                  <td style={{ textAlign: 'right' }}>₹ {totalAmountSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

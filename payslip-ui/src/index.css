@@ -347,3 +347,355 @@ a:hover {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Screen styling for print preview overlays to guarantee readability (dark text on light/white background) */
+.epf-preview-overlay,
+.paybill-preview-overlay,
+.supplementary-preview-overlay,
+.employees-preview-overlay,
+.surrender-preview-overlay,
+.arrear-preview-overlay,
+.festival-preview-overlay {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.epf-preview-overlay *,
+.paybill-preview-overlay *,
+.supplementary-preview-overlay *,
+.employees-preview-overlay *,
+.surrender-preview-overlay *,
+.arrear-preview-overlay *,
+.festival-preview-overlay * {
+  color: #000000 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.epf-preview-overlay .card,
+.paybill-preview-overlay .card,
+.supplementary-preview-overlay .card,
+.employees-preview-overlay .card,
+.surrender-preview-overlay .card,
+.arrear-preview-overlay .card,
+.festival-preview-overlay .card {
+  background-color: #f8f9fa !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.epf-preview-overlay .table-container,
+.paybill-preview-overlay .table-container,
+.supplementary-preview-overlay .table-container,
+.employees-preview-overlay .table-container,
+.surrender-preview-overlay .table-container,
+.arrear-preview-overlay .table-container,
+.festival-preview-overlay .table-container {
+  background-color: #ffffff !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.epf-preview-overlay .table th,
+.paybill-preview-overlay .table th,
+.supplementary-preview-overlay .table th,
+.employees-preview-overlay .table th,
+.surrender-preview-overlay .table th,
+.arrear-preview-overlay .table th,
+.festival-preview-overlay .table th {
+  background-color: #e9ecef !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.epf-preview-overlay .table td,
+.paybill-preview-overlay .table td,
+.supplementary-preview-overlay .table td,
+.employees-preview-overlay .table td,
+.surrender-preview-overlay .table td,
+.arrear-preview-overlay .table td,
+.festival-preview-overlay .table td {
+  border: 1px solid #dee2e6 !important;
+  background-color: #ffffff !important;
+}
+
+.epf-preview-overlay .table tr:hover,
+.paybill-preview-overlay .table tr:hover,
+.supplementary-preview-overlay .table tr:hover,
+.employees-preview-overlay .table tr:hover,
+.surrender-preview-overlay .table tr:hover,
+.arrear-preview-overlay .table tr:hover,
+.festival-preview-overlay .table tr:hover {
+  background-color: #f1f3f5 !important;
+}
+
+.epf-preview-overlay .btn-primary,
+.paybill-preview-overlay .btn-primary,
+.supplementary-preview-overlay .btn-primary,
+.employees-preview-overlay .btn-primary,
+.surrender-preview-overlay .btn-primary,
+.arrear-preview-overlay .btn-primary,
+.festival-preview-overlay .btn-primary {
+  background-color: #212529 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.epf-preview-overlay .btn-secondary,
+.paybill-preview-overlay .btn-secondary,
+.supplementary-preview-overlay .btn-secondary,
+.employees-preview-overlay .btn-secondary,
+.surrender-preview-overlay .btn-secondary,
+.arrear-preview-overlay .btn-secondary,
+.festival-preview-overlay .btn-secondary {
+  background-color: #f8f9fa !important;
+  color: #212529 !important;
+  border: 1px solid #ced4da !important;
+}
+
+/* Print layout optimizations for EPF sheet */
+/* Print layout optimizations for EPF, Paybill, and Supplementary Paybill sheets */
+@media print {
+  /* Hide UI elements that shouldn't be printed */
+  .sidebar,
+  .topbar,
+  .no-print,
+  button,
+  .btn {
+    display: none !important;
+  }
+
+  /* Make sure container heights and overflows do not restrict print pages */
+  html,
+  body,
+  #root,
+  .app-container,
+  .main-content,
+  .page-container {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Hide main content of pages when preview print sheet is shown */
+  .epf-main-content,
+  .paybill-main-content,
+  .supplementary-main-content,
+  .employees-main-content,
+  .surrender-main-content,
+  .arrear-main-content,
+  .festival-main-content {
+    display: none !important;
+  }
+
+  /* Preview overlay print layout styling */
+  .epf-preview-overlay,
+  .paybill-preview-overlay,
+  .supplementary-preview-overlay,
+  .employees-preview-overlay,
+  .surrender-preview-overlay,
+  .arrear-preview-overlay,
+  .festival-preview-overlay {
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: auto !important;
+    box-shadow: none !important;
+  }
+
+  /* Force light theme elements */
+  .epf-preview-overlay,
+  .epf-preview-overlay *,
+  .paybill-preview-overlay,
+  .paybill-preview-overlay *,
+  .supplementary-preview-overlay,
+  .supplementary-preview-overlay *,
+  .employees-preview-overlay,
+  .employees-preview-overlay *,
+  .surrender-preview-overlay,
+  .surrender-preview-overlay *,
+  .arrear-preview-overlay,
+  .arrear-preview-overlay *,
+  .festival-preview-overlay,
+  .festival-preview-overlay * {
+    color: #000 !important;
+    background-color: transparent !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Header styles */
+  .epf-preview-overlay h1,
+  .epf-preview-overlay h2,
+  .paybill-preview-overlay h1,
+  .paybill-preview-overlay h2,
+  .supplementary-preview-overlay h1,
+  .supplementary-preview-overlay h2,
+  .employees-preview-overlay h1,
+  .employees-preview-overlay h2,
+  .surrender-preview-overlay h1,
+  .surrender-preview-overlay h2,
+  .arrear-preview-overlay h1,
+  .arrear-preview-overlay h2,
+  .festival-preview-overlay h1,
+  .festival-preview-overlay h2 {
+    color: #000 !important;
+    font-size: 16pt !important;
+    margin-bottom: 5px !important;
+    font-weight: bold !important;
+  }
+
+  .epf-preview-overlay p,
+  .paybill-preview-overlay p,
+  .supplementary-preview-overlay p,
+  .employees-preview-overlay p,
+  .surrender-preview-overlay p,
+  .arrear-preview-overlay p,
+  .festival-preview-overlay p {
+    color: #333 !important;
+    font-size: 10pt !important;
+    margin-bottom: 15px !important;
+  }
+
+  /* Adjust grid columns for print dashboard summaries */
+  .epf-preview-overlay div[style*="grid-template-columns"],
+  .paybill-preview-overlay div[style*="grid-template-columns"],
+  .supplementary-preview-overlay div[style*="grid-template-columns"],
+  .employees-preview-overlay div[style*="grid-template-columns"],
+  .surrender-preview-overlay div[style*="grid-template-columns"],
+  .arrear-preview-overlay div[style*="grid-template-columns"],
+  .festival-preview-overlay div[style*="grid-template-columns"] {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 15px !important;
+    margin-bottom: 25px !important;
+  }
+
+  .epf-preview-overlay .card,
+  .paybill-preview-overlay .card,
+  .supplementary-preview-overlay .card,
+  .employees-preview-overlay .card,
+  .surrender-preview-overlay .card,
+  .arrear-preview-overlay .card,
+  .festival-preview-overlay .card {
+    border: 1px solid #000 !important;
+    border-radius: 4px !important;
+    padding: 8px !important;
+    background: #fff !important;
+  }
+
+  .epf-preview-overlay .card span,
+  .paybill-preview-overlay .card span,
+  .supplementary-preview-overlay .card span,
+  .employees-preview-overlay .card span,
+  .surrender-preview-overlay .card span,
+  .arrear-preview-overlay .card span,
+  .festival-preview-overlay .card span {
+    font-size: 9pt !important;
+    color: #555 !important;
+    text-transform: uppercase;
+  }
+
+  .epf-preview-overlay .card h3,
+  .paybill-preview-overlay .card h3,
+  .supplementary-preview-overlay .card h3,
+  .employees-preview-overlay .card h3,
+  .surrender-preview-overlay .card h3,
+  .arrear-preview-overlay .card h3,
+  .festival-preview-overlay .card h3 {
+    font-size: 13pt !important;
+    margin-top: 4px !important;
+    font-weight: bold !important;
+  }
+
+  /* Table container scroll override */
+  .epf-preview-overlay .table-container,
+  .paybill-preview-overlay .table-container,
+  .supplementary-preview-overlay .table-container,
+  .employees-preview-overlay .table-container,
+  .surrender-preview-overlay .table-container,
+  .arrear-preview-overlay .table-container,
+  .festival-preview-overlay .table-container {
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .epf-preview-overlay .table,
+  .paybill-preview-overlay .table,
+  .supplementary-preview-overlay .table,
+  .employees-preview-overlay .table,
+  .surrender-preview-overlay .table,
+  .arrear-preview-overlay .table,
+  .festival-preview-overlay .table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Standard/EPF/Employee/Surrender/Arrear/Festival Table styling (up to 12 columns) */
+  .epf-preview-overlay .table th,
+  .epf-preview-overlay .table td,
+  .employees-preview-overlay .table th,
+  .employees-preview-overlay .table td,
+  .surrender-preview-overlay .table th,
+  .surrender-preview-overlay .table td,
+  .arrear-preview-overlay .table th,
+  .arrear-preview-overlay .table td,
+  .festival-preview-overlay .table th,
+  .festival-preview-overlay .table td {
+    border: 1px solid #000 !important;
+    padding: 6px 4px !important;
+    font-size: 8.5pt !important;
+    color: #000 !important;
+  }
+
+  /* Paybill & Supplementary Table styling (up to 22 columns - needs tiny font & padding) */
+  .paybill-preview-overlay .table th,
+  .paybill-preview-overlay .table td,
+  .supplementary-preview-overlay .table th,
+  .supplementary-preview-overlay .table td {
+    border: 1px solid #000 !important;
+    padding: 4px 2px !important;
+    font-size: 6.5pt !important;
+    color: #000 !important;
+  }
+
+  .epf-preview-overlay .table th,
+  .paybill-preview-overlay .table th,
+  .supplementary-preview-overlay .table th,
+  .employees-preview-overlay .table th,
+  .surrender-preview-overlay .table th,
+  .arrear-preview-overlay .table th,
+  .festival-preview-overlay .table th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  .epf-preview-overlay .table tr,
+  .paybill-preview-overlay .table tr,
+  .supplementary-preview-overlay .table tr,
+  .employees-preview-overlay .table tr,
+  .surrender-preview-overlay .table tr,
+  .arrear-preview-overlay .table tr,
+  .festival-preview-overlay .table tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Define landscape layout for A4 print */
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+}

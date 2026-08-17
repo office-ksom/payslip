@@ -15,7 +15,8 @@ const emptyForm = {
   epf_uan: '',
   is_active: 1,
   title: 'Mr.',
-  sort_order: 0
+  sort_order: 0,
+  appointment_type: 'Permanent'
 };
 
 const emptyVisitingForm = {
@@ -65,10 +66,6 @@ const emptyDailyWageForm = {
 
 const Employees = () => {
   const { user } = useOutletContext();
-  if (user && user.role === 'viewer') {
-    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
-  }
-  
   const [activeTab, setActiveTab] = useState('permanent'); // 'permanent', 'visiting', 'contract', 'daily_wage'
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,10 +75,7 @@ const Employees = () => {
   const [formData, setFormData] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
-
-  useEffect(() => {
-    fetchEmployees();
-  }, [activeTab]);
+  const [showFullPreview, setShowFullPreview] = useState(false);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -98,6 +92,16 @@ const Employees = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  if (user && user.role === 'viewer') {
+    return <div className="card" style={{ textAlign: 'center', padding: '3rem' }}><h1>Access Denied</h1><p>You do not have permission to view this page.</p></div>;
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -133,7 +137,8 @@ const Employees = () => {
         epf_uan: emp.epf_uan || '',
         is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1,
         title: emp.title || 'Mr.',
-        sort_order: emp.sort_order || 0
+        sort_order: emp.sort_order || 0,
+        appointment_type: emp.appointment_type || 'Permanent'
       });
     } else {
       setFormData({
@@ -189,7 +194,7 @@ const Employees = () => {
         const err = await res.json();
         setMessage({ type: 'error', text: err.error || 'Failed to save.' });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Error communicating with server.' });
     } finally {
       setSaving(false);
@@ -203,19 +208,25 @@ const Employees = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Employee Directory</h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
-            Manage staff profiles, pay scales, and employment categories.
-          </p>
+      <div className="employees-main-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Employee Directory</h1>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
+              Manage staff profiles, pay scales, and employment categories.
+            </p>
+          </div>
+          {!showForm && (
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button className="btn btn-secondary" onClick={() => setShowFullPreview(true)}>
+                Preview Full Sheet
+              </button>
+              <button className="btn btn-primary" onClick={openAddForm}>
+                <UserPlus size={18} /> Add Employee
+              </button>
+            </div>
+          )}
         </div>
-        {!showForm && (
-          <button className="btn btn-primary" onClick={openAddForm}>
-            <UserPlus size={18} /> Add Employee
-          </button>
-        )}
-      </div>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
@@ -414,6 +425,11 @@ const Employees = () => {
                     </select>
                   </div>
                   <div className="form-group">
+                    <label className="form-label">Appointment Type</label>
+                    <select name="appointment_type" value={formData.appointment_type} onChange={handleInputChange} className="form-control">
+                      <option value="Permanent">Permanent</option>
+                      <option value="Deputation">Deputation</option>
+                    </select>
                   </div>
                 </div>
               </>
@@ -624,6 +640,13 @@ const Employees = () => {
                             <span className={`badge badge-${emp.category}`}>
                               {emp.category === 'ugc/csir' ? 'UGC/CSIR' : (emp.category ? emp.category.charAt(0).toUpperCase() + emp.category.slice(1) : '—')}
                             </span>
+                            {emp.appointment_type && emp.appointment_type !== 'Permanent' && (
+                              <div style={{ marginTop: '0.25rem' }}>
+                                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
+                                  {emp.appointment_type}
+                                </span>
+                              </div>
+                            )}
                             <div style={{ marginTop: '0.25rem' }}>
                               <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
                                 {emp.is_active ? 'Active' : 'Inactive'}
@@ -669,6 +692,93 @@ const Employees = () => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Full Screen Preview Overlay */}
+      {showFullPreview && (
+        <div className="employees-preview-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>
+                Employee Directory - {activeTab === 'permanent' ? 'Permanent Staff' : activeTab === 'visiting' ? 'Visiting Faculty' : activeTab === 'contract' ? 'Contract Staff' : 'Daily Wage Staff'}
+              </h1>
+              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Total Records: {filteredEmployees.length}</p>
+            </div>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
+                Print Sheet
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
+                <X size={20} /> Close Preview
+              </button>
+            </div>
+          </div>
+          
+          <div className="table-container" style={{ backgroundColor: '#fff', width: '100%' }}>
+            <table className="table">
+              <thead>
+                {activeTab === 'permanent' ? (
+                  <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Category</th>
+                    <th>Pay Scale</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>EPF UAN</th>
+                    <th>Appointment Type</th>
+                    <th>Status</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th>Emp ID</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Pay Type</th>
+                    <th>Pay</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {filteredEmployees.map(emp => (
+                  <tr key={emp.emp_id}>
+                    <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
+                    <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
+                    <td>{emp.designation || '—'}</td>
+                    {activeTab === 'permanent' ? (
+                      <>
+                        <td>{emp.category === 'ugc/csir' ? 'UGC/CSIR' : (emp.category ? emp.category.charAt(0).toUpperCase() + emp.category.slice(1) : '—')}</td>
+                        <td>{emp.scale_of_pay || '—'}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{emp.pay_type || '—'}</td>
+                        <td>₹{emp.pay ? parseFloat(emp.pay).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                      </>
+                    )}
+                    <td>{emp.mob_no || '—'}</td>
+                    <td>{emp.email_id || '—'}</td>
+                    {activeTab === 'permanent' ? (
+                      <>
+                        <td>{emp.epf_uan || '—'}</td>
+                        <td>{emp.appointment_type || 'Permanent'}</td>
+                      </>
+                    ) : null}
+                    <td>{emp.is_active ? 'Active' : 'Inactive'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

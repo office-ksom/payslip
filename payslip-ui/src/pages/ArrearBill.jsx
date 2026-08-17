@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle } from 'lucide-react';
+import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
@@ -53,6 +53,7 @@ const ArrearBill = (props) => {
   // Selected employees for bulk actions
   const [selectedEmps, setSelectedEmps] = useState(new Set());
   const [requireApproval, setRequireApproval] = useState(true);
+  const [showFullPreview, setShowFullPreview] = useState(false);
 
   // Load employees and arrear data when monthYear, category, or type changes
   useEffect(() => {
@@ -330,7 +331,8 @@ const ArrearBill = (props) => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="arrear-main-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Arrear Bill Generation</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -496,7 +498,17 @@ const ArrearBill = (props) => {
             </p>
           </div>
  
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {filteredEmployees.length > 0 && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowFullPreview(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Search size={16} /> Preview Full Sheet
+              </button>
+            )}
             {((user?.role === 'admin' && approvedCount < totalCount) || (user?.role === 'super_admin')) && (
               <button className="btn btn-primary" onClick={handleSave} disabled={saving || approving}>
                 <Save size={18} /> {saving ? 'Saving...' : 'Save Arrear Grid'}
@@ -752,6 +764,68 @@ const ArrearBill = (props) => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Full Screen Preview Overlay */}
+      {showFullPreview && (
+        <div className="arrear-preview-overlay" style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Salary Arrear Bill Verification Sheet</h1>
+              <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month/Year: {formatMonthYear(monthYear)} | Category: {staffCategory?.toUpperCase()} | Total Records: {filteredEmployees.length}</p>
+            </div>
+            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
+                Print Sheet
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff' }}>
+                <X size={20} /> Close Preview
+              </button>
+            </div>
+          </div>
+          
+          <div className="table-container" style={{ backgroundColor: '#fff', width: '100%' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th style={{ textAlign: 'right' }}>Arrear Amount</th>
+                  <th style={{ textAlign: 'right' }}>IT Deduction</th>
+                  <th style={{ textAlign: 'right' }}>Net Arrear</th>
+                  <th>Bill Date</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map(emp => (
+                  <tr key={emp.emp_id}>
+                    <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
+                    <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmt(emp.arrear_amount)}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmt(emp.it_deduction)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹ {fmt(emp.arrear_amount - emp.it_deduction)}</td>
+                    <td>{emp.bill_date}</td>
+                    <td>{emp.description || '—'}</td>
+                  </tr>
+                ))}
+                {/* Total Row */}
+                <tr style={{ fontWeight: 'bold', background: '#f9f9f9' }}>
+                  <td colSpan="2">Total ({filteredEmployees.length} Records)</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredEmployees.reduce((sum, e) => sum + (e.arrear_amount || 0), 0))}</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredEmployees.reduce((sum, e) => sum + (e.it_deduction || 0), 0))}</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmt(filteredEmployees.reduce((sum, e) => sum + ((e.arrear_amount || 0) - (e.it_deduction || 0)), 0))}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

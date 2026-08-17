@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useOutletContext } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, FileText, Download, ShieldCheck, UserCog, LogOut, ChevronDown, User, Key, Table } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, FileText, Download, ShieldCheck, UserCog, LogOut, ChevronDown, User, Key, Table, Coins } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 const Layout = () => {
@@ -261,6 +261,13 @@ const Layout = () => {
                 </div>
               )}
             </div>
+          )}
+
+          {!isViewer && (
+            <NavLink to="/epf-entry" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <Coins size={20} />
+              <span>EPF Entry</span>
+            </NavLink>
           )}
 
           <NavLink to="/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>

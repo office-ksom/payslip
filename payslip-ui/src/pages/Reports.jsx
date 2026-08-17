@@ -2605,6 +2605,168 @@ const Reports = () => {
       sigRow.getCell(13).alignment = sigAlign;
       sigRow.commit();
 
+      if (isPermanent) {
+        try {
+          // Fetch EPF entries for the month
+          let epfData = [];
+          const epfRes = await fetch(`/api/epf-entries?month_year=${monthYear}&category=permanent`);
+          if (epfRes.ok) {
+            epfData = await epfRes.json();
+          }
+
+          // Fetch Salary Summary Template
+          const summaryResponse = await fetch('/Salary_summary.xlsx');
+          if (summaryResponse.ok) {
+            const summaryArrayBuffer = await summaryResponse.arrayBuffer();
+            const tempWorkbook = new ExcelJS.Workbook();
+            await tempWorkbook.xlsx.load(summaryArrayBuffer);
+            const tempSheet = tempWorkbook.worksheets[0];
+
+            const summarySheet = workbook.addWorksheet('Salary Summary');
+            
+            // Copy properties and setup
+            summarySheet.views = tempSheet.views;
+            summarySheet.properties = tempSheet.properties;
+            summarySheet.pageSetup = tempSheet.pageSetup;
+
+            // Copy column widths
+            tempSheet.columns.forEach((col, idx) => {
+              const destCol = summarySheet.getColumn(idx + 1);
+              if (col.width !== undefined) {
+                destCol.width = col.width;
+              }
+            });
+
+            // Copy rows 1 to 9
+            for (let r = 1; r <= 9; r++) {
+              const srcRow = tempSheet.getRow(r);
+              const destRow = summarySheet.getRow(r);
+              destRow.height = srcRow.height;
+              
+              srcRow.eachCell({ includeEmpty: true }, (cell, col) => {
+                const destCell = destRow.getCell(col);
+                destCell.value = cell.value;
+                destCell.style = JSON.parse(JSON.stringify(cell.style || {}));
+              });
+              destRow.commit();
+            }
+
+            // Copy merges for first 9 rows
+            if (tempSheet.model.merges) {
+              tempSheet.model.merges.forEach(mergeRange => {
+                const [tl, br] = mergeRange.split(':');
+                const tlRow = parseInt(tl.replace(/[A-Z]+/i, ''));
+                const brRow = parseInt(br.replace(/[A-Z]+/i, ''));
+                if (tlRow <= 9 && brRow <= 9) {
+                  try { summarySheet.mergeCells(mergeRange); } catch(e) {}
+                }
+              });
+            }
+
+            // Update titles in Row 2
+            summarySheet.getCell('A2').value = `Pay Bill for the month of ${monthDisplay}`;
+            summarySheet.getCell('B2').value = `Salary Summary- ${monthDisplay}`;
+
+            // Set Gross Salary (D4) and Employer EPF Sum (D5)
+            summarySheet.getCell('D4').value = sumGross;
+            const epfERTotal = epfData.reduce((sum, item) => sum + (parseFloat(item.employer_contribution) || 0) + (parseFloat(item.admin_charges) || 0) + (parseFloat(item.edli) || 0), 0);
+            summarySheet.getCell('D5').value = epfERTotal;
+
+            // Copy employee rows template (row 10), total row template (row 24), and cheque row template (row 25)
+            const empRowTemplate = tempSheet.getRow(10);
+            const totalRowTemplate = tempSheet.getRow(24);
+            const chequeRowTemplate = tempSheet.getRow(25);
+
+            let currentRow = 10;
+            filteredData.forEach((emp, index) => {
+              const destRow = summarySheet.getRow(currentRow);
+              destRow.height = empRowTemplate.height;
+
+              // Match EPF details
+              const epfItem = epfData.find(item => item.emp_id === emp.emp_id) || {};
+              const epfEE = Math.round(parseFloat(emp.epf) || 0);
+              const epfER = Math.round(parseFloat(epfItem.employer_contribution) || 0);
+              const epfAdmin = Math.round(parseFloat(epfItem.admin_charges) || 0);
+              const epfEDLI = Math.round(parseFloat(epfItem.edli) || 0);
+              const epfSum = epfEE + epfER + epfAdmin + epfEDLI;
+
+              const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
+              const it = Math.round(parseFloat(emp.income_tax) || 0);
+              const gis = Math.round(parseFloat(emp.gis) || 0);
+              const sli = Math.round(parseFloat(emp.sli) || 0);
+              const hra = Math.round(parseFloat(emp.hra_recovery) || 0);
+              const net = Math.round(parseFloat(emp.net) || 0);
+
+              const colValues = {
+                2: fullName,
+                3: it || null,
+                4: epfSum || null,
+                5: gis || null,
+                6: sli || null,
+                7: hra || null,
+                8: net || null,
+                9: { formula: `SUM(C${currentRow}:H${currentRow})` }
+              };
+
+              for (let col = 1; col <= 9; col++) {
+                const destCell = destRow.getCell(col);
+                const tCell = empRowTemplate.getCell(col);
+                destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
+                if (colValues[col] !== undefined) {
+                  destCell.value = colValues[col];
+                }
+              }
+              destRow.commit();
+              currentRow++;
+            });
+
+            // Write TOTAL row
+            const totalRow = summarySheet.getRow(currentRow);
+            totalRow.height = totalRowTemplate.height;
+
+            const totalColValues = {
+              2: 'TOTAL',
+              3: { formula: `SUM(C10:C${currentRow - 1})` },
+              4: { formula: `SUM(D10:D${currentRow - 1})` },
+              5: { formula: `SUM(E10:E${currentRow - 1})` },
+              6: { formula: `SUM(F10:F${currentRow - 1})` },
+              7: { formula: `SUM(G10:G${currentRow - 1})` },
+              8: { formula: `SUM(H10:H${currentRow - 1})` },
+              9: { formula: `SUM(C${currentRow}:H${currentRow})` }
+            };
+
+            for (let col = 1; col <= 9; col++) {
+              const destCell = totalRow.getCell(col);
+              const tCell = totalRowTemplate.getCell(col);
+              destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
+              if (totalColValues[col] !== undefined) {
+                destCell.value = totalColValues[col];
+              }
+            }
+            totalRow.commit();
+            currentRow++;
+
+            // Write Cheque row
+            const chequeRow = summarySheet.getRow(currentRow);
+            chequeRow.height = chequeRowTemplate.height;
+
+            const netTotalSum = filteredData.reduce((sum, emp) => sum + (parseFloat(emp.net) || 0), 0);
+
+            for (let col = 1; col <= 9; col++) {
+              const destCell = chequeRow.getCell(col);
+              const tCell = chequeRowTemplate.getCell(col);
+              destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
+              if (col === 8) {
+                destCell.value = `Cheque for Rs.${Math.round(netTotalSum)}/-`;
+              }
+            }
+            chequeRow.commit();
+          }
+        } catch (eError) {
+          console.error("Error creating Salary Summary sheet:", eError);
+        }
+      }
+
       const buffer = await workbook.xlsx.writeBuffer();
       const prefix = isPermanent ? 'KSoM_Paybill_' : isDailyWage ? 'KSoM_DailyWage_Paybill_' : isContract ? 'KSoM_Contract_Paybill_' : 'KSoM_Visiting_Paybill_';
       saveAs(new Blob([buffer]), `${prefix}${formatMonthYear(monthYear)}.xlsx`);
