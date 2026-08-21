@@ -2698,6 +2698,7 @@ const Reports = () => {
               const net = Math.round(parseFloat(emp.net) || 0);
 
               const colValues = {
+                1: index + 1,
                 2: fullName,
                 3: it || null,
                 4: epfSum || null,
@@ -3016,7 +3017,7 @@ const Reports = () => {
               <button onClick={handleDownloadAllOrSelectedPDF} disabled={!data.length || downloadingPDFs}
                 style={{ backgroundColor: 'var(--color-accent-secondary)', color: '#fff', border: 'none' }}
                 className="btn">
-                <FileText size={16} /> {downloadingPDFs ? 'Generating...' : selectedEmps.size > 0 ? `Download Selected PDFs (${selectedEmps.size})` : `Download All PDFs (${data.length})`}
+                <FileText size={16} /> {downloadingPDFs ? 'Generating...' : selectedEmps.size > 0 ? `Download Selected Payslips (${selectedEmps.size})` : `Download All Payslips (${data.length})`}
               </button>
               <button onClick={handleExportMaster} disabled={!data.length}
                 style={{ backgroundColor: 'var(--color-success)', color: '#fff', border: 'none' }}
@@ -3239,7 +3240,7 @@ const Reports = () => {
                       <button className="btn btn-secondary"
                         style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}
                         onClick={() => triggerDownloadPDF(emp)}>
-                        <FileText size={15} /> Download PDF
+                        <FileText size={15} /> Download Payslip
                       </button>
                     </td>
                   </tr>

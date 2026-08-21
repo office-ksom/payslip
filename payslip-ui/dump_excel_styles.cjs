@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 
-const xlsxPath = 'D:\\KSOM\\Website\\Web Apps\\Payslip\\Salary_deductions-format.xlsx';
+const xlsxPath = 'D:\\KSOM\\Website\\Web Apps\\Payslip\\EPF_stmt.xlsx';
 
 async function main() {
   const workbook = new ExcelJS.Workbook();
@@ -26,7 +26,7 @@ async function main() {
     // Rows inspection
     console.log('--- Rows and Cell Styles ---');
     sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      if (rowNumber > 15) return; // only first 15 rows
+      if (rowNumber > 80) return; // only first 80 rows
       const rowInfo = [];
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         const colLetter = String.fromCharCode(64 + colNumber);

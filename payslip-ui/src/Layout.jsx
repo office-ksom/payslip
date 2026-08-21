@@ -59,12 +59,16 @@ const Layout = () => {
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [billMenuOpen, setBillMenuOpen] = useState(false);
+  const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
     const path = window.location.pathname;
     if (['/paybill', '/surrender-bill', '/arrear-bill', '/festival-bill', '/supplementary-bill'].includes(path)) {
       setBillMenuOpen(true);
+    }
+    if (['/reports', '/epf-reports'].includes(path)) {
+      setReportsMenuOpen(true);
     }
   }, []);
 
@@ -270,10 +274,30 @@ const Layout = () => {
             </NavLink>
           )}
 
-          <NavLink to="/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <Download size={20} />
-            <span>Reports & Exports</span>
-          </NavLink>
+          <div>
+            <div 
+              onClick={() => setReportsMenuOpen(!reportsMenuOpen)}
+              className={`nav-link ${reportsMenuOpen ? 'active' : ''}`}
+              style={{ cursor: 'pointer', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Download size={20} />
+                <span>Reports & Exports</span>
+              </div>
+              <ChevronDown size={14} style={{ transform: reportsMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            </div>
+            
+            {reportsMenuOpen && (
+              <div style={{ paddingLeft: '2.75rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <NavLink to="/reports" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <span>Bills</span>
+                </NavLink>
+                <NavLink to="/epf-reports" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <span>EPF Reports</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
 
           <NavLink to="/consolidated-statement" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Table size={20} />

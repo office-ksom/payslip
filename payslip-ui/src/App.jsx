@@ -15,6 +15,7 @@ import ResetPassword from './pages/ResetPassword';
 import ConsolidatedStatement from './pages/ConsolidatedStatement';
 import ConsolidatedStatementAll from './pages/ConsolidatedStatementAll';
 import EPFEntry from './pages/EPFEntry';
+import EPFReports from './pages/EPFReports';
 
 import { useState, useEffect } from 'react';
 
@@ -68,6 +69,7 @@ function App() {
           <Route path="festival-bill" element={<FestivalAllowanceBill user={user} />} />
           <Route path="epf-entry" element={<EPFEntry user={user} />} />
           <Route path="reports" element={<Reports user={user} />} />
+          <Route path="epf-reports" element={<EPFReports user={user} />} />
           <Route path="consolidated-statement" element={<ConsolidatedStatement user={user} />} />
           <Route path="consolidated-statement-all" element={<ConsolidatedStatementAll user={user} />} />
           <Route path="settings" element={<Settings user={user} />} />
