@@ -514,7 +514,7 @@ const ArrearBill = (props) => {
                 <Save size={18} /> {saving ? 'Saving...' : 'Save Arrear Grid'}
               </button>
             )}
-             {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredEmployees.length > 0 && (
+            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin')) && filteredEmployees.length > 0 && (
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button 
                   className="btn btn-primary" 
@@ -613,7 +613,7 @@ const ArrearBill = (props) => {
                           type="checkbox" 
                           checked={selectedEmps.has(emp.emp_id) || isRowApproved}
                           onChange={() => handleToggleSelect(emp.emp_id)}
-                          disabled={isRowApproved || saving || approving}
+                          disabled={(isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive)) || saving || approving}
                         />
                       </td>
                       <td>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X } from 'lucide-react';
+import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X, Edit } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 const getFinancialYear = (dateStr) => {
@@ -251,6 +251,17 @@ const SurrenderBill = (props) => {
     }
   };
 
+  const handleEdit = (bill) => {
+    setSelectedEmpId(bill.emp_id);
+    setBillDate(bill.bill_date);
+    setBasicPay(bill.basic_pay || 0);
+    setDa(bill.da || 0);
+    setHra(bill.hra || 0);
+    setNumEls(bill.num_els || 30);
+    setIsTerminal(bill.is_terminal === 1);
+    fetchCumulativeLeaves(bill.emp_id, bill.bill_date);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -543,7 +554,7 @@ const SurrenderBill = (props) => {
         <div className="card" style={{ marginBottom: '2.5rem', opacity: isReadOnly ? 0.7 : 1 }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileText size={20} className="text-primary" />
-            Generate New Surrender Slip
+            {selectedEmpId && existingBills.some(b => b.emp_id === selectedEmpId) ? 'Edit Surrender Slip' : 'Generate New Surrender Slip'}
           </h2>
 
           <form onSubmit={handleSave}>
@@ -810,7 +821,7 @@ const SurrenderBill = (props) => {
                 <Search size={16} /> Preview Full Sheet
               </button>
             )}
-            {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && filteredBills.length > 0 && (
+            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin')) && filteredBills.length > 0 && (
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button 
                   className="btn btn-primary" 
@@ -915,7 +926,7 @@ const SurrenderBill = (props) => {
                           <input 
                             type="checkbox" 
                             checked={bill.is_approved === 1 || selectedEmpIds.has(bill.emp_id)}
-                            disabled={bill.is_approved === 1}
+                            disabled={bill.is_approved === 1 && (user?.role !== 'super_admin' || !isOverrideActive)}
                             onChange={() => {
                               setSelectedEmpIds(prev => {
                                 const next = new Set(prev);
@@ -929,7 +940,16 @@ const SurrenderBill = (props) => {
                       )}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ fontWeight: 600, color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-primary)') }}>
+                          <div 
+                            style={{ 
+                              fontWeight: 600, 
+                              color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-primary)'),
+                              cursor: !isRowLocked ? 'pointer' : 'default',
+                              textDecoration: !isRowLocked ? 'underline' : 'none'
+                            }}
+                            onClick={() => !isRowLocked && handleEdit(bill)}
+                            title={!isRowLocked ? "Click to edit surrender bill" : undefined}
+                          >
                             {bill.title ? `${bill.title} ` : ''}{bill.name}
                           </div>
                           {user?.role === 'approver' && isPending && (
@@ -1025,17 +1045,28 @@ const SurrenderBill = (props) => {
                       </td>
                       {(user?.role === 'admin' || user?.role === 'super_admin') && (
                         <td>
-                          {bill.is_approved !== 1 && (
-                            <button 
-                              className="btn btn-danger" 
-                              onClick={() => handleDelete(bill.emp_id, bill.bill_date)}
-                              disabled={isRowLocked}
-                              style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
-                              title="Delete Bill"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            {!isRowLocked && (
+                              <button 
+                                className="btn btn-secondary" 
+                                onClick={() => handleEdit(bill)}
+                                style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                                title="Edit Bill"
+                              >
+                                <Edit size={14} />
+                              </button>
+                            )}
+                            {!isRowLocked && (
+                              <button 
+                                className="btn btn-danger" 
+                                onClick={() => handleDelete(bill.emp_id, bill.bill_date)}
+                                style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
+                                title="Delete Bill"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
