@@ -52,20 +52,24 @@ export async function onRequestGet(context) {
       "SELECT * FROM monthly_deductions WHERE emp_id = ? AND month_year >= ? AND month_year <= ? ORDER BY month_year ASC"
     ).bind(empId, startMonth, endMonth).all();
 
+    // Bill generated months range: April of fy to March of fy+1
+    const startBillMonth = `${fy}-04`;
+    const endBillMonth = `${parseInt(fy) + 1}-03`;
+
     // Fetch approved arrears for the range
     const { results: arrears } = await env.ksom_payslip_db.prepare(
       "SELECT * FROM arrear_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1 ORDER BY bill_date ASC"
-    ).bind(empId, startMonth, endMonth).all();
+    ).bind(empId, startBillMonth, endBillMonth).all();
 
     // Fetch approved surrender bills for the range
     const { results: surrender } = await env.ksom_payslip_db.prepare(
       "SELECT * FROM surrender_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1 ORDER BY bill_date ASC"
-    ).bind(empId, startMonth, endMonth).all();
+    ).bind(empId, startBillMonth, endBillMonth).all();
 
     // Fetch approved festival allowance bills for the range
     const { results: festival } = await env.ksom_payslip_db.prepare(
       "SELECT * FROM festival_allowance_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) >= ? AND substr(bill_date, 1, 7) <= ? AND is_approved = 1 ORDER BY bill_date ASC"
-    ).bind(empId, startMonth, endMonth).all();
+    ).bind(empId, startBillMonth, endBillMonth).all();
 
     // Fetch approved supplementary earnings for the range
     const { results: supplementaryEarnings } = await env.ksom_payslip_db.prepare(

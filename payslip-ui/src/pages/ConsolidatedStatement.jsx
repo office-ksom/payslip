@@ -8,6 +8,18 @@ import { saveAs } from 'file-saver';
 
 const fmt = (v) => (v === null || v === undefined || v === '') ? '' : Math.round(parseFloat(v) || 0).toFixed(2);
 
+const getBillMonth = (my) => {
+  if (!my) return '';
+  const [y, m] = my.split('-');
+  let year = parseInt(y, 10);
+  let month = parseInt(m, 10) + 1;
+  if (month > 12) {
+    month = 1;
+    year += 1;
+  }
+  return `${year}-${String(month).padStart(2, '0')}`;
+};
+
 const ConsolidatedStatement = () => {
   const { user } = useOutletContext() || {};
   const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
@@ -272,9 +284,10 @@ const ConsolidatedStatement = () => {
         const isSupApproved = !!se;
         const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
         
-        const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-        const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-        const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+        const targetBillMonth = getBillMonth(my);
+        const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+        const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+        const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
 
         const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
 
@@ -725,9 +738,10 @@ const ConsolidatedStatement = () => {
       const isSupApproved = !!se;
       const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
       
-      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const targetBillMonth = getBillMonth(my);
+      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
 
       const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
 
@@ -1041,9 +1055,10 @@ const ConsolidatedStatement = () => {
       const isSupApproved = !!se;
       const sd = supplementaryDeductions.find(x => x.month_year === my) || {};
       
-      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
-      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === my) : [];
+      const targetBillMonth = getBillMonth(my);
+      const monthArrears = arrears ? arrears.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+      const monthSurrender = surrender ? surrender.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
+      const monthFestival = festival ? festival.filter(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth) : [];
 
       const hasApprovedBill = isLocked || isSupApproved || monthSurrender.length > 0 || monthArrears.length > 0 || monthFestival.length > 0;
 

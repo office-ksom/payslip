@@ -38,6 +38,18 @@ const ConsolidatedStatementAll = () => {
     }
   };
 
+  const getBillMonth = (my) => {
+    if (!my) return '';
+    const [y, m] = my.split('-');
+    let year = parseInt(y, 10);
+    let month = parseInt(m, 10) + 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+    return `${year}-${String(month).padStart(2, '0')}`;
+  };
+
   const getEmployeeMonthlyDetails = (emp_id, monthYearStr, earnings, deductions, arrears, surrender, festival, supplementaryEarnings = [], supplementaryDeductions = []) => {
     const e = earnings.find(x => x.emp_id === emp_id && x.month_year === monthYearStr);
     const isLocked = e && e.is_approved === 1;
@@ -77,9 +89,10 @@ const ConsolidatedStatementAll = () => {
     const isSupApproved = !!se;
     const sd = supplementaryDeductions.find(x => x.emp_id === emp_id && x.month_year === monthYearStr) || {};
 
-    const empArrears = arrears.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
-    const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
-    const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === monthYearStr);
+    const targetBillMonth = getBillMonth(monthYearStr);
+    const empArrears = arrears.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth);
+    const empSurrender = surrender.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth);
+    const empFestival = festival.filter(x => x.emp_id === emp_id && x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth);
 
     const hasApprovedBill = isLocked || isSupApproved || empSurrender.length > 0 || empArrears.length > 0 || empFestival.length > 0;
 
@@ -239,19 +252,23 @@ const ConsolidatedStatementAll = () => {
     };
 
     const monthHasArrears = (monthStr) => {
-      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
     };
 
     const monthHasArrearIT = (monthStr) => {
-      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.income_tax) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.income_tax) || 0) > 0);
     };
 
     const monthHasSurrender = (monthStr) => {
-      return surrender.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.total_amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return surrender.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.total_amount) || 0) > 0);
     };
 
     const monthHasFestival = (monthStr) => {
-      return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.amount) || 0) > 0);
     };
 
     const cols = [];
@@ -377,19 +394,23 @@ const ConsolidatedStatementAll = () => {
     };
 
     const monthHasArrears = (monthStr) => {
-      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.arrear_amount) || 0) > 0);
     };
 
     const monthHasArrearIT = (monthStr) => {
-      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.income_tax) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return arrears.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.income_tax) || 0) > 0);
     };
 
     const monthHasSurrender = (monthStr) => {
-      return surrender.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.total_amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return surrender.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.total_amount) || 0) > 0);
     };
 
     const monthHasFestival = (monthStr) => {
-      return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === monthStr && Math.round(parseFloat(x.amount) || 0) > 0);
+      const targetBillMonth = getBillMonth(monthStr);
+      return festival.some(x => x.bill_date && x.bill_date.substring(0, 7) === targetBillMonth && Math.round(parseFloat(x.amount) || 0) > 0);
     };
 
     const buildSheetColumns = (typeKey, secondColHeader) => {

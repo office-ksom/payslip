@@ -15,6 +15,8 @@ export async function onRequestGet(context) {
     } else if (fy) {
       const startMonth = `${fy}-03`;
       const endMonth = `${parseInt(fy) + 1}-02`;
+      const startBillMonth = `${fy}-04`;
+      const endBillMonth = `${parseInt(fy) + 1}-03`;
       query = `SELECT * FROM employees 
                WHERE emp_id IN (
                  SELECT DISTINCT emp_id FROM monthly_earnings WHERE month_year >= ? AND month_year <= ?
@@ -31,9 +33,9 @@ export async function onRequestGet(context) {
       params = [
         startMonth, endMonth,
         startMonth, endMonth,
-        startMonth, endMonth,
-        startMonth, endMonth,
-        startMonth, endMonth
+        startBillMonth, endBillMonth,
+        startBillMonth, endBillMonth,
+        startBillMonth, endBillMonth
       ];
     }
 

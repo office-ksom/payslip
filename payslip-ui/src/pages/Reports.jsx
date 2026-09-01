@@ -2677,6 +2677,74 @@ const Reports = () => {
             const totalRowTemplate = tempSheet.getRow(24);
             const chequeRowTemplate = tempSheet.getRow(25);
 
+            // --- Detect dynamic "other deduction" columns across all employees ---
+            // Collect Professional Tax and items from other_deductions_breakdown (e.g. GPAIS)
+            const otherDedKeysSet = new Set();
+            filteredData.forEach(emp => {
+              // Check Professional Tax
+              const pt = Math.round(parseFloat(emp.professional_tax) || 0);
+              if (pt > 0) otherDedKeysSet.add('Professional Tax');
+              // Check other_deductions_breakdown items
+              let dArr = [];
+              try { dArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
+              if (Array.isArray(dArr)) {
+                dArr.forEach(item => {
+                  if (item && item.desc && Math.round(parseFloat(item.amount) || 0) > 0) {
+                    otherDedKeysSet.add(item.desc);
+                  }
+                });
+              }
+            });
+            const otherDedKeys = Array.from(otherDedKeysSet); // e.g. ['Professional Tax', 'GPAIS', ...]
+
+            // Column layout: A=SlNo, B=Name, C=IT, D=EPF, E=GIS, F=SLI, G=HRA,
+            //   then dynamic columns for PT/GPAIS/etc., then Net. NO Total column.
+            const fixedColCount = 7; // A(1)..G(7)
+            const dynamicColCount = otherDedKeys.length;
+            const netCol = fixedColCount + dynamicColCount + 1; // Net column index
+            const totalCols = netCol; // last column
+
+            // Set generous column widths for all columns to ensure borders and text/figures are clearly visible
+            summarySheet.getColumn(1).width = 8;   // Sl.No
+            summarySheet.getColumn(2).width = 32;  // Name
+            summarySheet.getColumn(3).width = 16;  // Income Tax
+            summarySheet.getColumn(4).width = 16;  // EPF
+            summarySheet.getColumn(5).width = 16;  // GIS
+            summarySheet.getColumn(6).width = 16;  // SLI
+            summarySheet.getColumn(7).width = 18;  // HRA Recovery
+
+            // Ensure Row 9 header has sufficient height for multi-line text
+            const headerRow = summarySheet.getRow(9);
+            headerRow.height = Math.max(headerRow.height || 28, 40);
+
+            // Write dynamic column headers in row 9
+            const headerStyle = JSON.parse(JSON.stringify(summarySheet.getRow(9).getCell(7).style || {}));
+            // Save original Net header value and style before overwriting
+            const origNetValue = summarySheet.getRow(9).getCell(8).value;
+            const origNetStyle = JSON.parse(JSON.stringify(summarySheet.getRow(9).getCell(8).style || headerStyle));
+
+            otherDedKeys.forEach((key, idx) => {
+              const col = fixedColCount + idx + 1; // starts at column 8
+              const cell = summarySheet.getRow(9).getCell(col);
+              cell.value = `Sundry Creditors-Others-${key}`;
+              const dynHeaderStyle = JSON.parse(JSON.stringify(headerStyle));
+              dynHeaderStyle.alignment = { ...(dynHeaderStyle.alignment || {}), wrapText: true, vertical: 'middle', horizontal: 'center' };
+              cell.style = dynHeaderStyle;
+              // Set column width to comfortably accommodate header text & numbers
+              summarySheet.getColumn(col).width = 28;
+            });
+            // Write Net header at its new position (after dynamic columns)
+            const netHeaderCell = summarySheet.getRow(9).getCell(netCol);
+            netHeaderCell.value = origNetValue || 'Net';
+            const netHeaderStyle = JSON.parse(JSON.stringify(origNetStyle));
+            netHeaderStyle.alignment = { ...(netHeaderStyle.alignment || {}), wrapText: true, vertical: 'middle', horizontal: 'center' };
+            netHeaderCell.style = netHeaderStyle;
+            summarySheet.getColumn(netCol).width = 30; // Net column (ample room for figures, cheque text & borders)
+            // Clear old Total column header (col 9 from template) if beyond our range
+            if (9 > totalCols) {
+              summarySheet.getRow(9).getCell(9).value = null;
+            }
+
             let currentRow = 10;
             filteredData.forEach((emp, index) => {
               const destRow = summarySheet.getRow(currentRow);
@@ -2697,21 +2765,41 @@ const Reports = () => {
               const hra = Math.round(parseFloat(emp.hra_recovery) || 0);
               const net = Math.round(parseFloat(emp.net) || 0);
 
-              const colValues = {
-                1: index + 1,
-                2: fullName,
-                3: it || null,
-                4: epfSum || null,
-                5: gis || null,
-                6: sli || null,
-                7: hra || null,
-                8: net || null,
-                9: { formula: `SUM(C${currentRow}:H${currentRow})` }
-              };
+              // Parse other_deductions_breakdown for this employee
+              let empDedArr = [];
+              try { empDedArr = typeof emp.other_deductions_breakdown === 'string' ? JSON.parse(emp.other_deductions_breakdown) : (emp.other_deductions_breakdown || []); } catch(e){}
+              const empDynD = {};
+              if (Array.isArray(empDedArr)) {
+                empDedArr.forEach(item => {
+                  if (item && item.desc) empDynD[item.desc] = Math.round(parseFloat(item.amount) || 0);
+                });
+              }
+              const pt = Math.round(parseFloat(emp.professional_tax) || 0);
 
-              for (let col = 1; col <= 9; col++) {
+              const colValues = {};
+              colValues[1] = index + 1;
+              colValues[2] = fullName;
+              colValues[3] = it || null;
+              colValues[4] = epfSum || null;
+              colValues[5] = gis || null;
+              colValues[6] = sli || null;
+              colValues[7] = hra || null;
+              // Dynamic deduction columns
+              otherDedKeys.forEach((key, idx) => {
+                const col = fixedColCount + idx + 1;
+                if (key === 'Professional Tax') {
+                  colValues[col] = pt || null;
+                } else {
+                  colValues[col] = empDynD[key] || null;
+                }
+              });
+              colValues[netCol] = net || null;
+
+              for (let col = 1; col <= totalCols; col++) {
                 const destCell = destRow.getCell(col);
-                const tCell = empRowTemplate.getCell(col);
+                // Use template style from the appropriate source column
+                const tColIdx = col <= 7 ? col : (col === netCol ? 8 : 7);
+                const tCell = empRowTemplate.getCell(tColIdx);
                 destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
                 if (colValues[col] !== undefined) {
                   destCell.value = colValues[col];
@@ -2725,20 +2813,28 @@ const Reports = () => {
             const totalRow = summarySheet.getRow(currentRow);
             totalRow.height = totalRowTemplate.height;
 
-            const totalColValues = {
-              2: 'TOTAL',
-              3: { formula: `SUM(C10:C${currentRow - 1})` },
-              4: { formula: `SUM(D10:D${currentRow - 1})` },
-              5: { formula: `SUM(E10:E${currentRow - 1})` },
-              6: { formula: `SUM(F10:F${currentRow - 1})` },
-              7: { formula: `SUM(G10:G${currentRow - 1})` },
-              8: { formula: `SUM(H10:H${currentRow - 1})` },
-              9: { formula: `SUM(C${currentRow}:H${currentRow})` }
-            };
+            const totalColValues = {};
+            totalColValues[2] = 'TOTAL';
+            for (let col = 3; col <= totalCols; col++) {
+              // Helper for columns beyond Z
+              const getColLetter = (c) => {
+                let result = '';
+                let temp = c;
+                while (temp > 0) {
+                  temp--;
+                  result = String.fromCharCode(65 + (temp % 26)) + result;
+                  temp = Math.floor(temp / 26);
+                }
+                return result;
+              };
+              const letter = getColLetter(col);
+              totalColValues[col] = { formula: `SUM(${letter}10:${letter}${currentRow - 1})` };
+            }
 
-            for (let col = 1; col <= 9; col++) {
+            for (let col = 1; col <= totalCols; col++) {
               const destCell = totalRow.getCell(col);
-              const tCell = totalRowTemplate.getCell(col);
+              const tColIdx = col <= 7 ? col : (col === netCol ? 8 : 7);
+              const tCell = totalRowTemplate.getCell(tColIdx);
               destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
               if (totalColValues[col] !== undefined) {
                 destCell.value = totalColValues[col];
@@ -2753,11 +2849,12 @@ const Reports = () => {
 
             const netTotalSum = filteredData.reduce((sum, emp) => sum + (parseFloat(emp.net) || 0), 0);
 
-            for (let col = 1; col <= 9; col++) {
+            for (let col = 1; col <= totalCols; col++) {
               const destCell = chequeRow.getCell(col);
-              const tCell = chequeRowTemplate.getCell(col);
+              const tColIdx = col <= 7 ? col : (col === netCol ? 8 : 7);
+              const tCell = chequeRowTemplate.getCell(tColIdx);
               destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
-              if (col === 8) {
+              if (col === netCol) {
                 destCell.value = `Cheque for Rs.${Math.round(netTotalSum)}/-`;
               }
             }
