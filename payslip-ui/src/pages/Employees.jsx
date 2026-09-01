@@ -201,10 +201,19 @@ const Employees = () => {
     }
   };
 
-  const filteredEmployees = employees.filter(emp =>
-    (emp.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (emp.emp_id || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEmployees = employees
+    .filter(emp =>
+      (emp.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (emp.emp_id || '').toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+      const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+      if (aActive !== bActive) return bActive - aActive;
+      const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+      if (sortDiff !== 0) return sortDiff;
+      return (a.name || '').localeCompare(b.name || '');
+    });
 
   return (
     <div>
@@ -629,10 +638,10 @@ const Employees = () => {
                   </tr>
                 ) : (
                   filteredEmployees.map(emp => (
-                    <tr key={emp.emp_id}>
+                    <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''}>
                       <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
                       <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
+                      <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.designation || '—'}</td>
                       
                       {activeTab === 'permanent' ? (
                         <>
@@ -648,12 +657,12 @@ const Employees = () => {
                               </div>
                             )}
                             <div style={{ marginTop: '0.25rem' }}>
-                              <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`} style={{ fontSize: '0.7rem' }}>
+                              <span className={`badge badge-${emp.is_active ? 'success' : 'inactive'}`} style={{ fontSize: '0.7rem' }}>
                                 {emp.is_active ? 'Active' : 'Inactive'}
                               </span>
                             </div>
                           </td>
-                          <td style={{ color: 'var(--color-text-secondary)' }}>{emp.scale_of_pay || '—'}</td>
+                          <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.scale_of_pay || '—'}</td>
                         </>
                       ) : (
                         <>
@@ -662,16 +671,16 @@ const Employees = () => {
                               {emp.pay_type || '—'}
                             </span>
                           </td>
-                          <td style={{ color: 'var(--color-text-secondary)' }}>₹{emp.pay ? parseFloat(emp.pay).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</td>
+                          <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>₹{emp.pay ? parseFloat(emp.pay).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}</td>
                         </>
                       )}
                       
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{emp.mob_no || '—'}</td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{emp.email_id || '—'}</td>
+                      <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.mob_no || '—'}</td>
+                      <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.email_id || '—'}</td>
                       
-                      {activeTab === 'visiting' && (
+                      {activeTab !== 'permanent' && (
                         <td>
-                          <span className={`badge badge-${emp.is_active ? 'success' : 'danger'}`}>
+                          <span className={`badge badge-${emp.is_active ? 'success' : 'inactive'}`}>
                             {emp.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
@@ -748,7 +757,7 @@ const Employees = () => {
               </thead>
               <tbody>
                 {filteredEmployees.map(emp => (
-                  <tr key={emp.emp_id}>
+                  <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''}>
                     <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
                     <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
                     <td>{emp.designation || '—'}</td>
@@ -771,7 +780,7 @@ const Employees = () => {
                         <td>{emp.appointment_type || 'Permanent'}</td>
                       </>
                     ) : null}
-                    <td>{emp.is_active ? 'Active' : 'Inactive'}</td>
+                    <td style={{ fontWeight: emp.is_active === 0 ? 'bold' : 'normal' }}>{emp.is_active ? 'Active' : 'Inactive'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -349,6 +349,7 @@ const ConsolidatedStatementAll = () => {
         slNo: index + 1,
         name: (emp.title ? `${emp.title} ` : '') + emp.name,
         empId: emp.emp_id,
+        is_active: emp.is_active,
         cellValues,
         total: rowSum
       };
@@ -947,9 +948,11 @@ const ConsolidatedStatementAll = () => {
                 </thead>
                 <tbody>
                   {preview.rows.map((row) => (
-                    <tr key={row.empId} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>{row.slNo}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: '500', position: 'sticky', left: 0, backgroundColor: 'var(--color-bg-secondary)', zIndex: 1 }}>{row.name}</td>
+                    <tr key={row.empId} className={row.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: row.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
+                      <td style={{ padding: '0.75rem', textAlign: 'center', color: row.is_active === 0 ? '#fb923c' : 'var(--color-text-muted)' }}>{row.slNo}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: '500', position: 'sticky', left: 0, backgroundColor: row.is_active === 0 ? '#fff7ed' : 'var(--color-bg-secondary)', zIndex: 1, color: row.is_active === 0 ? '#ea580c' : 'inherit' }}>
+                        {row.name}{row.is_active === 0 ? ' [Inactive]' : ''}
+                      </td>
                       {row.cellValues.map((val, cIdx) => (
                         <td key={cIdx} style={{ padding: '0.75rem', textAlign: 'center', color: val !== null && val !== undefined ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                           {val !== null && val !== undefined ? Math.round(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}

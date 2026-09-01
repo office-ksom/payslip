@@ -71,7 +71,14 @@ const SupplementaryPaybill = (props) => {
 
     fetch(endpoint)
       .then(res => res.json())
-      .then(data => setAllEmployeesList(Array.isArray(data) ? data.filter(e => e.is_active === 1) : []))
+      .then(data => setAllEmployeesList(Array.isArray(data) ? data.sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      }) : []))
       .catch(err => console.error("Failed to load employees list", err));
   }, [activeTab]);
 
@@ -162,7 +169,14 @@ const SupplementaryPaybill = (props) => {
         };
       });
 
-      setEmployees(combined);
+      setEmployees(combined.sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      }));
     } catch (err) {
       console.error(err);
       alert('Failed to load supplementary paybill data: ' + err.message);
@@ -256,7 +270,14 @@ const SupplementaryPaybill = (props) => {
       total_wage: 0
     };
 
-    setEmployees(prev => [...prev, newRow]);
+    setEmployees(prev => [...prev, newRow].sort((a, b) => {
+      const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+      const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+      if (aActive !== bActive) return bActive - aActive;
+      const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+      if (sortDiff !== 0) return sortDiff;
+      return (a.name || '').localeCompare(b.name || '');
+    }));
     setSelectedAddEmpId('');
   };
 
@@ -694,8 +715,8 @@ const SupplementaryPaybill = (props) => {
               <select className="form-control" value={selectedAddEmpId} onChange={(e) => setSelectedAddEmpId(e.target.value)}>
                 <option value="">-- Choose Employee --</option>
                 {allEmployeesList.map(emp => (
-                  <option key={emp.emp_id} value={emp.emp_id}>
-                    {emp.name} ({emp.emp_id}) - {emp.designation}
+                  <option key={emp.emp_id} value={emp.emp_id} style={emp.is_active === 0 ? { color: '#ea580c' } : {}}>
+                    {emp.name} ({emp.emp_id}) - {emp.designation}{emp.is_active === 0 ? ' [Inactive]' : ''}
                   </option>
                 ))}
               </select>
@@ -978,13 +999,13 @@ const SupplementaryPaybill = (props) => {
 
                   if (isPermanent) {
                     return (
-                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          <div style={{ fontWeight: 700, color: emp.is_active === 0 ? '#f97316' : 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: emp.is_active === 0 ? '#fb923c' : 'var(--color-text-muted)', textTransform: 'capitalize' }}>
                             {emp.category === 'ugc/csir' ? 'UGC' : emp.category} | {emp.designation}
                           </div>
                         </td>
@@ -1089,13 +1110,13 @@ const SupplementaryPaybill = (props) => {
                     );
                   } else if (isDailyWage) {
                     return (
-                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          <div style={{ fontWeight: 700, color: emp.is_active === 0 ? '#f97316' : 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: emp.is_active === 0 ? '#fb923c' : 'var(--color-text-muted)' }}>
                             {emp.designation}
                           </div>
                         </td>
@@ -1160,13 +1181,13 @@ const SupplementaryPaybill = (props) => {
                     );
                   } else {
                     return (
-                      <tr key={emp.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
                         <td>
-                          <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                          <div style={{ fontWeight: 700, color: emp.is_active === 0 ? '#f97316' : 'var(--color-primary)' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : 'var(--color-text-secondary)' }}>ID: {emp.emp_id}</div>
+                          <div style={{ fontSize: '0.65rem', color: emp.is_active === 0 ? '#fb923c' : 'var(--color-text-muted)' }}>
                             {emp.designation}
                           </div>
                         </td>
@@ -1505,8 +1526,10 @@ const SupplementaryPaybill = (props) => {
                       };
 
                       return (
-                        <tr key={emp.emp_id} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                          <td style={{ fontWeight: 'bold', border: '1px solid #000', padding: '8px', color: '#000' }}>{emp.name}</td>
+                        <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: emp.is_active === 0 ? '#fff7ed' : (idx % 2 === 0 ? '#fff' : '#f9fafb') }}>
+                          <td style={{ fontWeight: 'bold', border: '1px solid #000', padding: '8px', color: emp.is_active === 0 ? '#c2410c' : '#000' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
+                          </td>
                           {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}
                           {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', color: '#000' }}>{Math.round(emp.regular_basic).toFixed(2)}</td>}
                           {(!isPermanent && !isDailyWage) && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}

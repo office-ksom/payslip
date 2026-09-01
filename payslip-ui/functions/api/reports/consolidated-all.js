@@ -39,7 +39,7 @@ export async function onRequestGet(context) {
          UNION
          SELECT DISTINCT emp_id FROM festival_allowance_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ? AND is_approved = 1
        )
-       ORDER BY sort_order ASC, name ASC`
+       ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC`
     ).bind(
       startMonth, endMonth,
       startMonth, endMonth,

@@ -57,7 +57,15 @@ const EPFEntry = (props) => {
         throw new Error('Failed to fetch EPF entries');
       }
       const data = await res.json();
-      setEntries(Array.isArray(data) ? data : []);
+      const sorted = (Array.isArray(data) ? data : []).sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      setEntries(sorted);
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: err.message });
@@ -466,16 +474,16 @@ const EPFEntry = (props) => {
               </thead>
               <tbody>
                 {entries.map((row, idx) => (
-                  <tr key={row.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{row.emp_id}</td>
+                  <tr key={row.emp_id} className={row.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: row.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: row.is_active === 0 ? '#fb923c' : 'var(--color-text-secondary)' }}>{row.emp_id}</td>
                     <td style={{ fontWeight: 500 }}>
                       <div 
-                        style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--color-accent-primary)' }}
+                        style={{ cursor: 'pointer', textDecoration: 'underline', color: row.is_active === 0 ? '#f97316' : 'var(--color-accent-primary)' }}
                         onClick={() => openModal(row, idx)}
                       >
-                        {row.name}
+                        {row.name}{row.is_active === 0 ? ' [Inactive]' : ''}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Joined: {row.date_of_joining || 'N/A'}</div>
+                      <div style={{ fontSize: '0.7rem', color: row.is_active === 0 ? '#fb923c' : 'var(--color-text-muted)' }}>Joined: {row.date_of_joining || 'N/A'}</div>
                     </td>
                     <td>
                       <input
@@ -788,9 +796,9 @@ const EPFEntry = (props) => {
               </thead>
               <tbody>
                 {entries.map((row) => (
-                  <tr key={row.emp_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <tr key={row.emp_id} className={row.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: row.is_active === 0 ? '#fff7ed' : '' }}>
                     <td style={{ padding: '0.75rem 1rem' }}>{row.emp_id}</td>
-                    <td>{row.name}</td>
+                    <td style={{ color: row.is_active === 0 ? '#c2410c' : 'inherit' }}>{row.name}{row.is_active === 0 ? ' [Inactive]' : ''}</td>
                     <td>{row.uan || 'N/A'}</td>
                     <td style={{ textAlign: 'right' }}>₹{row.wages?.toLocaleString('en-IN')}</td>
                     <td style={{ textAlign: 'right' }}>₹{row.epf_wage?.toLocaleString('en-IN')}</td>

@@ -23,6 +23,7 @@ export async function onRequestGet(context) {
           e.epf_uan AS uan,
           e.date_of_joining,
           e.appointment_type,
+          e.is_active,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -37,7 +38,7 @@ export async function onRequestGet(context) {
         FROM epf_entries ee
         JOIN employees e ON ee.emp_id = e.emp_id
         WHERE ee.month_year = ? AND ee.employee_category = 'permanent'
-        ORDER BY e.sort_order ASC, e.name ASC
+        ORDER BY (CASE WHEN e.is_active = 0 THEN 1 ELSE 0 END) ASC, e.sort_order ASC, e.name ASC
       `;
     } else {
       savedQuery = `
@@ -46,6 +47,7 @@ export async function onRequestGet(context) {
           d.name,
           d.epf_uan AS uan,
           d.date_of_joining,
+          d.is_active,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -60,7 +62,7 @@ export async function onRequestGet(context) {
         FROM epf_entries ee
         JOIN daily_wage_employees d ON ee.emp_id = d.emp_id
         WHERE ee.month_year = ? AND ee.employee_category = 'daily_wage'
-        ORDER BY d.sort_order ASC, d.name ASC
+        ORDER BY (CASE WHEN d.is_active = 0 THEN 1 ELSE 0 END) ASC, d.sort_order ASC, d.name ASC
       `;
     }
 
@@ -82,6 +84,7 @@ export async function onRequestGet(context) {
           e.epf_uan AS uan, 
           e.date_of_joining,
           e.appointment_type,
+          e.is_active,
           (coalesce(me.basic_pay, 0) + coalesce(me.da_state, 0) + coalesce(me.da_ugc, 0)) AS wages,
           coalesce(md.epf, 0) AS employee_contribution,
           0 AS is_saved
@@ -89,7 +92,7 @@ export async function onRequestGet(context) {
         JOIN monthly_earnings me ON e.emp_id = me.emp_id AND me.month_year = ?
         JOIN monthly_deductions md ON e.emp_id = md.emp_id AND md.month_year = ?
         WHERE md.epf > 0 AND e.is_active = 1
-        ORDER BY e.sort_order ASC, e.name ASC
+        ORDER BY (CASE WHEN e.is_active = 0 THEN 1 ELSE 0 END) ASC, e.sort_order ASC, e.name ASC
       `;
     } else {
       paybillQuery = `
@@ -98,6 +101,7 @@ export async function onRequestGet(context) {
           d.name, 
           d.epf_uan AS uan, 
           d.date_of_joining,
+          d.is_active,
           coalesce(dwe.basic_pay, 0) AS wages,
           coalesce(dwd.epf, 0) AS employee_contribution,
           0 AS is_saved
@@ -105,7 +109,7 @@ export async function onRequestGet(context) {
         JOIN daily_wage_monthly_earnings dwe ON d.emp_id = dwe.emp_id AND dwe.month_year = ?
         JOIN daily_wage_monthly_deductions dwd ON d.emp_id = dwd.emp_id AND dwd.month_year = ?
         WHERE dwd.epf > 0 AND d.is_active = 1
-        ORDER BY d.sort_order ASC, d.name ASC
+        ORDER BY (CASE WHEN d.is_active = 0 THEN 1 ELSE 0 END) ASC, d.sort_order ASC, d.name ASC
       `;
     }
 

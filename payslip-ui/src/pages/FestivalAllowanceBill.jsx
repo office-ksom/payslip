@@ -75,7 +75,7 @@ const FestivalAllowanceBill = (props) => {
       const data = await res.json();
 
       // Combine employees list with active/saved festival allowance records
-      const gridData = data.map(emp => {
+      const gridData = (Array.isArray(data) ? data : []).map(emp => {
         return {
           ...emp,
           amount: emp.amount || 0,
@@ -83,6 +83,13 @@ const FestivalAllowanceBill = (props) => {
           description: emp.description || '',
           has_saved_bill: emp.bill_id !== null
         };
+      }).sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
       });
 
       setEmployees(gridData);
@@ -525,10 +532,10 @@ const FestivalAllowanceBill = (props) => {
                   const isRowApproved = emp.is_approved === 1;
                   const isRowLocked = isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive);
                   const isRowEditable = !isRowLocked && user?.role !== 'approver';
-                  const rowBg = selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent';
-                  const rowColor = emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit');
+                  const rowBg = emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : (selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent');
+                  const rowColor = emp.is_active === 0 ? '#fb923c' : (emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit'));
                   return (
-                    <tr key={emp.emp_id} style={{ 
+                    <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
                       backgroundColor: rowBg,
                       color: rowColor
                     }}>
@@ -541,8 +548,8 @@ const FestivalAllowanceBill = (props) => {
                         />
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)'), display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {emp.title ? `${emp.title} ` : ''}{emp.name}
+                        <div style={{ fontWeight: 600, color: emp.is_active === 0 ? '#f97316' : (emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)')), display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           {isRowApproved && (
                             <span style={{ 
                               backgroundColor: '#10b981', 
@@ -712,9 +719,9 @@ const FestivalAllowanceBill = (props) => {
               </thead>
               <tbody>
                 {filteredEmployees.map(emp => (
-                  <tr key={emp.emp_id}>
+                  <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: emp.is_active === 0 ? '#fff7ed' : '' }}>
                     <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
-                    <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
+                    <td style={{ color: emp.is_active === 0 ? '#c2410c' : '#000' }}>{emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}</td>
                     <td>{emp.category?.toUpperCase()}</td>
                     <td style={{ textAlign: 'right' }}>₹ {(emp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td>{emp.allowance_date || '—'}</td>

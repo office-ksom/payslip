@@ -23,7 +23,7 @@ export async function onRequestGet(context) {
          FROM daily_wage_monthly_earnings 
          WHERE month_year >= ? AND month_year <= ?
        )
-       ORDER BY sort_order ASC, name ASC`
+       ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC`
     ).bind(startMonth, endMonth).all();
 
     const { results: earnings } = await env.ksom_payslip_db.prepare(

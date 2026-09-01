@@ -86,7 +86,6 @@ const ArrearBill = (props) => {
         return catMatch && (emp.is_active === 1 || hasBill);
       });
  
-      // Map to form state structure
       const gridData = filtered.map(emp => {
         const isMatchedRecord = emp.arrear_type === arrearType;
         return {
@@ -98,6 +97,13 @@ const ArrearBill = (props) => {
           description: isMatchedRecord ? (emp.description || '') : '',
           has_saved_bill: isMatchedRecord && emp.bill_id !== null
         };
+      }).sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
       });
  
       setEmployees(gridData);
@@ -601,10 +607,10 @@ const ArrearBill = (props) => {
                   const isRowApproved = emp.is_approved === 1;
                   const isRowLocked = isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive);
                   const isRowEditable = !isRowLocked && user?.role !== 'approver';
-                  const rowBg = selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent';
-                  const rowColor = emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit');
+                  const rowBg = emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : (selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent');
+                  const rowColor = emp.is_active === 0 ? '#fb923c' : (emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit'));
                   return (
-                    <tr key={emp.emp_id} style={{ 
+                    <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
                       backgroundColor: rowBg,
                       color: rowColor
                     }}>
@@ -617,8 +623,8 @@ const ArrearBill = (props) => {
                         />
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, color: emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)'), display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {emp.title ? `${emp.title} ` : ''}{emp.name}
+                        <div style={{ fontWeight: 600, color: emp.is_active === 0 ? '#f97316' : (emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'var(--color-primary)')), display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           {isRowApproved && (
                             <span style={{ 
                               backgroundColor: '#10b981', 
@@ -802,9 +808,9 @@ const ArrearBill = (props) => {
               </thead>
               <tbody>
                 {filteredEmployees.map(emp => (
-                  <tr key={emp.emp_id}>
+                  <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: emp.is_active === 0 ? '#fff7ed' : '' }}>
                     <td style={{ fontWeight: 600 }}>{emp.emp_id}</td>
-                    <td>{emp.title ? `${emp.title} ` : ''}{emp.name}</td>
+                    <td style={{ color: emp.is_active === 0 ? '#c2410c' : '#000' }}>{emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}</td>
                     <td style={{ textAlign: 'right' }}>₹ {fmt(emp.arrear_amount)}</td>
                     <td style={{ textAlign: 'right' }}>₹ {fmt(emp.it_deduction)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹ {fmt(emp.arrear_amount - emp.it_deduction)}</td>

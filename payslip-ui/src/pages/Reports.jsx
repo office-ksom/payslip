@@ -1376,24 +1376,52 @@ const Reports = () => {
         });
 
         const approved = combined.filter(e => e.is_approved === 1);
-        setData(approved.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+        setData(approved.sort((a, b) => {
+          const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+          const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+          if (aActive !== bActive) return bActive - aActive;
+          const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+          if (sortDiff !== 0) return sortDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        }));
 
       } else if (type === 'surrender') {
         const res = await fetch(`/api/surrender/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
+        const approved = (Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : []).sort((a, b) => {
+          const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+          const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+          if (aActive !== bActive) return bActive - aActive;
+          const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+          if (sortDiff !== 0) return sortDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        });
         setData(approved);
 
       } else if (type === 'arrears') {
         const res = await fetch(`/api/arrears/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
+        const approved = (Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : []).sort((a, b) => {
+          const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+          const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+          if (aActive !== bActive) return bActive - aActive;
+          const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+          if (sortDiff !== 0) return sortDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        });
         setData(approved);
 
       } else if (type === 'festival') {
         const res = await fetch(`/api/festival/${targetMonth}?category=${employeeCategory}`);
         const list = await res.json();
-        const approved = Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : [];
+        const approved = (Array.isArray(list) ? list.filter(bill => bill.bill_id !== null && bill.is_approved === 1) : []).sort((a, b) => {
+          const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+          const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+          if (aActive !== bActive) return bActive - aActive;
+          const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+          if (sortDiff !== 0) return sortDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        });
         setData(approved);
       } else if (type === 'supplementary') {
         const res = await fetch(`/api/supplementary/${targetMonth}?category=${employeeCategory}`);
@@ -1420,7 +1448,14 @@ const Reports = () => {
             return { ...e, gross, dedux, net: gross - dedux, da: 0, hra: e.hra || 0 };
           }
         });
-        setData(combined.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+        setData(combined.sort((a, b) => {
+          const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+          const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+          if (aActive !== bActive) return bActive - aActive;
+          const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+          if (sortDiff !== 0) return sortDiff;
+          return (a.name || '').localeCompare(b.name || '');
+        }));
       }
     } catch (err) { 
       console.error(err); 
@@ -3209,7 +3244,7 @@ const Reports = () => {
                 )}
                 {data.map(emp => {
                   return (
-                  <tr key={emp.emp_id}>
+                  <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : '' }}>
                     {!isViewer && (
                       <td style={{ textAlign: 'center' }}>
                         <input type="checkbox" 
@@ -3218,8 +3253,10 @@ const Reports = () => {
                       </td>
                     )}
                     <td>
-                      <div style={{ fontWeight: 600 }}>{emp.title ? `${emp.title} ` : ''}{emp.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{emp.designation} ({emp.emp_id})</div>
+                      <div style={{ fontWeight: 600, color: emp.is_active === 0 ? '#f97316' : 'inherit' }}>
+                        {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: emp.is_active === 0 ? '#fb923c' : 'var(--color-text-secondary)' }}>{emp.designation} ({emp.emp_id})</div>
                       {!emp.email_id && <div style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>No Email</div>}
                     </td>
 

@@ -26,7 +26,7 @@ export async function onRequestGet(context) {
       query += ` WHERE e.is_active = 1 OR m.id IS NOT NULL`;
     }
 
-    query += ` ORDER BY e.sort_order ASC, e.name ASC`;
+    query += ` ORDER BY (CASE WHEN e.is_active = 0 THEN 1 ELSE 0 END) ASC, e.sort_order ASC, e.name ASC`;
 
     const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
 

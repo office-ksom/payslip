@@ -50,11 +50,19 @@ const ConsolidatedStatement = () => {
             : `/api/employees/daily_wage`;
       const res = await fetch(endpoint);
       const data = await res.json();
-      setEmployees(data);
-      if (data.length > 0) {
-        const stillExists = data.some(emp => emp.emp_id === currentSelectedId);
+      const sorted = Array.isArray(data) ? data.sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      }) : [];
+      setEmployees(sorted);
+      if (sorted.length > 0) {
+        const stillExists = sorted.some(emp => emp.emp_id === currentSelectedId);
         if (!stillExists) {
-          setSelectedEmpId(data[0].emp_id);
+          setSelectedEmpId(sorted[0].emp_id);
         }
       } else {
         setSelectedEmpId('');
@@ -1499,8 +1507,8 @@ const ConsolidatedStatement = () => {
             ) : (
               <select className="form-control" value={selectedEmpId} onChange={(e) => setSelectedEmpId(e.target.value)}>
                 {employees.map(emp => (
-                  <option key={emp.emp_id} value={emp.emp_id}>
-                    {emp.emp_id} - {emp.name}
+                  <option key={emp.emp_id} value={emp.emp_id} style={emp.is_active === 0 ? { color: '#ea580c' } : {}}>
+                    {emp.emp_id} - {emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                   </option>
                 ))}
               </select>

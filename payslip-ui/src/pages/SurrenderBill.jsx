@@ -155,8 +155,16 @@ const SurrenderBill = (props) => {
       const empData = await empRes.json();
       const settingsData = await settingsRes.json();
 
-      setEmployees(empData);
-      setActiveEmployees(empData.filter(e => e.is_active === 1));
+      const sortedEmp = Array.isArray(empData) ? empData.sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      }) : [];
+      setEmployees(sortedEmp);
+      setActiveEmployees(sortedEmp);
       setGlobalSettingsList(settingsData);
     } catch (e) {
       console.error("Failed to load base data", e);
@@ -179,7 +187,14 @@ const SurrenderBill = (props) => {
       const res = await fetch(`/api/surrender/${targetMonth}`);
       const data = await res.json();
       // Filter out only employees that actually have saved surrender bills
-      const savedBills = data.filter(e => e.bill_id !== null);
+      const savedBills = (Array.isArray(data) ? data : []).filter(e => e.bill_id !== null).sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      });
       setExistingBills(savedBills);
       setSelectedEmpIds(new Set());
 
@@ -572,8 +587,8 @@ const SurrenderBill = (props) => {
                   >
                     <option value="">-- Choose Employee --</option>
                     {filteredEmployees.map(emp => (
-                      <option key={emp.emp_id} value={emp.emp_id}>
-                        {emp.title ? `${emp.title} ` : ''}{emp.name} ({emp.emp_id})
+                      <option key={emp.emp_id} value={emp.emp_id} style={emp.is_active === 0 ? { color: '#ea580c' } : {}}>
+                        {emp.title ? `${emp.title} ` : ''}{emp.name} ({emp.emp_id}){emp.is_active === 0 ? ' [Inactive]' : ''}
                       </option>
                     ))}
                   </select>
@@ -918,9 +933,9 @@ const SurrenderBill = (props) => {
                   const isRowLocked = bill.is_approved === 1 && (user?.role !== 'super_admin' || !isOverrideActive);
                   const rowBg = 'transparent';
                   const isPending = bill.is_approved === 2 || bill.is_approved === 0 || bill.is_approved === null || bill.is_approved === 3;
-                  const rowColor = bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'inherit');
+                  const rowColor = bill.is_active === 0 ? '#fb923c' : (bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'inherit'));
                   return (
-                    <tr key={bill.emp_id} style={{ backgroundColor: rowBg, color: rowColor }}>
+                    <tr key={bill.emp_id} className={bill.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: bill.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : rowBg, color: rowColor }}>
                       {(user?.role === 'approver' || (!requireApproval && (user?.role === 'admin' || user?.role === 'super_admin'))) && (
                         <td style={{ textAlign: 'center' }}>
                           <input 
@@ -943,14 +958,14 @@ const SurrenderBill = (props) => {
                           <div 
                             style={{ 
                               fontWeight: 600, 
-                              color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-primary)'),
+                              color: bill.is_active === 0 ? '#f97316' : (bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : 'var(--color-primary)')),
                               cursor: !isRowLocked ? 'pointer' : 'default',
                               textDecoration: !isRowLocked ? 'underline' : 'none'
                             }}
                             onClick={() => !isRowLocked && handleEdit(bill)}
                             title={!isRowLocked ? "Click to edit surrender bill" : undefined}
                           >
-                            {bill.title ? `${bill.title} ` : ''}{bill.name}
+                            {bill.title ? `${bill.title} ` : ''}{bill.name}{bill.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
                           {user?.role === 'approver' && isPending && (
                             <span style={{ 
@@ -1119,9 +1134,9 @@ const SurrenderBill = (props) => {
               </thead>
               <tbody>
                 {filteredBills.map(bill => (
-                  <tr key={bill.emp_id}>
+                  <tr key={bill.emp_id} className={bill.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: bill.is_active === 0 ? '#fff7ed' : '' }}>
                     <td style={{ fontWeight: 600 }}>{bill.emp_id}</td>
-                    <td>{bill.title ? `${bill.title} ` : ''}{bill.name}</td>
+                    <td style={{ color: bill.is_active === 0 ? '#c2410c' : '#000' }}>{bill.title ? `${bill.title} ` : ''}{bill.name}{bill.is_active === 0 ? ' [Inactive]' : ''}</td>
                     <td>{bill.category?.toUpperCase()}</td>
                     <td>{bill.bill_date}</td>
                     <td style={{ textAlign: 'right' }}>₹ {fmt(bill.basic_pay)}</td>

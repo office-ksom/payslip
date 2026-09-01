@@ -134,15 +134,27 @@ const EPFReports = (props) => {
       const rawPerm = await resPermanent.json();
       const rawDaily = await resDailyWage.json();
 
-      setRawPermanentData(rawPerm || []);
+      const sortFn = (a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      };
+
+      const sortedRawPerm = (rawPerm || []).sort(sortFn);
+      const sortedRawDaily = (rawDaily || []).sort(sortFn);
+
+      setRawPermanentData(sortedRawPerm);
 
       // Filter: Only employees of appointment type "permanent" in Regular employees list
-      const filteredPerm = (rawPerm || []).filter(
+      const filteredPerm = sortedRawPerm.filter(
         emp => (emp.appointment_type || '').toLowerCase() === 'permanent'
       );
 
       setPermanentData(filteredPerm);
-      setDailyWageData(rawDaily || []);
+      setDailyWageData(sortedRawDaily);
       setDataLoaded(true);
     } catch (err) {
       console.error(err);
@@ -1613,13 +1625,15 @@ const EPFReports = (props) => {
                       const totalEeEr = eeShare + erShare;
 
                       return (
-                        <tr key={i} style={{ height: '22px', backgroundColor: rowStyle.backgroundColor }}>
+                        <tr key={i} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ height: '22px', backgroundColor: emp.is_active === 0 ? '#fff7ed' : rowStyle.backgroundColor }}>
                           {/* A NO */}
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'center', fontFamily: 'Times New Roman, serif' }}>{emp.no}</td>
                           {/* B UAN */}
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'center', fontFamily: 'Times New Roman, serif' }}>{emp.uan}</td>
                           {/* C Name */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{emp.name}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '2px 5px', fontFamily: 'Times New Roman, serif', color: emp.is_active === 0 ? '#c2410c' : 'inherit' }}>
+                            {emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
+                          </td>
                           {/* D Wages */}
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{wages.toFixed(2)}</td>
                           {/* E EPF Wages */}
@@ -1908,9 +1922,11 @@ const EPFReports = (props) => {
                       }
 
                       return (
-                        <tr key={index} style={{ height: '22px', backgroundColor: rowBg }}>
+                        <tr key={index} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ height: '22px', backgroundColor: emp.is_active === 0 ? '#fff7ed' : rowBg }}>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{index + 1}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{emp.name ? String(emp.name).toUpperCase() : ''}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px', color: emp.is_active === 0 ? '#c2410c' : 'inherit' }}>
+                            {emp.name ? String(emp.name).toUpperCase() : ''}{emp.is_active === 0 ? ' [INACTIVE]' : ''}
+                          </td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{emp.designation || ''}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{wages.toFixed(2)}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : epf_wage.toFixed(2)}</td>

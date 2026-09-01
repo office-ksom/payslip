@@ -342,6 +342,37 @@ a:hover {
 .badge-ugc { background-color: rgba(99, 102, 241, 0.1); color: var(--color-accent-secondary); }
 .badge-temporary { background-color: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
 .badge-contract { background-color: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.badge-inactive { background-color: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+.badge-danger { background-color: rgba(239, 68, 68, 0.1); color: var(--color-danger); }
+.badge-success { background-color: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.badge-warning { background-color: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+
+/* Inactive Member Styles */
+.inactive-row {
+  background-color: rgba(249, 115, 22, 0.08) !important;
+  color: #fb923c !important;
+}
+
+.inactive-row td {
+  color: #fb923c !important;
+}
+
+.inactive-row td div:not(.badge-container) {
+  color: #fb923c !important;
+}
+
+.inactive-row td a {
+  color: #fb923c !important;
+}
+
+.inactive-row td input.form-control {
+  color: #fb923c !important;
+  border-color: rgba(249, 115, 22, 0.3) !important;
+}
+
+.inactive-text {
+  color: #f97316 !important;
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
@@ -415,6 +446,34 @@ a:hover {
 .festival-preview-overlay .table td {
   border: 1px solid #dee2e6 !important;
   background-color: #ffffff !important;
+}
+
+.epf-preview-overlay .table tr.inactive-row td,
+.paybill-preview-overlay .table tr.inactive-row td,
+.supplementary-preview-overlay .table tr.inactive-row td,
+.employees-preview-overlay .table tr.inactive-row td,
+.surrender-preview-overlay .table tr.inactive-row td,
+.arrear-preview-overlay .table tr.inactive-row td,
+.festival-preview-overlay .table tr.inactive-row td,
+.epf-preview-overlay .table tr.inactive-row,
+.paybill-preview-overlay .table tr.inactive-row,
+.supplementary-preview-overlay .table tr.inactive-row,
+.employees-preview-overlay .table tr.inactive-row,
+.surrender-preview-overlay .table tr.inactive-row,
+.arrear-preview-overlay .table tr.inactive-row,
+.festival-preview-overlay .table tr.inactive-row {
+  background-color: #fff7ed !important;
+  color: #c2410c !important;
+}
+
+.epf-preview-overlay .table tr.inactive-row *,
+.paybill-preview-overlay .table tr.inactive-row *,
+.supplementary-preview-overlay .table tr.inactive-row *,
+.employees-preview-overlay .table tr.inactive-row *,
+.surrender-preview-overlay .table tr.inactive-row *,
+.arrear-preview-overlay .table tr.inactive-row *,
+.festival-preview-overlay .table tr.inactive-row * {
+  color: #c2410c !important;
 }
 
 .epf-preview-overlay .table tr:hover,

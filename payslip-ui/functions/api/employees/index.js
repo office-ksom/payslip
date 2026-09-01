@@ -6,11 +6,11 @@ export async function onRequestGet(context) {
     const url = new URL(context.request.url);
     const fy = url.searchParams.get('fy');
 
-    let query = "SELECT * FROM employees ORDER BY sort_order ASC, name ASC";
+    let query = "SELECT * FROM employees ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC";
     let params = [];
 
     if (userRole !== 'admin' && userRole !== 'super_admin' && userEmail) {
-      query = "SELECT * FROM employees WHERE LOWER(email_id) = LOWER(?) ORDER BY sort_order ASC, name ASC";
+      query = "SELECT * FROM employees WHERE LOWER(email_id) = LOWER(?) ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC";
       params = [userEmail];
     } else if (fy) {
       const startMonth = `${fy}-03`;
@@ -29,7 +29,7 @@ export async function onRequestGet(context) {
                  UNION
                  SELECT DISTINCT emp_id FROM festival_allowance_bills WHERE SUBSTR(bill_date, 1, 7) >= ? AND SUBSTR(bill_date, 1, 7) <= ?
                ) 
-               ORDER BY sort_order ASC, name ASC`;
+               ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC`;
       params = [
         startMonth, endMonth,
         startMonth, endMonth,

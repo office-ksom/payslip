@@ -6,11 +6,11 @@ export async function onRequestGet(context) {
     const url = new URL(context.request.url);
     const fy = url.searchParams.get('fy');
 
-    let query = "SELECT * FROM visiting_employees ORDER BY sort_order ASC, name ASC";
+    let query = "SELECT * FROM visiting_employees ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC";
     let params = [];
 
     if (userRole !== 'admin' && userRole !== 'super_admin' && userEmail) {
-      query = "SELECT * FROM visiting_employees WHERE LOWER(email_id) = LOWER(?) ORDER BY sort_order ASC, name ASC";
+      query = "SELECT * FROM visiting_employees WHERE LOWER(email_id) = LOWER(?) ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC";
       params = [userEmail];
     } else if (fy) {
       const startMonth = `${fy}-03`;
@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
                WHERE emp_id IN (
                  SELECT DISTINCT emp_id FROM visiting_monthly_earnings WHERE month_year >= ? AND month_year <= ?
                ) 
-               ORDER BY sort_order ASC, name ASC`;
+               ORDER BY (CASE WHEN is_active = 0 THEN 1 ELSE 0 END) ASC, sort_order ASC, name ASC`;
       params = [startMonth, endMonth];
     }
 

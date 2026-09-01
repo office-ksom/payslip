@@ -219,7 +219,14 @@ const Paybill = (props) => {
       setEmployees(combined.filter(e => {
         if (e.is_active === 0 && e.earnings_id == null) return false;
         return true;
-      }).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+      }).sort((a, b) => {
+        const aActive = a.is_active !== undefined ? Number(a.is_active) : 1;
+        const bActive = b.is_active !== undefined ? Number(b.is_active) : 1;
+        if (aActive !== bActive) return bActive - aActive;
+        const sortDiff = (a.sort_order || 0) - (b.sort_order || 0);
+        if (sortDiff !== 0) return sortDiff;
+        return (a.name || '').localeCompare(b.name || '');
+      }));
     } catch (err) {
       console.error(err);
       alert('Failed to load paybill data: ' + err.message);
@@ -1208,29 +1215,33 @@ const Paybill = (props) => {
                     };
 
                     return (
-                      <tr key={emp.emp_id} style={{ 
-                        backgroundColor: isRowGrey 
-                        ? 'rgba(229, 231, 235, 0.05)'
-                        : (user?.role === 'approver' 
-                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
-                            : 'var(--color-bg-secondary)'),
-                        color: isRowGrey ? '#9ca3af' : ''
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
+                        backgroundColor: emp.is_active === 0
+                          ? 'rgba(249, 115, 22, 0.08)'
+                          : (isRowGrey 
+                              ? 'rgba(229, 231, 235, 0.05)'
+                              : (user?.role === 'approver' 
+                                  ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                                  : 'var(--color-bg-secondary)')),
+                        color: emp.is_active === 0 ? '#fb923c' : (isRowGrey ? '#9ca3af' : '')
                       }}>
                         <td>
                           <div 
                             style={{ 
                               fontWeight: 600, 
-                              color: isRowGrey 
-                                ? '#9ca3af' 
-                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              color: emp.is_active === 0
+                                ? '#f97316'
+                                : (isRowGrey 
+                                    ? '#9ca3af' 
+                                    : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)'))), 
                               cursor: isReadOnly ? 'default' : 'pointer', 
                               textDecoration: isReadOnly ? 'none' : 'underline' 
                             }} 
                             onClick={() => !isReadOnly && openModal(emp)}
                           >
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : (isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)')) }}>{emp.emp_id}</div>
                         </td>
                         <td>{inp('basic_pay')}</td>
                         <td>{inp('dp_gp')}</td>
@@ -1367,29 +1378,33 @@ const Paybill = (props) => {
                     };
 
                     return (
-                      <tr key={emp.emp_id} style={{ 
-                        backgroundColor: isRowGrey 
-                        ? 'rgba(229, 231, 235, 0.05)'
-                        : (user?.role === 'approver' 
-                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
-                            : 'var(--color-bg-secondary)'),
-                        color: isRowGrey ? '#9ca3af' : ''
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
+                        backgroundColor: emp.is_active === 0
+                          ? 'rgba(249, 115, 22, 0.08)'
+                          : (isRowGrey 
+                              ? 'rgba(229, 231, 235, 0.05)'
+                              : (user?.role === 'approver' 
+                                  ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                                  : 'var(--color-bg-secondary)')),
+                        color: emp.is_active === 0 ? '#fb923c' : (isRowGrey ? '#9ca3af' : '')
                       }}>
                         <td>
                           <div 
                             style={{ 
                               fontWeight: 600, 
-                              color: isRowGrey 
-                                ? '#9ca3af' 
-                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              color: emp.is_active === 0
+                                ? '#f97316'
+                                : (isRowGrey 
+                                    ? '#9ca3af' 
+                                    : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)'))), 
                               cursor: isReadOnly ? 'default' : 'pointer', 
                               textDecoration: isReadOnly ? 'none' : 'underline' 
                             }} 
                             onClick={() => !isReadOnly && openModal(emp)}
                           >
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : (isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)')) }}>{emp.emp_id}</div>
                         </td>
                         <td>{inp('basic_pay')}</td>
                         <td>{inp('other_earnings')}</td>
@@ -1505,29 +1520,33 @@ const Paybill = (props) => {
                     };
 
                     return (
-                      <tr key={emp.emp_id} style={{ 
-                        backgroundColor: isRowGrey 
-                        ? 'rgba(229, 231, 235, 0.05)'
-                        : (user?.role === 'approver' 
-                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
-                            : 'var(--color-bg-secondary)'),
-                        color: isRowGrey ? '#9ca3af' : ''
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
+                        backgroundColor: emp.is_active === 0
+                          ? 'rgba(249, 115, 22, 0.08)'
+                          : (isRowGrey 
+                              ? 'rgba(229, 231, 235, 0.05)'
+                              : (user?.role === 'approver' 
+                                  ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                                  : 'var(--color-bg-secondary)')),
+                        color: emp.is_active === 0 ? '#fb923c' : (isRowGrey ? '#9ca3af' : '')
                       }}>
                         <td>
                           <div 
                             style={{ 
                               fontWeight: 600, 
-                              color: isRowGrey 
-                                ? '#9ca3af' 
-                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              color: emp.is_active === 0
+                                ? '#f97316'
+                                : (isRowGrey 
+                                    ? '#9ca3af' 
+                                    : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)'))), 
                               cursor: isReadOnly ? 'default' : 'pointer', 
                               textDecoration: isReadOnly ? 'none' : 'underline' 
                             }} 
                             onClick={() => !isReadOnly && openModal(emp)}
                           >
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : (isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)')) }}>{emp.emp_id}</div>
                         </td>
                         <td>{inp('days_worked')}</td>
                         <td>{inp('daily_wage')}</td>
@@ -1652,29 +1671,33 @@ const Paybill = (props) => {
                     };
 
                     return (
-                      <tr key={emp.emp_id} style={{ 
-                        backgroundColor: isRowGrey 
-                        ? 'rgba(229, 231, 235, 0.05)'
-                        : (user?.role === 'approver' 
-                            ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
-                            : 'var(--color-bg-secondary)'),
-                        color: isRowGrey ? '#9ca3af' : ''
+                      <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ 
+                        backgroundColor: emp.is_active === 0
+                          ? 'rgba(249, 115, 22, 0.08)'
+                          : (isRowGrey 
+                              ? 'rgba(229, 231, 235, 0.05)'
+                              : (user?.role === 'approver' 
+                                  ? (!isApproved ? '#fefce8' : 'var(--color-bg-secondary)') 
+                                  : 'var(--color-bg-secondary)')),
+                        color: emp.is_active === 0 ? '#fb923c' : (isRowGrey ? '#9ca3af' : '')
                       }}>
                         <td>
                           <div 
                             style={{ 
                               fontWeight: 600, 
-                              color: isRowGrey 
-                                ? '#9ca3af' 
-                                : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)')), 
+                              color: emp.is_active === 0
+                                ? '#f97316'
+                                : (isRowGrey 
+                                    ? '#9ca3af' 
+                                    : ((user?.role === 'approver' && !isApproved) ? '#713f12' : (isReadOnly ? '#fff' : 'var(--color-primary)'))), 
                               cursor: isReadOnly ? 'default' : 'pointer', 
                               textDecoration: isReadOnly ? 'none' : 'underline' 
                             }} 
                             onClick={() => !isReadOnly && openModal(emp)}
                           >
-                            {emp.title ? `${emp.title} ` : ''}{emp.name}
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)') }}>{emp.emp_id}</div>
+                          <div style={{ fontSize: '0.7rem', color: emp.is_active === 0 ? '#f97316' : (isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#a16207' : 'var(--color-text-secondary)')) }}>{emp.emp_id}</div>
                         </td>
                         <td>{inp('basic_pay')}</td>
                         <td>{inp('other_earnings')}</td>
@@ -2136,8 +2159,10 @@ const Paybill = (props) => {
                       };
 
                       return (
-                        <tr key={emp.emp_id} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb' }}>
-                          <td style={{ fontWeight: 'bold', border: '1px solid #000', padding: '8px', color: '#000' }}>{emp.name}</td>
+                        <tr key={emp.emp_id} className={emp.is_active === 0 ? 'inactive-row' : ''} style={{ backgroundColor: emp.is_active === 0 ? '#fff7ed' : (idx % 2 === 0 ? '#fff' : '#f9fafb') }}>
+                          <td style={{ fontWeight: 'bold', border: '1px solid #000', padding: '8px', color: emp.is_active === 0 ? '#c2410c' : '#000' }}>
+                            {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
+                          </td>
                           {earnCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000', fontWeight: c.isBold ? 'bold' : 'normal' }}>
                               {Math.round(getVal(c)).toFixed(2)}
