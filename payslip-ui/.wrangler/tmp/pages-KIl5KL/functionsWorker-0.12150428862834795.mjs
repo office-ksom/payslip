@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-QDVF9o/checked-fetch.js
+// ../.wrangler/tmp/bundle-MMZaYp/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -3823,6 +3823,7 @@ async function onRequestGet39(context) {
           e.date_of_joining,
           e.appointment_type,
           e.is_active,
+          e.sort_order,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -3847,6 +3848,7 @@ async function onRequestGet39(context) {
           d.epf_uan AS uan,
           d.date_of_joining,
           d.is_active,
+          d.sort_order,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -3880,6 +3882,7 @@ async function onRequestGet39(context) {
           e.date_of_joining,
           e.appointment_type,
           e.is_active,
+          e.sort_order,
           (coalesce(me.basic_pay, 0) + coalesce(me.da_state, 0) + coalesce(me.da_ugc, 0)) AS wages,
           coalesce(md.epf, 0) AS employee_contribution,
           0 AS is_saved
@@ -3897,6 +3900,7 @@ async function onRequestGet39(context) {
           d.epf_uan AS uan, 
           d.date_of_joining,
           d.is_active,
+          d.sort_order,
           coalesce(dwe.basic_pay, 0) AS wages,
           coalesce(dwd.epf, 0) AS employee_contribution,
           0 AS is_saved
@@ -5324,7 +5328,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-QDVF9o/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-MMZaYp/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -5356,7 +5360,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-QDVF9o/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-MMZaYp/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

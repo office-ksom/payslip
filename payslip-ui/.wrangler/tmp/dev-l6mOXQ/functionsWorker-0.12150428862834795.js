@@ -3845,6 +3845,7 @@ async function onRequestGet39(context) {
           e.date_of_joining,
           e.appointment_type,
           e.is_active,
+          e.sort_order,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -3869,6 +3870,7 @@ async function onRequestGet39(context) {
           d.epf_uan AS uan,
           d.date_of_joining,
           d.is_active,
+          d.sort_order,
           ee.wages,
           ee.epf_wage,
           ee.eps_wage,
@@ -3902,6 +3904,7 @@ async function onRequestGet39(context) {
           e.date_of_joining,
           e.appointment_type,
           e.is_active,
+          e.sort_order,
           (coalesce(me.basic_pay, 0) + coalesce(me.da_state, 0) + coalesce(me.da_ugc, 0)) AS wages,
           coalesce(md.epf, 0) AS employee_contribution,
           0 AS is_saved
@@ -3919,6 +3922,7 @@ async function onRequestGet39(context) {
           d.epf_uan AS uan, 
           d.date_of_joining,
           d.is_active,
+          d.sort_order,
           coalesce(dwe.basic_pay, 0) AS wages,
           coalesce(dwd.epf, 0) AS employee_contribution,
           0 AS is_saved
