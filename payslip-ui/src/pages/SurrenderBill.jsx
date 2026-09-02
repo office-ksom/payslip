@@ -472,14 +472,14 @@ const SurrenderBill = (props) => {
   return (
     <div>
       <div className="surrender-main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Earned Leave Surrender Bill</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
             Generate Earned Leave surrender bill for a single employee (max 30 days per financial year).
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select 
             className="form-control" 
             value={viewType} 
@@ -1100,12 +1100,12 @@ const SurrenderBill = (props) => {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Earned Leave Surrender Bill Verification Sheet</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month/Year: {formatMonthYear(monthYear)} | Total Records: {filteredBills.length}</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
                 Print Sheet
               </button>

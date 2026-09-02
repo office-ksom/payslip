@@ -248,7 +248,7 @@ const Settings = (props) => {
 
       {/* Tab bar for Super Admin */}
       {isSuperAdmin && (
-        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
+        <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
           <button 
             onClick={() => setActiveTab('allowances')}
             style={{
@@ -261,7 +261,8 @@ const Settings = (props) => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             Allowance & Workflow Settings
@@ -278,7 +279,8 @@ const Settings = (props) => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             System Activity Logs
@@ -288,7 +290,7 @@ const Settings = (props) => {
 
       {activeTab === 'allowances' ? (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Global Allowances</h1>
               <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>

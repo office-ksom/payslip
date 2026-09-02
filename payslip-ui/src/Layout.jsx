@@ -1,10 +1,14 @@
-import { Outlet, NavLink, useOutletContext } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, FileText, Download, ShieldCheck, UserCog, LogOut, ChevronDown, User, Key, Table, Coins } from 'lucide-react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, Settings, FileText, Download, ShieldCheck, UserCog, LogOut, ChevronDown, User, Key, Table, Coins, Menu, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 const Layout = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+
+  // Mobile navigation drawer state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Login form states
   const [loginEmail, setLoginEmail] = useState('');
@@ -30,6 +34,11 @@ const Layout = () => {
       setLoading(false);
     });
   }, []);
+
+  // Close mobile drawer on route navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -91,17 +100,18 @@ const Layout = () => {
 
     return (
       <div style={{
-        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%)'
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%)',
+        padding: '1rem'
       }}>
-        <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem', textAlign: 'center', boxShadow: 'var(--shadow-xl)' }}>
+        <div className="card" style={{ width: '100%', maxWidth: '420px', padding: 'clamp(1.5rem, 5vw, 2.5rem)', textAlign: 'center', boxShadow: 'var(--shadow-xl)' }}>
           <img 
             src="/logo.png" 
             alt="KSoM Logo" 
             style={{ width: '64px', height: '64px', objectFit: 'contain', marginBottom: '1.5rem' }} 
           />
           <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem', fontWeight: 800 }}>KSoM Portal</h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem' }}>Sign in to manage payslips</p>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem', fontSize: '0.9rem' }}>Sign in to manage payslips</p>
           
           {loginError && (
             <div style={{ 
@@ -136,7 +146,7 @@ const Layout = () => {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 required 
                 placeholder="••••••••"
-                style={{ padding: '0.75rem 1rem', paddingRight: '3rem' }}
+                style={{ padding: '0.75rem 1rem', paddingRight: '3.5rem' }}
               />
               <button 
                 type="button"
@@ -144,14 +154,14 @@ const Layout = () => {
                 style={{
                   position: 'absolute', right: '12px', top: '38px',
                   background: 'none', border: 'none', color: 'var(--color-text-muted)',
-                  cursor: 'pointer'
+                  cursor: 'pointer', fontSize: '0.8rem'
                 }}
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', cursor: 'pointer' }}>
                 <input 
                   type="checkbox" 
@@ -205,27 +215,45 @@ const Layout = () => {
   const isViewer = user && user.role === 'viewer';
   const isApprover = user && user.role === 'approver';
 
+  const closeMobileDrawer = () => setMobileMenuOpen(false);
+
   return (
     <div className="app-container">
+      {/* Mobile Drawer Backdrop */}
+      <div 
+        className={`sidebar-backdrop ${mobileMenuOpen ? 'active' : ''}`} 
+        onClick={closeMobileDrawer}
+        aria-hidden="true"
+      />
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
-          <img 
-            src="/logo.png" 
-            alt="KSoM Logo" 
-            style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
-          />
-          <span className="sidebar-logo-text">KSoM Payslip</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <img 
+              src="/logo.png" 
+              alt="KSoM Logo" 
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }} 
+            />
+            <span className="sidebar-logo-text">KSoM Payslip</span>
+          </div>
+          <button 
+            className="mobile-sidebar-close" 
+            onClick={closeMobileDrawer}
+            aria-label="Close navigation"
+          >
+            <X size={20} />
+          </button>
         </div>
         
         <nav className="sidebar-nav">
-          <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
+          <NavLink to="/" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
             <LayoutDashboard size={20} />
             <span>Overview</span>
           </NavLink>
           
           {isAdmin && (
-            <NavLink to="/employees" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/employees" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <Users size={20} />
               <span>Employees</span>
             </NavLink>
@@ -247,19 +275,19 @@ const Layout = () => {
               
               {billMenuOpen && (
                 <div style={{ paddingLeft: '2.75rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <NavLink to="/paybill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/paybill" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Paybill</span>
                   </NavLink>
-                  <NavLink to="/supplementary-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/supplementary-bill" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Supplementary Paybill</span>
                   </NavLink>
-                  <NavLink to="/surrender-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/surrender-bill" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Surrender Bill</span>
                   </NavLink>
-                  <NavLink to="/arrear-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/arrear-bill" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Arrear Bill</span>
                   </NavLink>
-                  <NavLink to="/festival-bill" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                  <NavLink to="/festival-bill" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                     <span>Festival Allowance Bill</span>
                   </NavLink>
                 </div>
@@ -268,7 +296,7 @@ const Layout = () => {
           )}
 
           {!isViewer && (
-            <NavLink to="/epf-entry" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/epf-entry" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <Coins size={20} />
               <span>EPF Entry</span>
             </NavLink>
@@ -289,42 +317,42 @@ const Layout = () => {
             
             {reportsMenuOpen && (
               <div style={{ paddingLeft: '2.75rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <NavLink to="/reports" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                <NavLink to="/reports" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                   <span>Bills</span>
                 </NavLink>
-                <NavLink to="/epf-reports" className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
+                <NavLink to="/epf-reports" onClick={closeMobileDrawer} className={({ isActive }) => `sub-nav-link ${isActive ? 'active' : ''}`}>
                   <span>EPF Reports</span>
                 </NavLink>
               </div>
             )}
           </div>
 
-          <NavLink to="/consolidated-statement" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="/consolidated-statement" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Table size={20} />
             <span>Consolidated FY Statement (individual)</span>
           </NavLink>
 
           {isAdmin && (
-            <NavLink to="/consolidated-statement-all" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/consolidated-statement-all" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <Table size={20} />
               <span>Consolidated FY Statements (All Employees)</span>
             </NavLink>
           )}
 
-          <div style={{ marginTop: 'auto' }}>
+          <div style={{ marginTop: 'auto', paddingTop: '1rem' }}>
             {!isViewer && isSuperAdmin && (
-              <NavLink to="/users" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ marginBottom: '0.5rem' }}>
+              <NavLink to="/users" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ marginBottom: '0.5rem' }}>
                 <UserCog size={20} />
                 <span>User Management</span>
               </NavLink>
             )}
             {!isViewer && isAdmin && (
               <>
-                <NavLink to="/backup" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ marginBottom: '0.5rem' }}>
+                <NavLink to="/backup" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} style={{ marginBottom: '0.5rem' }}>
                   <ShieldCheck size={20} />
                   <span>Backup & Restore</span>
                 </NavLink>
-                <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <NavLink to="/settings" onClick={closeMobileDrawer} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                   <Settings size={20} />
                   <span>Settings</span>
                 </NavLink>
@@ -337,15 +365,25 @@ const Layout = () => {
       {/* Main Content Area */}
       <main className="main-content">
         <header className="topbar">
-          <div className="topbar-title">
-            <h2 style={{ fontSize: '1.25rem', marginBottom: 0 }}>Portal Dashboard</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button 
+              className="mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={22} />
+            </button>
+            <div className="topbar-title">
+              <h2 style={{ fontSize: '1.15rem', marginBottom: 0, fontWeight: 700 }}>Portal Dashboard</h2>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ position: 'relative' }} ref={menuRef}>
               <div 
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.75rem',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.65rem',
                   borderRadius: '12px', backgroundColor: 'var(--color-bg-surface-hover)',
                   cursor: 'pointer', transition: 'all 0.2s',
                   border: showUserMenu ? '1px solid var(--color-primary)' : '1px solid transparent',
@@ -353,16 +391,16 @@ const Layout = () => {
                 }}
               >
                 <div style={{
-                  width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--color-primary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+                  width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'var(--color-primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0
                 }}>
-                  <User size={18} />
+                  <User size={16} />
                 </div>
-                <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <div className="topbar-user-info" style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-primary)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {user ? user.email.split('@')[0] : 'User'}
                   </div>
-                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--color-accent-primary)', fontWeight: 800 }}>
+                  <div style={{ fontSize: '0.625rem', textTransform: 'uppercase', color: 'var(--color-accent-primary)', fontWeight: 800 }}>
                     {user ? user.role.replace('_', ' ') : ''}
                   </div>
                 </div>
@@ -371,7 +409,7 @@ const Layout = () => {
               
               {showUserMenu && (
                 <div style={{
-                  position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: '240px',
+                  position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 'min(90vw, 240px)',
                   backgroundColor: 'var(--color-bg-surface)', borderRadius: '12px', 
                   boxShadow: 'var(--shadow-lg)', padding: '0.5rem', zIndex: 1001, 
                   border: '1px solid var(--color-border)',
@@ -379,7 +417,7 @@ const Layout = () => {
                 }}>
                   <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-border)', marginBottom: '0.5rem' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Signed in as</div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{user?.email}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{user?.email}</div>
                   </div>
                   <div 
                     onClick={() => {
@@ -400,13 +438,13 @@ const Layout = () => {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
                       borderRadius: '8px', cursor: 'pointer',
-                      color: 'var(--color-primary)', fontSize: '0.9rem', fontWeight: 600,
+                      color: 'var(--color-primary)', fontSize: '0.875rem', fontWeight: 600,
                       transition: 'background-color 0.2s'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <Key size={18} /> Change Password
+                    <Key size={16} /> Change Password
                   </div>
                   <div 
                     onClick={() => {
@@ -415,13 +453,13 @@ const Layout = () => {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem',
                       borderRadius: '8px', cursor: 'pointer',
-                      color: 'var(--color-danger)', fontSize: '0.9rem', fontWeight: 600,
+                      color: 'var(--color-danger)', fontSize: '0.875rem', fontWeight: 600,
                       transition: 'background-color 0.2s'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <LogOut size={18} /> Logout / Switch User
+                    <LogOut size={16} /> Logout / Switch User
                   </div>
                 </div>
               )}

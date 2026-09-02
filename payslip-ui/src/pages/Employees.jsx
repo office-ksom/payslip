@@ -218,7 +218,7 @@ const Employees = () => {
   return (
     <div>
       <div className="employees-main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Employee Directory</h1>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -226,7 +226,7 @@ const Employees = () => {
             </p>
           </div>
           {!showForm && (
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => setShowFullPreview(true)}>
                 Preview Full Sheet
               </button>
@@ -238,7 +238,7 @@ const Employees = () => {
         </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
         <button 
           onClick={() => { setActiveTab('permanent'); setShowForm(false); }}
           style={{
@@ -583,14 +583,14 @@ const Employees = () => {
 
       {/* Employees Table */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <h3 style={{ fontSize: '1.125rem' }}>
             {activeTab === 'permanent' ? 'All Permanent Employees' 
              : activeTab === 'visiting' ? 'All Visiting Faculty' 
              : activeTab === 'contract' ? 'All Contract Staff' 
              : 'All Daily Wage Staff'} ({filteredEmployees.length})
           </h3>
-          <div style={{ position: 'relative', width: '260px' }}>
+          <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
             <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
             <input type="text" placeholder="Search by name or ID..." value={search}
               onChange={(e) => setSearch(e.target.value)} className="form-control"
@@ -709,14 +709,14 @@ const Employees = () => {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>
                 Employee Directory - {activeTab === 'permanent' ? 'Permanent Staff' : activeTab === 'visiting' ? 'Visiting Faculty' : activeTab === 'contract' ? 'Contract Staff' : 'Daily Wage Staff'}
               </h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Total Records: {filteredEmployees.length}</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
                 Print Sheet
               </button>

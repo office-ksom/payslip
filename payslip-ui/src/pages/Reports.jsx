@@ -3074,7 +3074,7 @@ const Reports = () => {
   return (
     <div>
       {/* Category Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
         {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
           <button 
             key={cat}
@@ -3089,7 +3089,8 @@ const Reports = () => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {cat === 'permanent' && 'Permanent Employees'}
@@ -3109,11 +3110,11 @@ const Reports = () => {
           </p>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Bill Type Selector */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>Bill Type:</label>
-            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: '200px' }}>
+            <select className="form-control" value={billType} onChange={(e) => setBillType(e.target.value)} style={{ width: 'min(100%, 200px)' }}>
               <option value="regular">Regular Paybill</option>
               <option value="supplementary">Supplementary Paybill</option>
               <option value="surrender">Leave Surrender Bill</option>
@@ -3123,7 +3124,7 @@ const Reports = () => {
           </div>
           {/* Month Selector */}
           <input type="month" className="form-control" value={monthYear}
-            onChange={(e) => setMonthYear(e.target.value)} style={{ width: '150px' }} />
+            onChange={(e) => setMonthYear(e.target.value)} style={{ width: 'auto' }} />
         </div>
       </div>
 
@@ -3141,7 +3142,7 @@ const Reports = () => {
           </div>
 
           {!isViewer && (
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button onClick={handleSendEmails} disabled={selectedEmps.size === 0 || sendingEmails}
                 className="btn btn-primary">
                 <Mail size={16} /> {sendingEmails ? 'Dispatching...' : `Email Selected (${selectedEmps.size})`}

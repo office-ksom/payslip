@@ -778,12 +778,12 @@ const ArrearBill = (props) => {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Salary Arrear Bill Verification Sheet</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month/Year: {formatMonthYear(monthYear)} | Category: {staffCategory?.toUpperCase()} | Total Records: {filteredEmployees.length}</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
                 Print Sheet
               </button>

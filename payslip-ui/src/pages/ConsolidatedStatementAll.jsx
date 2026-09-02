@@ -796,7 +796,7 @@ const ConsolidatedStatementAll = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
         {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
           <button 
             key={cat}
@@ -811,7 +811,8 @@ const ConsolidatedStatementAll = () => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {cat === 'permanent' && 'Permanent Employees'}
@@ -832,12 +833,12 @@ const ConsolidatedStatementAll = () => {
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
           <button
             className="btn btn-primary"
             onClick={handleDownload}
             disabled={loading || previewLoading}
-            style={{ flex: 1, backgroundColor: 'var(--color-success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+            style={{ flex: 1, minWidth: '220px', backgroundColor: 'var(--color-success)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : <Table size={18} />}
             Download Consolidated Excel Workbook
@@ -846,7 +847,7 @@ const ConsolidatedStatementAll = () => {
             className="btn btn-secondary"
             onClick={handlePreview}
             disabled={loading || previewLoading}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+            style={{ flex: 1, minWidth: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
           >
             {previewLoading && <Loader2 className="animate-spin" size={18} />}
             {!previewLoading && previewData && <EyeOff size={18} />}

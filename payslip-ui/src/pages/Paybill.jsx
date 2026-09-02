@@ -801,19 +801,19 @@ const Paybill = (props) => {
   if (user?.role === 'approver' && !isSubmitted && !isApproved) {
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Paybill Generation</h1>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
               Verify earnings and deductions, then approve or reject the submitted paybill.
             </p>
           </div>
-          <input type="month" className="form-control" value={monthYear}
+          <input type="month" className="form-control" value={monthYear} style={{ width: 'auto' }}
             onChange={(e) => setMonthYear(e.target.value)} />
         </div>
 
         {/* Tabs inside Approvable section */}
-        <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+        <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
           {['permanent', 'visiting', 'contract', 'daily_wage'].map(tab => (
             <button 
               key={tab}
@@ -826,7 +826,8 @@ const Paybill = (props) => {
                 color: activeTab === tab ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontSize: '0.95rem'
+                fontSize: '0.95rem',
+                whiteSpace: 'nowrap'
               }}
             >
               {tab === 'permanent' ? 'Permanent Employees' : 
@@ -850,7 +851,7 @@ const Paybill = (props) => {
   return (
     <div>
       <div className="paybill-main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Paybill Generation</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
@@ -862,12 +863,12 @@ const Paybill = (props) => {
             </div>
           )}
         </div>
-        <input type="month" className="form-control" value={monthYear}
+        <input type="month" className="form-control" value={monthYear} style={{ width: 'auto' }}
           onChange={(e) => setMonthYear(e.target.value)} />
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
         {['permanent', 'visiting', 'contract', 'daily_wage'].map(tab => (
           <button 
             key={tab}
@@ -882,7 +883,8 @@ const Paybill = (props) => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {tab === 'permanent' ? 'Permanent Employees' : 
@@ -967,7 +969,7 @@ const Paybill = (props) => {
         transition: 'all 0.3s ease'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <>
                 <button className="btn btn-secondary" onClick={handleCopyPreviousMonth} disabled={isApproved && (!isOverrideActive || user?.role !== 'super_admin')}>
@@ -981,7 +983,7 @@ const Paybill = (props) => {
               </>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <button 
                 className="btn btn-secondary" 
@@ -1761,7 +1763,7 @@ const Paybill = (props) => {
               </button>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
               {/* Earnings Column */}
               <div>
                 <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'rgba(59,130,246,1)' }}>ALLOWANCES</h3>
@@ -2023,12 +2025,12 @@ const Paybill = (props) => {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Monthly Paybill Verification Sheet ({getTabLabel(activeTab)})</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {formatMonthYear(monthYear)} | Status: Pending Approval</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
                 Print Sheet
               </button>

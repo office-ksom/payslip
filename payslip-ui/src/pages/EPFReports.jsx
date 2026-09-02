@@ -1355,11 +1355,11 @@ const EPFReports = (props) => {
   const totalAdminCharges = ac2PFAdmin + ac21EDLISAdmin;
 
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.8rem', marginBottom: '0.25rem' }}>EPF Reports & Exports</h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+          <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>EPF Reports & Exports</h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
             Preview and export the institutional multi-sheet EPF Statement workbook.
           </p>
         </div>
@@ -1389,8 +1389,8 @@ const EPFReports = (props) => {
 
       {/* Inputs and actions panel */}
       <div className="card" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', alignItems: 'flex-end' }}>
-          <div className="form-group" style={{ flex: '1', minWidth: '220px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ flex: '1', minWidth: '200px', marginBottom: 0 }}>
             <label className="form-label" style={{ fontWeight: 600 }}>Select Month & Year</label>
             <input 
               type="month" 
@@ -1401,7 +1401,7 @@ const EPFReports = (props) => {
             />
           </div>
 
-          <div className="form-group" style={{ flex: '1', minWidth: '220px' }}>
+          <div className="form-group" style={{ flex: '1', minWidth: '200px', marginBottom: 0 }}>
             <label className="form-label" style={{ fontWeight: 600 }}>Select Report Type</label>
             <select
               className="form-control"
@@ -1415,7 +1415,7 @@ const EPFReports = (props) => {
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button 
               className="btn btn-secondary"
               onClick={() => setShowPreview(!showPreview)}
@@ -1424,7 +1424,7 @@ const EPFReports = (props) => {
                 display: 'inline-flex', 
                 alignItems: 'center', 
                 gap: '0.5rem',
-                padding: '0.75rem 1.25rem',
+                padding: '0.625rem 1.25rem',
                 fontWeight: 600
               }}
             >

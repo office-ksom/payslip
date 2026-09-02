@@ -124,7 +124,7 @@ const UserManagement = (props) => {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>User Management</h1>
           <p style={{ color: 'var(--color-text-secondary)' }}>Control who can access the portal and what they can do.</p>
@@ -155,7 +155,7 @@ const UserManagement = (props) => {
           <h3 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>
             {users.some(u => u.email.toLowerCase() === newUser.email.toLowerCase()) ? 'Edit User Authorization' : 'Authorize New Email ID'}
           </h3>
-          <form onSubmit={handleAddUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <form onSubmit={handleAddUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Institute Email</label>
               <input 
@@ -211,7 +211,7 @@ const UserManagement = (props) => {
                 <option value="inactive">Inactive / Suspended</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', justifyContent: 'flex-end', gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', justifyContent: 'flex-end', gridColumn: '1 / -1' }}>
               <button type="submit" className="btn btn-primary" disabled={loading}>Save</button>
               <button type="button" className="btn btn-secondary" onClick={() => {
                 setShowAddForm(false);

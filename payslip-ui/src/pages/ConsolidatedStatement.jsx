@@ -1461,7 +1461,7 @@ const ConsolidatedStatement = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
         {['permanent', 'visiting', 'contract', 'daily_wage'].map((cat) => (
           <button 
             key={cat}
@@ -1476,7 +1476,8 @@ const ConsolidatedStatement = () => {
               cursor: 'pointer',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              outline: 'none'
+              outline: 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {cat === 'permanent' && 'Permanent Employees'}

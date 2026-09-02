@@ -53,10 +53,11 @@ const ResetPassword = () => {
 
   return (
     <div style={{
-      height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem',
       background: 'linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%)'
     }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
+      <div className="card" style={{ width: '100%', maxWidth: '420px', padding: 'clamp(1.5rem, 5vw, 2.5rem)' }}>
         <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>Reset Password</h1>
         
         {status && (

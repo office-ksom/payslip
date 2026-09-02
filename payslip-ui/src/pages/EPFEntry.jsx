@@ -312,14 +312,14 @@ const EPFEntry = (props) => {
   const totalAdminCharges = entries.reduce((sum, r) => sum + (r.admin_charges || 0), 0);
 
   return (
-    <div className="page-container">
+    <div>
       <div className="epf-main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.8rem', marginBottom: '0.25rem' }}>EPF Entry Management</h1>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Manage, recalculate, and lock EPF filings for employees.</p>
+          <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>EPF Entry Management</h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Manage, recalculate, and lock EPF filings for employees.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>Month & Year</span>
             <input
@@ -327,7 +327,7 @@ const EPFEntry = (props) => {
               value={monthYear}
               onChange={(e) => setMonthYear(e.target.value)}
               className="form-control"
-              style={{ width: '180px', padding: '0.5rem 0.75rem' }}
+              style={{ width: 'auto', padding: '0.5rem 0.75rem' }}
             />
           </div>
         </div>
@@ -343,7 +343,9 @@ const EPFEntry = (props) => {
             justifyContent: 'space-between',
             alignItems: 'center', 
             borderLeft: '4px solid var(--color-success)',
-            background: 'rgba(16, 185, 129, 0.05)'
+            background: 'rgba(16, 185, 129, 0.05)',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -385,7 +387,7 @@ const EPFEntry = (props) => {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', gap: '0.5rem' }}>
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
         <button
           onClick={() => setActiveTab('permanent')}
           style={{
@@ -396,7 +398,8 @@ const EPFEntry = (props) => {
             color: activeTab === 'permanent' ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
             fontWeight: 600,
             cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
+            transition: 'all var(--transition-fast)',
+            whiteSpace: 'nowrap'
           }}
         >
           Permanent Employees
@@ -411,7 +414,8 @@ const EPFEntry = (props) => {
             color: activeTab === 'daily_wage' ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
             fontWeight: 600,
             cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
+            transition: 'all var(--transition-fast)',
+            whiteSpace: 'nowrap'
           }}
         >
           Daily Wage Employees
@@ -578,7 +582,7 @@ const EPFEntry = (props) => {
             </table>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             <div>
               <button
                 onClick={() => setShowFullPreview(true)}
@@ -590,12 +594,12 @@ const EPFEntry = (props) => {
               </button>
             </div>
             
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
                 onClick={handleSave}
                 disabled={saving || isLocked}
                 className="btn btn-secondary"
-                style={{ minWidth: '150px' }}
+                style={{ minWidth: '140px' }}
               >
                 {saving ? (
                   <>
@@ -614,7 +618,7 @@ const EPFEntry = (props) => {
                 onClick={handleLock}
                 disabled={locking || isLocked}
                 className="btn btn-primary"
-                style={{ minWidth: '150px', backgroundColor: 'var(--color-success)', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)' }}
+                style={{ minWidth: '140px', backgroundColor: 'var(--color-success)', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)' }}
               >
                 {locking ? (
                   <>
@@ -640,15 +644,15 @@ const EPFEntry = (props) => {
           backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1000, 
           display: 'flex', justifyContent: 'center', alignItems: 'center'
         }}>
-          <div className="card" style={{ width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+          <div className="card" style={{ width: 'min(95vw, 600px)', maxHeight: '90vh', overflowY: 'auto', padding: 'clamp(1rem, 3vw, 1.5rem)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Data Entry: {modalEmp.name} ({modalEmp.emp_id})</h2>
               <button className="btn" style={{ padding: '0.3rem', background: 'transparent', border: 'none', cursor: 'pointer' }} onClick={() => setModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.75rem' }}>Employee ID</label>
                 <input type="text" value={modalEmp.emp_id} disabled className="form-control" />
@@ -743,12 +747,12 @@ const EPFEntry = (props) => {
           backgroundColor: 'var(--color-bg-primary)', zIndex: 2000, 
           padding: '2rem', overflowY: 'auto'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.5rem', margin: 0 }}>EPF Statement Summary - {formatMonthYear(monthYear)}</h2>
               <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Category: {activeTab === 'permanent' ? 'Permanent Employees' : 'Daily Wage Employees'}</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem' }}>
                 Print EPF Sheet
               </button>
@@ -759,7 +763,7 @@ const EPFEntry = (props) => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             <div className="card">
               <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total EE Contribution</span>
               <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>₹{totalEEContribution.toLocaleString('en-IN')}</h3>

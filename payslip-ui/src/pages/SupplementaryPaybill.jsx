@@ -576,7 +576,7 @@ const SupplementaryPaybill = (props) => {
   const isReadOnly = isApproved && (!isOverrideActive || user?.role !== 'super_admin');
 
   const renderCategoryTabs = () => (
-    <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+    <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
       {[
         { id: 'permanent', label: 'Permanent Staff' },
         { id: 'visiting', label: 'Visiting Faculty' },
@@ -594,7 +594,8 @@ const SupplementaryPaybill = (props) => {
             color: activeTab === tab.id ? 'var(--color-accent-primary)' : 'var(--color-text-secondary)',
             fontWeight: activeTab === tab.id ? 'bold' : 'normal',
             cursor: 'pointer',
-            marginBottom: '-1px'
+            marginBottom: '-1px',
+            whiteSpace: 'nowrap'
           }}
         >
           {tab.label}
@@ -740,14 +741,14 @@ const SupplementaryPaybill = (props) => {
         transition: 'all 0.3s ease'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {(user?.role === 'admin' || user?.role === 'super_admin') && activeTab === 'permanent' && (
               <button className="btn btn-secondary" onClick={applyCalculations} disabled={isReadOnly}>
                 <Calculator size={18} /> Auto Calculate DA & HRA
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <button 
                 type="button"
@@ -1283,8 +1284,8 @@ const SupplementaryPaybill = (props) => {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
           justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: 'min(95vw, 650px)', maxHeight: '90vh', overflowY: 'auto', padding: 'clamp(1rem, 3vw, 2rem)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{modalEmp.name} - Custom Breakdowns</h3>
                 <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>Enter custom items that roll up to other earnings or deductions.</p>
@@ -1294,7 +1295,7 @@ const SupplementaryPaybill = (props) => {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
               {/* Earnings Breakdown */}
               <div>
                 <h4 style={{ color: 'var(--color-success)', marginBottom: '1rem', fontWeight: 'bold' }}>Other Earnings (Total: ₹{Math.round(modalEmp.other_earnings)})</h4>
@@ -1322,8 +1323,13 @@ const SupplementaryPaybill = (props) => {
                       </button>
                     </div>
                   ))}
-                  <button className="btn btn-secondary btn-sm" onClick={() => addBreakdownItem('earnings')} style={{ marginTop: '0.5rem' }}>
-                    + Add Item
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm" 
+                    onClick={() => addBreakdownItem('earnings')}
+                    style={{ border: '1px dashed var(--color-success)', color: 'var(--color-success)', marginTop: '0.25rem' }}
+                  >
+                    + Add Earning Item
                   </button>
                 </div>
               </div>
@@ -1355,16 +1361,21 @@ const SupplementaryPaybill = (props) => {
                       </button>
                     </div>
                   ))}
-                  <button className="btn btn-secondary btn-sm" onClick={() => addBreakdownItem('deductions')} style={{ marginTop: '0.5rem' }}>
-                    + Add Item
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm" 
+                    onClick={() => addBreakdownItem('deductions')}
+                    style={{ border: '1px dashed var(--color-danger)', color: 'var(--color-danger)', marginTop: '0.25rem' }}
+                  >
+                    + Add Deduction Item
                   </button>
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem', gap: '0.75rem' }}>
               <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={commitModalSave}>Apply & Close</button>
+              <button className="btn btn-primary" onClick={commitModalSave}>Done</button>
             </div>
           </div>
         </div>
@@ -1380,12 +1391,12 @@ const SupplementaryPaybill = (props) => {
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
           backgroundColor: '#fff', zIndex: 9999, overflow: 'auto', padding: '2rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#000' }}>Supplementary Salary Verification Sheet</h1>
               <p style={{ margin: 0, color: '#333', fontWeight: 'bold' }}>Month: {formatMonthYear(monthYear)} | Status: {isApproved ? 'Approved & Locked' : isSubmitted ? 'Pending Approval' : 'Draft'}</p>
             </div>
-            <div className="no-print" style={{ display: 'flex', gap: '1rem' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem', border: '1px solid #ccc' }}>
                 Print Sheet
               </button>
