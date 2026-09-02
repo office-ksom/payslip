@@ -14,7 +14,7 @@ const getFinancialYear = (dateStr) => {
   }
 };
 
-const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -1010,7 +1010,7 @@ const SurrenderBill = (props) => {
                       </td>
                       <td>{bill.financial_year}</td>
                       <td style={{ fontWeight: 'bold', color: bill.is_approved === 3 ? '#ef4444' : (isPending ? '#d97706' : (bill.is_approved === 1 ? 'var(--color-success)' : 'inherit')) }}>
-                        ₹ {Math.round(bill.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₹ {(parseFloat(bill.total_amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td>
                         {bill.is_approved === 1 ? (
@@ -1144,7 +1144,7 @@ const SurrenderBill = (props) => {
                     <td style={{ textAlign: 'right' }}>₹ {fmt(bill.hra)}</td>
                     <td style={{ textAlign: 'center' }}>{bill.num_els} days {bill.is_terminal === 1 && '(Terminal)'}</td>
                     <td style={{ textAlign: 'center' }}>{bill.financial_year}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹ {Math.round(bill.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹ {(parseFloat(bill.total_amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style={{ textAlign: 'center' }}>
                       {bill.is_approved === 1 ? 'Approved' : bill.is_approved === 3 ? 'Rejected' : bill.is_approved === 2 ? 'Submitted' : 'Draft'}
                     </td>
@@ -1158,7 +1158,7 @@ const SurrenderBill = (props) => {
                   <td style={{ textAlign: 'right' }}>₹ {fmt(filteredBills.reduce((sum, b) => sum + (b.hra || 0), 0))}</td>
                   <td style={{ textAlign: 'center' }}>{filteredBills.reduce((sum, b) => sum + (b.num_els || 0), 0)} days</td>
                   <td></td>
-                  <td style={{ textAlign: 'right' }}>₹ {Math.round(filteredBills.reduce((sum, b) => sum + (b.total_amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ textAlign: 'right' }}>₹ {(parseFloat(filteredBills.reduce((sum, b) => sum + (b.total_amount || 0), 0)) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td></td>
                 </tr>
               </tbody>

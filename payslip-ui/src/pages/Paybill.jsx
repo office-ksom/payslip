@@ -1179,10 +1179,10 @@ const Paybill = (props) => {
                   )}
 
                   {employees.map(emp => {
-                    const da = Math.round((emp.da_state || 0) + (emp.da_ugc || 0));
-                    const hra = Math.round((emp.hra_state || 0) + (emp.hra_ugc || 0));
-                    const gross = Math.round((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0));
-                    const dedux = Math.round((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0));
+                    const da = (emp.da_state || 0) + (emp.da_ugc || 0);
+                    const hra = (emp.hra_state || 0) + (emp.hra_ugc || 0);
+                    const gross = (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0);
+                    const dedux = (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0);
                     const net = gross - dedux;
                     const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
@@ -1265,7 +1265,7 @@ const Paybill = (props) => {
                         <td>{inp('sli')}</td>
                         <td>{inp('gis')}</td>
                         <td>{inp('lic')}</td>
-                        <td>{emp.onam_advance ? inp('onam_advance') : (Math.round(emp.onam_advance||0)).toFixed(2)}</td>
+                        <td>{emp.onam_advance ? inp('onam_advance') : (parseFloat(emp.onam_advance||0)).toFixed(2)}</td>
                         <td>{inp('hra_recovery')}</td>
                         <td>{inp('other_deductions')}</td>
                         <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : (net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'))) }}>
@@ -1343,8 +1343,8 @@ const Paybill = (props) => {
                   )}
 
                   {employees.map(emp => {
-                    const gross = Math.round((emp.basic_pay || 0) + (emp.other_earnings || 0));
-                    const dedux = Math.round((emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0));
+                    const gross = (emp.basic_pay || 0) + (emp.other_earnings || 0);
+                    const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
                     const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
@@ -1485,8 +1485,8 @@ const Paybill = (props) => {
                   )}
 
                   {employees.map(emp => {
-                    const gross = Math.round((emp.total_wage || 0) + (emp.other_earnings || 0));
-                    const dedux = Math.round((emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0));
+                    const gross = (emp.total_wage || 0) + (emp.other_earnings || 0);
+                    const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
                     const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
@@ -1636,8 +1636,8 @@ const Paybill = (props) => {
                   )}
 
                   {employees.map(emp => {
-                    const gross = Math.round((emp.basic_pay || 0) + (emp.other_earnings || 0));
-                    const dedux = Math.round((emp.income_tax || 0) + (emp.hra || 0) + (emp.other_deductions || 0));
+                    const gross = (emp.basic_pay || 0) + (emp.other_earnings || 0);
+                    const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
                     const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
@@ -2167,15 +2167,15 @@ const Paybill = (props) => {
                           </td>
                           {earnCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000', fontWeight: c.isBold ? 'bold' : 'normal' }}>
-                              {Math.round(getVal(c)).toFixed(2)}
+                              {(Number(getVal(c)) || 0).toFixed(2)}
                             </td>
                           ))}
                           {deduxCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                              {Math.round(getVal(c)).toFixed(2)}
+                              {(Number(getVal(c)) || 0).toFixed(2)}
                             </td>
                           ))}
-                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{Math.round(net).toFixed(2)}</td>
+                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{(Number(net) || 0).toFixed(2)}</td>
                         </tr>
                       );
                     })}
@@ -2199,7 +2199,7 @@ const Paybill = (props) => {
                         }, 0);
                         return (
                           <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                            {Math.round(total).toFixed(2)}
+                            {(Number(total) || 0).toFixed(2)}
                           </td>
                         );
                       })}
@@ -2209,12 +2209,12 @@ const Paybill = (props) => {
                         }, 0);
                         return (
                           <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                            {Math.round(total).toFixed(2)}
+                            {(Number(total) || 0).toFixed(2)}
                           </td>
                         );
                       })}
                       <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
-                        ₹{Math.round(employees.reduce((sum, emp) => {
+                        ₹{(employees.reduce((sum, emp) => {
                           const da = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
                           const hra = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
                           const gross = activeTab === 'permanent'

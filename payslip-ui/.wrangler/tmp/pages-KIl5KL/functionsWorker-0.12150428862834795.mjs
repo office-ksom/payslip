@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-MMZaYp/checked-fetch.js
+// ../.wrangler/tmp/bundle-wNGL1E/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -951,7 +951,7 @@ async function onRequestGet14(context) {
     const userRole = context.request.headers.get("X-User-Role");
     const userEmail = context.request.headers.get("X-User-Email");
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order, e.epf_uan,
              'contract' as category,
              m.id as earnings_id, m.basic_pay, m.other_earnings, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.income_tax, d.hra, d.epf, d.other_deductions, d.other_deductions_breakdown
@@ -1083,7 +1083,7 @@ async function onRequestGet15(context) {
     const userRole = context.request.headers.get("X-User-Role");
     const userEmail = context.request.headers.get("X-User-Email");
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order, e.epf_uan,
              'daily_wage' as category,
              m.id as earnings_id, m.days_worked, m.daily_wage, m.total_wage, m.basic_pay, m.other_earnings, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.income_tax, d.hra, d.epf, d.other_deductions, d.other_deductions_breakdown
@@ -1935,14 +1935,14 @@ __name(onRequestGet21, "onRequestGet");
 async function onRequestPost17(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order, epf_uan } = data;
     const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
     const sOrder = typeof sort_order !== "undefined" ? Number(sort_order) : 0;
     const payVal = typeof pay !== "undefined" ? Number(pay) : 0;
     await context.env.ksom_payslip_db.prepare(
-      `INSERT INTO contract_employees (emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder).run();
+      `INSERT INTO contract_employees (emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order, epf_uan) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(emp_id, name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder, epf_uan || null).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -1955,16 +1955,16 @@ __name(onRequestPost17, "onRequestPost");
 async function onRequestPut(context) {
   try {
     const data = await context.request.json();
-    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order } = data;
+    const { emp_id, name, designation, date_of_birth, date_of_joining, pay_type, pay, email_id, mob_no, is_active, title, sort_order, epf_uan } = data;
     const activeVal = typeof is_active !== "undefined" ? Number(is_active) : 1;
     const sOrder = typeof sort_order !== "undefined" ? Number(sort_order) : 0;
     const payVal = typeof pay !== "undefined" ? Number(pay) : 0;
     await context.env.ksom_payslip_db.prepare(
       `UPDATE contract_employees 
        SET name = ?, designation = ?, date_of_birth = ?, date_of_joining = ?, 
-           pay_type = ?, pay = ?, email_id = ?, mob_no = ?, is_active = ?, title = ?, sort_order = ?
+           pay_type = ?, pay = ?, email_id = ?, mob_no = ?, is_active = ?, title = ?, sort_order = ?, epf_uan = ?
        WHERE emp_id = ?`
-    ).bind(name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder, emp_id).run();
+    ).bind(name, designation, date_of_birth, date_of_joining, pay_type, payVal, email_id || null, mob_no || null, activeVal, title || null, sOrder, epf_uan || null, emp_id).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -3201,7 +3201,7 @@ async function onRequestGet35(context) {
     const isPerm = tableName === "employees";
     const payColumn = isPerm ? "e.scale_of_pay" : "e.pay_type as scale_of_pay";
     const catColumn = isPerm ? "e.category" : `'${category}' as category`;
-    const uanColumn = isPerm ? "e.epf_uan" : "NULL as epf_uan";
+    const uanColumn = category === "visiting" ? "NULL as epf_uan" : "e.epf_uan";
     const joinEpfColumn = isPerm ? "m.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca" : "NULL as dp_gp, NULL as da_state, NULL as da_ugc, NULL as hra_state, NULL as hra_ugc, NULL as cca";
     const dailyWageCols = "m.days_worked, m.daily_wage, m.total_wage";
     let query = `
@@ -5328,7 +5328,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-MMZaYp/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-wNGL1E/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -5360,7 +5360,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-MMZaYp/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-wNGL1E/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

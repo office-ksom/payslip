@@ -971,18 +971,14 @@ const SupplementaryPaybill = (props) => {
 
                   const da = isPermanent ? ((parseFloat(emp.da_state) || 0) + (parseFloat(emp.da_ugc) || 0)) : 0;
                   const hra = isPermanent ? ((parseFloat(emp.hra_state) || 0) + (parseFloat(emp.hra_ugc) || 0)) : 0;
-                  const gross = Math.round(
-                    isPermanent 
-                      ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
-                      : isDailyWage
-                        ? ((emp.total_wage||0)+(emp.other_earnings||0))
-                        : ((emp.basic_pay||0)+(emp.other_earnings||0))
-                  );
-                  const dedux = Math.round(
-                    isPermanent
-                      ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
-                      : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
-                  );
+                  const gross = isPermanent 
+                    ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                    : isDailyWage
+                      ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                      : ((emp.basic_pay||0)+(emp.other_earnings||0));
+                  const dedux = isPermanent
+                    ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                    : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0));
                   const net = gross - dedux;
 
                   const inp = (field, type = 'number') => (
@@ -1065,7 +1061,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_earnings)})
+                            Details (₹{(Number(emp.other_earnings) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td>{inp('epf')}</td>
@@ -1083,7 +1079,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_deductions)})
+                            Details (₹{(Number(emp.other_deductions) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td style={{ fontWeight: 800, color: 'var(--color-success)' }}>
@@ -1137,7 +1133,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_earnings)})
+                            Details (₹{(Number(emp.other_earnings) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td style={{ fontWeight: 'bold' }}>
@@ -1151,7 +1147,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_deductions)})
+                            Details (₹{(Number(emp.other_deductions) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td style={{ fontWeight: 'bold' }}>
@@ -1226,7 +1222,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_earnings)})
+                            Details (₹{(Number(emp.other_earnings) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td style={{ fontWeight: 'bold' }}>
@@ -1240,7 +1236,7 @@ const SupplementaryPaybill = (props) => {
                             onClick={() => openModal(emp)}
                             style={{ padding: '0.2rem 0.5rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}
                           >
-                            Details (₹{Math.round(emp.other_deductions)})
+                            Details (₹{(Number(emp.other_deductions) || 0).toFixed(2)})
                           </button>
                         </td>
                         <td style={{ fontWeight: 'bold' }}>
@@ -1298,7 +1294,7 @@ const SupplementaryPaybill = (props) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
               {/* Earnings Breakdown */}
               <div>
-                <h4 style={{ color: 'var(--color-success)', marginBottom: '1rem', fontWeight: 'bold' }}>Other Earnings (Total: ₹{Math.round(modalEmp.other_earnings)})</h4>
+                <h4 style={{ color: 'var(--color-success)', marginBottom: '1rem', fontWeight: 'bold' }}>Other Earnings (Total: ₹{(Number(modalEmp.other_earnings) || 0).toFixed(2)})</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {(modalEmp.other_earnings_breakdown || []).map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1336,7 +1332,7 @@ const SupplementaryPaybill = (props) => {
 
               {/* Deductions Breakdown */}
               <div>
-                <h4 style={{ color: 'var(--color-danger)', marginBottom: '1rem', fontWeight: 'bold' }}>Other Deductions (Total: ₹{Math.round(modalEmp.other_deductions)})</h4>
+                <h4 style={{ color: 'var(--color-danger)', marginBottom: '1rem', fontWeight: 'bold' }}>Other Deductions (Total: ₹{(Number(modalEmp.other_deductions) || 0).toFixed(2)})</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {(modalEmp.other_deductions_breakdown || []).map((item, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -1514,18 +1510,14 @@ const SupplementaryPaybill = (props) => {
                     {employees.map((emp, idx) => {
                       const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
                       const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
-                      const gross = Math.round(
-                        isPermanent 
-                          ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
-                          : isDailyWage
-                            ? ((emp.total_wage||0)+(emp.other_earnings||0))
-                            : ((emp.basic_pay||0)+(emp.other_earnings||0))
-                      );
-                      const dedux = Math.round(
-                        isPermanent
-                          ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
-                          : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
-                      );
+                      const gross = isPermanent 
+                        ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                        : isDailyWage
+                          ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                          : ((emp.basic_pay||0)+(emp.other_earnings||0));
+                      const dedux = isPermanent
+                        ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                        : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0));
                       const net = gross - dedux;
                       
                       const getVal = (col) => {
@@ -1542,19 +1534,19 @@ const SupplementaryPaybill = (props) => {
                             {emp.title ? `${emp.title} ` : ''}{emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </td>
                           {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}
-                          {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', color: '#000' }}>{Math.round(emp.regular_basic).toFixed(2)}</td>}
+                          {isPermanent && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', color: '#000' }}>{(Number(emp.regular_basic) || 0).toFixed(2)}</td>}
                           {(!isPermanent && !isDailyWage) && <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', color: '#000' }}>{emp.num_days}</td>}
                           {earnCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000', fontWeight: c.isBold ? 'bold' : 'normal' }}>
-                              {Math.round(getVal(c)).toFixed(2)}
+                              {(Number(getVal(c)) || 0).toFixed(2)}
                             </td>
                           ))}
                           {deduxCols.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                              {Math.round(getVal(c)).toFixed(2)}
+                              {(Number(getVal(c)) || 0).toFixed(2)}
                             </td>
                           ))}
-                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{Math.round(net).toFixed(2)}</td>
+                          <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{(Number(net) || 0).toFixed(2)}</td>
                         </tr>
                       );
                     })}
@@ -1568,7 +1560,7 @@ const SupplementaryPaybill = (props) => {
                       )}
                       {isPermanent && (
                         <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
-                          {Math.round(employees.reduce((sum, emp) => sum + (emp.regular_basic || 0), 0)).toFixed(2)}
+                          {(Number(employees.reduce((sum, emp) => sum + (emp.regular_basic || 0), 0)) || 0).toFixed(2)}
                         </td>
                       )}
                       {(!isPermanent && !isDailyWage) && (
@@ -1580,13 +1572,11 @@ const SupplementaryPaybill = (props) => {
                         const total = employees.reduce((sum, emp) => {
                           const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
                           const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
-                          const gross = Math.round(
-                            isPermanent 
-                              ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
-                              : isDailyWage
-                                ? ((emp.total_wage||0)+(emp.other_earnings||0))
-                                : ((emp.basic_pay||0)+(emp.other_earnings||0))
-                          );
+                          const gross = isPermanent 
+                            ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                            : isDailyWage
+                              ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                              : ((emp.basic_pay||0)+(emp.other_earnings||0));
                           
                           if (c.key === 'da') return sum + da;
                           if (c.key === 'hra') return sum + hra;
@@ -1595,7 +1585,7 @@ const SupplementaryPaybill = (props) => {
                         }, 0);
                         return (
                           <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                            {Math.round(total).toFixed(2)}
+                            {(Number(total) || 0).toFixed(2)}
                           </td>
                         );
                       })}
@@ -1605,26 +1595,22 @@ const SupplementaryPaybill = (props) => {
                         }, 0);
                         return (
                           <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                            {Math.round(total).toFixed(2)}
+                            {(Number(total) || 0).toFixed(2)}
                           </td>
                         );
                       })}
                       <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
-                        ₹{Math.round(employees.reduce((sum, emp) => {
+                        ₹{(employees.reduce((sum, emp) => {
                           const da = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;
                           const hra = isPermanent ? ((emp.category === 'ugc/csir' || emp.category === 'ugc') ? (emp.hra_ugc || 0) : (emp.hra_state || 0)) : 0;
-                          const gross = Math.round(
-                            isPermanent 
-                              ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
-                              : isDailyWage
-                                ? ((emp.total_wage||0)+(emp.other_earnings||0))
-                                : ((emp.basic_pay||0)+(emp.other_earnings||0))
-                          );
-                          const dedux = Math.round(
-                            isPermanent
-                              ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
-                              : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0))
-                          );
+                          const gross = isPermanent 
+                            ? ((emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0))
+                            : isDailyWage
+                              ? ((emp.total_wage||0)+(emp.other_earnings||0))
+                              : ((emp.basic_pay||0)+(emp.other_earnings||0));
+                          const dedux = isPermanent
+                            ? ((emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0))
+                            : ((emp.epf||0)+(emp.income_tax||0)+(emp.other_deductions||0));
                           return sum + (gross - dedux);
                         }, 0)).toFixed(2)}
                       </td>

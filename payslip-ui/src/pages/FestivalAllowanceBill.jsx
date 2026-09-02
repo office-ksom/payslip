@@ -3,7 +3,7 @@ import { Save, ShieldCheck, Copy, Calendar, FileText, XCircle, Trash2, Search, X
 import { useOutletContext } from 'react-router-dom';
 
 
-const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;

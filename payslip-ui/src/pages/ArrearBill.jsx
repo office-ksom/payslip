@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
-const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
+const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -751,13 +751,13 @@ const ArrearBill = (props) => {
                     <td></td>
                     <td style={{ textAlign: 'right', paddingRight: '1rem' }}>TOTALS:</td>
                     <td style={{ textAlign: 'right', color: 'var(--color-text-primary)', padding: '1rem 0.5rem' }}>
-                      ₹ {Math.round(totalArrearsSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹ {(totalArrearsSum || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td style={{ textAlign: 'right', color: 'var(--color-danger)', padding: '1rem 0.5rem' }}>
-                      ₹ {Math.round(totalITSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹ {(totalITSum || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td style={{ color: 'var(--color-success)', padding: '1rem 1.5rem' }}>
-                      ₹ {Math.round(totalNetSum).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹ {(totalNetSum || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td></td>
                     <td></td>

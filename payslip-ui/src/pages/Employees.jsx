@@ -46,6 +46,7 @@ const emptyContractForm = {
   date_of_joining: '',
   mob_no: '',
   email_id: '',
+  epf_uan: '',
   is_active: 1
 };
 
@@ -61,6 +62,7 @@ const emptyDailyWageForm = {
   date_of_joining: '',
   mob_no: '',
   email_id: '',
+  epf_uan: '',
   is_active: 1
 };
 
@@ -153,6 +155,7 @@ const Employees = () => {
         date_of_joining: emp.date_of_joining || '',
         mob_no: emp.mob_no || '',
         email_id: emp.email_id || '',
+        epf_uan: emp.epf_uan || '',
         is_active: typeof emp.is_active !== 'undefined' ? emp.is_active : 1
       });
     }
@@ -560,14 +563,34 @@ const Employees = () => {
                     <input type="email" name="email_id" value={formData.email_id} onChange={handleInputChange}
                       className="form-control" placeholder="employee@example.com" />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Status</label>
-                    <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
-                      <option value={1}>Active</option>
-                      <option value={0}>Inactive</option>
-                    </select>
-                  </div>
+                  {activeTab !== 'visiting' ? (
+                    <div className="form-group">
+                      <label className="form-label">EPF UAN</label>
+                      <input type="text" name="epf_uan" value={formData.epf_uan} onChange={handleInputChange}
+                        className="form-control" placeholder="12-digit UAN" />
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label className="form-label">Status</label>
+                      <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
+                        <option value={1}>Active</option>
+                        <option value={0}>Inactive</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
+
+                {activeTab !== 'visiting' && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Status</label>
+                      <select name="is_active" value={formData.is_active} onChange={handleInputChange} className="form-control">
+                        <option value={1}>Active</option>
+                        <option value={0}>Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -613,6 +636,7 @@ const Employees = () => {
                     <th>Pay Scale</th>
                     <th>Mobile</th>
                     <th>Email</th>
+                    <th>EPF UAN</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 ) : (
@@ -624,6 +648,7 @@ const Employees = () => {
                     <th>Pay</th>
                     <th>Mobile</th>
                     <th>Email</th>
+                    {activeTab !== 'visiting' && <th>EPF UAN</th>}
                     <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
@@ -632,7 +657,7 @@ const Employees = () => {
               <tbody>
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={activeTab === 'permanent' ? "8" : "9"} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan={activeTab === 'permanent' ? "9" : (activeTab === 'visiting' ? "9" : "10")} style={{ textAlign: 'center', padding: '2rem' }}>
                       {employees.length === 0 ? 'No employees yet. Click "Add Employee" to get started.' : 'No matches found.'}
                     </td>
                   </tr>
@@ -677,6 +702,13 @@ const Employees = () => {
                       
                       <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.mob_no || '—'}</td>
                       <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.email_id || '—'}</td>
+                      
+                      {activeTab === 'permanent' && (
+                        <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.epf_uan || '—'}</td>
+                      )}
+                      {activeTab !== 'permanent' && activeTab !== 'visiting' && (
+                        <td style={{ color: emp.is_active === 0 ? 'inherit' : 'var(--color-text-secondary)' }}>{emp.epf_uan || '—'}</td>
+                      )}
                       
                       {activeTab !== 'permanent' && (
                         <td>
@@ -751,6 +783,7 @@ const Employees = () => {
                     <th>Pay</th>
                     <th>Mobile</th>
                     <th>Email</th>
+                    {activeTab !== 'visiting' && <th>EPF UAN</th>}
                     <th>Status</th>
                   </tr>
                 )}
@@ -779,7 +812,9 @@ const Employees = () => {
                         <td>{emp.epf_uan || '—'}</td>
                         <td>{emp.appointment_type || 'Permanent'}</td>
                       </>
-                    ) : null}
+                    ) : (
+                      activeTab !== 'visiting' ? <td>{emp.epf_uan || '—'}</td> : null
+                    )}
                     <td style={{ fontWeight: emp.is_active === 0 ? 'bold' : 'normal' }}>{emp.is_active ? 'Active' : 'Inactive'}</td>
                   </tr>
                 ))}

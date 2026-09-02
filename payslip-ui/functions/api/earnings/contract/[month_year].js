@@ -7,7 +7,7 @@ export async function onRequestGet(context) {
     const userEmail = context.request.headers.get('X-User-Email');
 
     let query = `
-      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order,
+      SELECT e.emp_id, e.name, e.designation, e.pay_type, e.pay, e.is_active, e.date_of_joining, e.email_id, e.date_of_birth, e.title, e.sort_order, e.epf_uan,
              'contract' as category,
              m.id as earnings_id, m.basic_pay, m.other_earnings, m.other_earnings_breakdown, m.is_approved, m.approved_on, m.approved_by,
              d.id as deductions_id, d.income_tax, d.hra, d.epf, d.other_deductions, d.other_deductions_breakdown

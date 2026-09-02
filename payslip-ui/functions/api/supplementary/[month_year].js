@@ -21,7 +21,7 @@ export async function onRequestGet(context) {
     const isPerm = tableName === 'employees';
     const payColumn = isPerm ? 'e.scale_of_pay' : 'e.pay_type as scale_of_pay';
     const catColumn = isPerm ? 'e.category' : `'${category}' as category`;
-    const uanColumn = isPerm ? 'e.epf_uan' : 'NULL as epf_uan';
+    const uanColumn = (category === 'visiting') ? 'NULL as epf_uan' : 'e.epf_uan';
     const joinEpfColumn = isPerm ? 'm.dp_gp, m.da_state, m.da_ugc, m.hra_state, m.hra_ugc, m.cca' : 'NULL as dp_gp, NULL as da_state, NULL as da_ugc, NULL as hra_state, NULL as hra_ugc, NULL as cca';
     const dailyWageCols = 'm.days_worked, m.daily_wage, m.total_wage';
 
