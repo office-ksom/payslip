@@ -314,22 +314,79 @@ const EPFEntry = (props) => {
   return (
     <div>
       <div className="epf-main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>EPF Entry Management</h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Manage, recalculate, and lock EPF filings for employees.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>Month & Year</span>
-            <input
-              type="month"
-              value={monthYear}
-              onChange={(e) => setMonthYear(e.target.value)}
-              className="form-control"
-              style={{ width: 'auto', padding: '0.5rem 0.75rem' }}
-            />
-          </div>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="month"
+            value={monthYear}
+            onChange={(e) => setMonthYear(e.target.value)}
+            className="form-control"
+            style={{ width: 'auto', padding: '0.5rem 0.75rem' }}
+          />
+          {entries.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowFullPreview(true)}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Eye size={18} />
+                Preview Full Sheet
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || isLocked}
+                className="btn btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    Save EPF Entries
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleLock}
+                disabled={locking || isLocked}
+                className="btn"
+                style={{
+                  backgroundColor: 'var(--color-success)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '0.6rem 1.2rem',
+                  fontWeight: 'bold',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: isLocked ? 'not-allowed' : 'pointer',
+                  opacity: isLocked ? 0.6 : 1
+                }}
+              >
+                {locking ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Locking...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={18} />
+                    Verify & Lock
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -581,59 +638,6 @@ const EPFEntry = (props) => {
               </tbody>
             </table>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-            <div>
-              <button
-                onClick={() => setShowFullPreview(true)}
-                className="btn btn-secondary"
-                style={{ display: 'inline-flex', gap: '0.5rem' }}
-              >
-                <Eye size={16} />
-                Preview Full Sheet
-              </button>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={handleSave}
-                disabled={saving || isLocked}
-                className="btn btn-secondary"
-                style={{ minWidth: '140px' }}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="animate-spin" size={16} />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    Save EPF Entries
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={handleLock}
-                disabled={locking || isLocked}
-                className="btn btn-primary"
-                style={{ minWidth: '140px', backgroundColor: 'var(--color-success)', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)' }}
-              >
-                {locking ? (
-                  <>
-                    <Loader2 className="animate-spin" size={16} />
-                    Locking...
-                  </>
-                ) : (
-                  <>
-                    <Lock size={16} />
-                    Verify & Lock
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
         </>
       )}
 
@@ -706,11 +710,11 @@ const EPFEntry = (props) => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>EPF Employee Contribution</label>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>EE Contribution (12%)</label>
                 <input type="text" value={`₹${modalEmp.employee_contribution?.toLocaleString('en-IN')}`} disabled className="form-control" />
               </div>
               <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>EPF Employer Contribution</label>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>ER Contribution (12%)</label>
                 <input 
                   type="number" 
                   value={modalEmp.employer_contribution || 0} 
@@ -719,8 +723,8 @@ const EPFEntry = (props) => {
                   className="form-control" 
                 />
               </div>
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>Administrative Charges</label>
+              <div className="form-group">
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Admin Charges (0.5%)</label>
                 <input 
                   type="number" 
                   value={modalEmp.admin_charges || 0} 
@@ -731,9 +735,10 @@ const EPFEntry = (props) => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-              <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveModalData} disabled={isLocked}>OK</button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -743,46 +748,70 @@ const EPFEntry = (props) => {
       {/* Full Sheet Preview Overlay */}
       {showFullPreview && (
         <div className="epf-preview-overlay" style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
-          backgroundColor: 'var(--color-bg-primary)', zIndex: 2000, 
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+          backgroundColor: '#fff', color: '#000', zIndex: 9999, 
           padding: '2rem', overflowY: 'auto'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '2px solid #333', paddingBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.5rem', margin: 0 }}>EPF Statement Summary - {formatMonthYear(monthYear)}</h2>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Category: {activeTab === 'permanent' ? 'Permanent Employees' : 'Daily Wage Employees'}</p>
+              <h2 style={{ fontSize: '1.5rem', margin: 0, color: '#000' }}>EPF Statement Summary - {formatMonthYear(monthYear)}</h2>
+              <p style={{ color: '#333', fontSize: '0.9rem', margin: '0.25rem 0 0 0', fontWeight: 'bold' }}>Category: {activeTab === 'permanent' ? 'Permanent Employees' : 'Daily Wage Employees'}</p>
             </div>
             <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => window.print()} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem', 
+                  backgroundColor: '#fff', 
+                  color: '#000', 
+                  border: '1px solid #000',
+                  fontWeight: 600
+                }}
+              >
                 Print EPF Sheet
               </button>
-              <button className="btn btn-primary" onClick={() => setShowFullPreview(false)} style={{ backgroundColor: '#000', color: '#fff', display: 'flex', gap: '0.5rem' }}>
-                <X size={16} />
+              <button 
+                className="btn btn-primary" 
+                onClick={() => setShowFullPreview(false)} 
+                style={{ 
+                  backgroundColor: '#000', 
+                  color: '#fff', 
+                  border: '1px solid #000', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  fontWeight: 600
+                }}
+              >
+                <X size={18} />
                 Close Preview
               </button>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-            <div className="card">
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total EE Contribution</span>
-              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>₹{totalEEContribution.toLocaleString('en-IN')}</h3>
+            <div className="card" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#000' }}>
+              <span style={{ fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', fontWeight: 600 }}>Total EE Contribution</span>
+              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem', color: '#000' }}>₹{totalEEContribution.toLocaleString('en-IN')}</h3>
             </div>
-            <div className="card">
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total ER Contribution</span>
-              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>₹{totalERContribution.toLocaleString('en-IN')}</h3>
+            <div className="card" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#000' }}>
+              <span style={{ fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', fontWeight: 600 }}>Total ER Contribution</span>
+              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem', color: '#000' }}>₹{totalERContribution.toLocaleString('en-IN')}</h3>
             </div>
-            <div className="card">
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total EDLI</span>
-              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>₹{totalEDLI.toLocaleString('en-IN')}</h3>
+            <div className="card" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#000' }}>
+              <span style={{ fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', fontWeight: 600 }}>Total EDLI</span>
+              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem', color: '#000' }}>₹{totalEDLI.toLocaleString('en-IN')}</h3>
             </div>
-            <div className="card">
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total Admin Charges</span>
-              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>₹{totalAdminCharges.toLocaleString('en-IN')}</h3>
+            <div className="card" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#000' }}>
+              <span style={{ fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', fontWeight: 600 }}>Total Admin Charges</span>
+              <h3 style={{ fontSize: '1.5rem', marginTop: '0.25rem', color: '#000' }}>₹{totalAdminCharges.toLocaleString('en-IN')}</h3>
             </div>
           </div>
 
-          <div className="table-container">
+          <div className="table-container" style={{ backgroundColor: '#fff', width: '100%' }}>
             <table className="table">
               <thead>
                 <tr>
@@ -800,9 +829,9 @@ const EPFEntry = (props) => {
               </thead>
               <tbody>
                 {entries.map((row) => (
-                  <tr key={row.emp_id} className={row.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: row.is_active === 0 ? '#fff7ed' : '' }}>
-                    <td style={{ padding: '0.75rem 1rem' }}>{row.emp_id}</td>
-                    <td style={{ color: row.is_active === 0 ? '#c2410c' : 'inherit' }}>{row.name}{row.is_active === 0 ? ' [Inactive]' : ''}</td>
+                  <tr key={row.emp_id} className={row.is_active === 0 ? 'inactive-row' : ''} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: row.is_active === 0 ? '#fff7ed' : '#fff' }}>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{row.emp_id}</td>
+                    <td style={{ color: row.is_active === 0 ? '#c2410c' : '#000' }}>{row.name}{row.is_active === 0 ? ' [Inactive]' : ''}</td>
                     <td>{row.uan || 'N/A'}</td>
                     <td style={{ textAlign: 'right' }}>₹{row.wages?.toLocaleString('en-IN')}</td>
                     <td style={{ textAlign: 'right' }}>₹{row.epf_wage?.toLocaleString('en-IN')}</td>
@@ -813,7 +842,7 @@ const EPFEntry = (props) => {
                     <td style={{ textAlign: 'right' }}>₹{row.admin_charges?.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
-                <tr style={{ background: 'rgba(255, 255, 255, 0.05)', fontWeight: 'bold' }}>
+                <tr style={{ background: '#f1f5f9', fontWeight: 'bold' }}>
                   <td colSpan="3" style={{ padding: '1rem' }}>Total</td>
                   <td style={{ textAlign: 'right' }}>₹{totalWages.toLocaleString('en-IN')}</td>
                   <td style={{ textAlign: 'right' }}>₹{totalEPFWages.toLocaleString('en-IN')}</td>
