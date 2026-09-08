@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X } from 'lucide-react';
+import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X, Unlock } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X, Edit } from 'lucide-react';
+import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X, Edit, Unlock } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 const getFinancialYear = (dateStr) => {
@@ -522,7 +522,9 @@ const SurrenderBill = (props) => {
     }
   };
 
-  const employeesListToUse = isTerminal ? employees : activeEmployees;
+  const employeesListToUse = (isTerminal || (selectedEmpId && employees.some(e => e.emp_id === selectedEmpId && e.is_active === 0))) 
+    ? employees 
+    : [...activeEmployees, ...employees.filter(e => e.is_active === 0 && existingBills.some(b => b.emp_id === e.emp_id))];
   const filteredEmployees = employeesListToUse.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.emp_id.toLowerCase().includes(searchTerm.toLowerCase())
