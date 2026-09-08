@@ -1,4 +1,5 @@
 import { logActivity } from '../../lib/logger.js';
+import { hasAdminConsent } from '../../lib/consent_helper.js';
 
 export async function onRequestGet(context) {
   try {
@@ -69,8 +70,9 @@ export async function onRequestPost(context) {
 
     // Check if month is approved
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== 'super_admin') {
-      return new Response(JSON.stringify({ error: 'This month is approved and locked. Only super_admin can modify it.' }), { status: 403 });
+    const consentGranted = await hasAdminConsent(db, 'supplementary', monthYear);
+    if (approvalCheck && userRole !== 'super_admin' && !consentGranted) {
+      return new Response(JSON.stringify({ error: 'This month is approved and locked. Super Admin consent is required to modify it.' }), { status: 403 });
     }
 
     const statements = [];
@@ -197,8 +199,9 @@ export async function onRequestDelete(context) {
 
     // Check if month is approved
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== 'super_admin') {
-      return new Response(JSON.stringify({ error: 'This month is approved and locked. Only super_admin can modify it.' }), { status: 403 });
+    const consentGranted = await hasAdminConsent(db, 'supplementary', monthYear);
+    if (approvalCheck && userRole !== 'super_admin' && !consentGranted) {
+      return new Response(JSON.stringify({ error: 'This month is approved and locked. Super Admin consent is required to modify it.' }), { status: 403 });
     }
 
     // Delete from supplementary_earnings and supplementary_deductions

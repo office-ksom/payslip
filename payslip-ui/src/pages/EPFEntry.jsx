@@ -37,6 +37,9 @@ const EPFEntry = (props) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [locking, setLocking] = useState(false);
+  const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [togglingConsent, setTogglingConsent] = useState(false);
+  const [requestingConsent, setRequestingConsent] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Modal State
@@ -66,6 +69,19 @@ const EPFEntry = (props) => {
         return (a.name || '').localeCompare(b.name || '');
       });
       setEntries(sorted);
+
+      // Check Super Admin consent
+      try {
+        const consentRes = await fetch(`/api/edit-consent?module=epf&period_key=${targetMonth}`);
+        if (consentRes.ok) {
+          const consentData = await consentRes.json();
+          setAdminConsentActive(consentData.has_consent === true);
+        } else {
+          setAdminConsentActive(false);
+        }
+      } catch (ce) {
+        setAdminConsentActive(false);
+      }
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: err.message });
@@ -92,8 +108,9 @@ const EPFEntry = (props) => {
 
   const isSuperAdmin = user?.role === 'super_admin';
 
-  // Determine lock state from records (if any record is locked, the whole tab is locked)
-  const isLocked = entries.length > 0 && entries[0].is_approved === 1;
+  // Determine lock state from records (if any record is locked, the whole tab is locked unless consent granted)
+  const isApprovedRecord = entries.length > 0 && entries[0].is_approved === 1;
+  const isLocked = isApprovedRecord && !adminConsentActive;
   const lockedBy = entries.length > 0 ? entries[0].approved_by : '';
   const lockedOn = entries.length > 0 ? entries[0].approved_on : '';
 
@@ -302,6 +319,59 @@ const EPFEntry = (props) => {
     }
   };
 
+  const handleToggleConsent = async () => {
+    if (!isSuperAdmin) return;
+    setTogglingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'epf',
+          period_key: monthYear,
+          action: adminConsentActive ? 'revoke' : 'grant'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminConsentActive(!adminConsentActive);
+        alert(adminConsentActive ? 'Edit consent revoked from Admin.' : 'Edit consent successfully granted to Admin! Admins can now edit locked entries.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to update consent.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setTogglingConsent(false);
+    }
+  };
+
+  const handleRequestConsent = async () => {
+    setRequestingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'epf',
+          period_key: monthYear,
+          action: 'request',
+          notes: `Admin requested edit permission for EPF Entries (${monthYear})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Edit permission request submitted to Super Admin.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to submit request.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setRequestingConsent(false);
+    }
+  };
+
   // Calculate totals
   const totalWages = entries.reduce((sum, r) => sum + (r.wages || 0), 0);
   const totalEPFWages = entries.reduce((sum, r) => sum + (r.epf_wage || 0), 0);
@@ -357,7 +427,7 @@ const EPFEntry = (props) => {
               </button>
               <button
                 onClick={handleLock}
-                disabled={locking || isLocked}
+                disabled={locking || isApprovedRecord}
                 className="btn"
                 style={{
                   backgroundColor: 'var(--color-success)',
@@ -369,8 +439,8 @@ const EPFEntry = (props) => {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  cursor: isLocked ? 'not-allowed' : 'pointer',
-                  opacity: isLocked ? 0.6 : 1
+                  cursor: isApprovedRecord ? 'not-allowed' : 'pointer',
+                  opacity: isApprovedRecord ? 0.6 : 1
                 }}
               >
                 {locking ? (
@@ -390,7 +460,7 @@ const EPFEntry = (props) => {
         </div>
       </div>
 
-      {isLocked && (
+      {isApprovedRecord && (
         <div 
           className="card" 
           style={{ 
@@ -412,12 +482,66 @@ const EPFEntry = (props) => {
               <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Locked by {lockedBy} on {formatDate(lockedOn)}</span>
             </div>
           </div>
-          {isSuperAdmin && (
-            <button className="btn btn-secondary" onClick={handleUnlock} disabled={locking} style={{ display: 'flex', gap: '0.5rem' }}>
-              <Unlock size={14} />
-              Unlock Sheet
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isSuperAdmin && (
+              <>
+                <button className="btn btn-secondary" onClick={handleUnlock} disabled={locking} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Unlock size={14} />
+                  Unlock Sheet
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={handleToggleConsent}
+                  disabled={togglingConsent}
+                  style={{
+                    backgroundColor: adminConsentActive ? '#d97706' : '#10b981',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {togglingConsent ? 'Updating...' : (adminConsentActive ? 'Revoke Admin Edit Consent' : 'Grant Edit Consent to Admin')}
+                </button>
+              </>
+            )}
+            {user?.role === 'admin' && (
+              adminConsentActive ? (
+                <span style={{ 
+                  display: 'inline-block', 
+                  padding: '4px 10px', 
+                  backgroundColor: '#10b981', 
+                  color: '#fff', 
+                  borderRadius: '4px', 
+                  fontSize: '0.8rem', 
+                  fontWeight: 600 
+                }}>
+                  ✓ Super Admin Consent Granted: You can edit and save records
+                </span>
+              ) : (
+                <button
+                  className="btn btn-sm"
+                  onClick={handleRequestConsent}
+                  disabled={requestingConsent}
+                  style={{
+                    backgroundColor: '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {requestingConsent ? 'Requesting...' : 'Request Edit Permission from Super Admin'}
+                </button>
+              )
+            )}
+          </div>
         </div>
       )}
 

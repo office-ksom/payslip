@@ -46,6 +46,9 @@ const FestivalAllowanceBill = (props) => {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [isOverrideActive, setIsOverrideActive] = useState(false);
+  const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [togglingConsent, setTogglingConsent] = useState(false);
+  const [requestingConsent, setRequestingConsent] = useState(false);
 
   // Checked employees for bulk actions
   const [selectedEmps, setSelectedEmps] = useState(new Set());
@@ -105,6 +108,19 @@ const FestivalAllowanceBill = (props) => {
         setIsApproved(false);
         setApprovalInfo(null);
       }
+
+      // Check Super Admin consent
+      try {
+        const consentRes = await fetch(`/api/edit-consent?module=festival&period_key=${targetMonth}`);
+        if (consentRes.ok) {
+          const consentData = await consentRes.json();
+          setAdminConsentActive(consentData.has_consent === true);
+        } else {
+          setAdminConsentActive(false);
+        }
+      } catch (ce) {
+        setAdminConsentActive(false);
+      }
     } catch (e) {
       console.error(e);
       alert("Failed to load festival allowance bills.");
@@ -113,11 +129,65 @@ const FestivalAllowanceBill = (props) => {
     }
   };
 
-  const handleDelete = async (empId, date) => {
+  const handleToggleConsent = async () => {
+    if (user?.role !== 'super_admin') return;
+    setTogglingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'festival',
+          period_key: monthYear,
+          action: adminConsentActive ? 'revoke' : 'grant'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminConsentActive(!adminConsentActive);
+        alert(adminConsentActive ? 'Edit consent revoked from Admin.' : 'Edit consent successfully granted to Admin! Admins can now edit locked entries.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to update consent.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setTogglingConsent(false);
+    }
+  };
+
+  const handleRequestConsent = async () => {
+    setRequestingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'festival',
+          period_key: monthYear,
+          action: 'request',
+          notes: `Admin requested edit permission for Festival Allowance (${monthYear})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Edit permission request submitted to Super Admin.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to submit request.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setRequestingConsent(false);
+    }
+  };
+
+  const handleDelete = async (empId, date, billId) => {
     if (!window.confirm("Are you sure you want to delete this festival allowance bill?")) return;
     try {
       const payload = {
         records: [{
+          bill_id: billId || undefined,
           emp_id: empId,
           bill_date: date,
           amount: 0 // setting to 0 triggers deletion in backend
@@ -195,6 +265,7 @@ const FestivalAllowanceBill = (props) => {
 
   const handleSave = async () => {
     const validRecords = employees.map(emp => ({
+      bill_id: emp.bill_id || undefined,
       emp_id: emp.emp_id,
       amount: emp.amount,
       bill_date: emp.bill_date || bulkDate,
@@ -348,41 +419,91 @@ const FestivalAllowanceBill = (props) => {
       {hasApprovedBills && (
         <div style={{ 
           marginBottom: '2rem', padding: '1.5rem', borderRadius: '12px', 
-          backgroundColor: user?.role === 'approver' ? '#fef9c3' : 'rgba(16, 185, 129, 0.1)', 
-          border: user?.role === 'approver' ? '1px solid #fde047' : '1px solid rgba(16, 185, 129, 0.2)',
-          display: 'flex', alignItems: 'center', gap: '1rem'
+          backgroundColor: adminConsentActive ? '#f0fdf4' : (user?.role === 'approver' ? '#fef9c3' : 'rgba(16, 185, 129, 0.1)'), 
+          border: adminConsentActive ? '1px solid #86efac' : (user?.role === 'approver' ? '1px solid #fde047' : '1px solid rgba(16, 185, 129, 0.2)'),
+          display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap'
         }}>
-          <ShieldCheck size={32} style={{ color: user?.role === 'approver' ? '#a16207' : 'var(--color-success)' }} />
-          <div>
-            <h3 style={{ fontSize: '1.1rem', color: user?.role === 'approver' ? '#713f12' : 'var(--color-success)', margin: 0 }}>
-              {approvedCount === totalCount ? 'ALL ALLOWANCES VERIFIED & SEALED' : 'SOME ALLOWANCES VERIFIED & SEALED'}
+          <ShieldCheck size={32} style={{ color: adminConsentActive ? '#16a34a' : (user?.role === 'approver' ? '#a16207' : 'var(--color-success)') }} />
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <h3 style={{ fontSize: '1.1rem', color: adminConsentActive ? '#15803d' : (user?.role === 'approver' ? '#713f12' : 'var(--color-success)'), margin: 0 }}>
+              {adminConsentActive ? 'EDIT CONSENT ACTIVE (SUPER ADMIN GRANTED)' : (approvedCount === totalCount ? 'ALL ALLOWANCES VERIFIED & SEALED' : 'SOME ALLOWANCES VERIFIED & SEALED')}
             </h3>
-            <p style={{ fontSize: '0.875rem', color: user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)', margin: '0.25rem 0 0 0' }}>
+            <p style={{ fontSize: '0.875rem', color: adminConsentActive ? '#166534' : (user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)'), margin: '0.25rem 0 0 0' }}>
               <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> active festival allowance bills in {formatMonthYear(monthYear)} are verified and locked.
-              {user?.role === 'super_admin' && (
-                <div style={{ marginTop: '0.75rem' }}>
-                  <button 
-                    className="btn btn-sm" 
-                    onClick={() => setIsOverrideActive(!isOverrideActive)}
-                    style={{ 
-                      backgroundColor: isOverrideActive ? '#ef4444' : '#3b82f6', 
-                      color: '#fff',
-                      border: 'none',
-                      padding: '6px 14px',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    {isOverrideActive ? 'Lock Month' : 'Unlock Month for Editing'}
-                  </button>
-                </div>
+              {adminConsentActive && (
+                <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600, color: '#15803d' }}>
+                  ✓ Super Admin has granted consent. Admins can now edit dates, amounts & descriptions directly.
+                </span>
               )}
             </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {user?.role === 'super_admin' && (
+              <>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={handleToggleConsent}
+                  disabled={togglingConsent}
+                  style={{ 
+                    backgroundColor: adminConsentActive ? '#ea580c' : '#16a34a', 
+                    color: '#fff',
+                    border: 'none',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Unlock size={14} />
+                  {adminConsentActive ? 'Revoke Admin Consent' : 'Grant Edit Consent to Admin'}
+                </button>
+                <button 
+                  className="btn btn-sm" 
+                  onClick={() => setIsOverrideActive(!isOverrideActive)}
+                  style={{ 
+                    backgroundColor: isOverrideActive ? '#ef4444' : '#3b82f6', 
+                    color: '#fff',
+                    border: 'none',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {isOverrideActive ? 'Lock Month' : 'Unlock for Super Admin'}
+                </button>
+              </>
+            )}
+            {user?.role === 'admin' && !adminConsentActive && (
+              <button 
+                className="btn btn-sm" 
+                onClick={handleRequestConsent}
+                disabled={requestingConsent}
+                style={{ 
+                  backgroundColor: '#3b82f6', 
+                  color: '#fff',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                Request Edit Permission from Super Admin
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -530,7 +651,8 @@ const FestivalAllowanceBill = (props) => {
                 )}
                 {filteredEmployees.map(emp => {
                   const isRowApproved = emp.is_approved === 1;
-                  const isRowLocked = isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive);
+                  const isAllowedByConsent = adminConsentActive && (user?.role === 'admin' || user?.role === 'super_admin');
+                  const isRowLocked = isRowApproved && !isAllowedByConsent && (user?.role !== 'super_admin' || !isOverrideActive);
                   const isRowEditable = !isRowLocked && user?.role !== 'approver';
                   const rowBg = emp.is_active === 0 ? 'rgba(249, 115, 22, 0.08)' : (selectedEmps.has(emp.emp_id) ? 'rgba(59, 130, 246, 0.03)' : 'transparent');
                   const rowColor = emp.is_active === 0 ? '#fb923c' : (emp.is_approved === 3 ? '#ef4444' : (emp.is_approved === 2 ? '#d97706' : 'inherit'));
@@ -544,7 +666,7 @@ const FestivalAllowanceBill = (props) => {
                           type="checkbox" 
                           checked={selectedEmps.has(emp.emp_id) || isRowApproved}
                           onChange={() => handleToggleSelect(emp.emp_id)}
-                          disabled={(isRowApproved && (user?.role !== 'super_admin' || !isOverrideActive)) || saving || approving}
+                          disabled={(isRowApproved && !isAllowedByConsent && (user?.role !== 'super_admin' || !isOverrideActive)) || saving || approving}
                         />
                       </td>
                       <td>
@@ -647,7 +769,7 @@ const FestivalAllowanceBill = (props) => {
                           {emp.has_saved_bill && !isRowLocked && (
                             <button 
                               className="btn btn-danger" 
-                              onClick={() => handleDelete(emp.emp_id, emp.bill_date)}
+                              onClick={() => handleDelete(emp.emp_id, emp.bill_date, emp.bill_id)}
                               style={{ padding: '0.3rem 0.5rem', borderRadius: '4px' }}
                               title="Delete Bill"
                             >

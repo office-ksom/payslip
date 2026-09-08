@@ -1,4 +1,5 @@
 import { logActivity } from '../../lib/logger.js';
+import { hasAdminConsent } from '../../lib/consent_helper.js';
 
 export async function onRequestGet(context) {
   try {
@@ -66,14 +67,16 @@ export async function onRequestPost(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
 
+    const consentGranted = await hasAdminConsent(db, 'surrender', monthYear);
+
     // Check if any of the records being updated/deleted are already approved
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM surrender_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear).first('is_approved');
 
-      if (isApprovedRecord === 1 && userRole !== 'super_admin') {
-        return new Response(JSON.stringify({ error: `Record for employee ${record.emp_id} is approved and locked. Only super_admin can modify it.` }), { status: 403 });
+      if (isApprovedRecord === 1 && userRole !== 'super_admin' && !consentGranted) {
+        return new Response(JSON.stringify({ error: `Record for employee ${record.emp_id} is approved and locked. Super Admin consent is required to modify it.` }), { status: 403 });
       }
     }
 
@@ -87,39 +90,61 @@ export async function onRequestPost(context) {
           return new Response(JSON.stringify({ error: `Maximum ${maxEls} Earned Leaves can be surrendered.` }), { status: 400 });
         }
 
-        statements.push(
-          db.prepare(`
-            INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved, is_terminal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, ?)
-            ON CONFLICT(emp_id, bill_date) DO UPDATE SET
-              financial_year = excluded.financial_year,
-              basic_pay = excluded.basic_pay,
-              da = excluded.da,
-              hra = excluded.hra,
-              num_els = excluded.num_els,
-              total_amount = excluded.total_amount,
-              is_approved = 2,
-              is_terminal = excluded.is_terminal
-          `).bind(
-            record.emp_id,
-            record.bill_date,
-            record.financial_year,
-            record.basic_pay || 0,
-            record.da || 0,
-            record.hra || 0,
-            record.num_els,
-            record.total_amount || 0,
-            record.is_terminal ? 1 : 0
-          )
-        );
-      } else {
-        // If leaves set to 0, delete the record if it exists for this employee on this bill_date
-        if (record.bill_date) {
+        if (record.bill_id) {
+          // If bill_id exists, update the specific record by ID so changing bill_date or other fields updates accurately
           statements.push(
             db.prepare(`
-              DELETE FROM surrender_bills 
-              WHERE emp_id = ? AND bill_date = ?
-            `).bind(record.emp_id, record.bill_date)
+              UPDATE surrender_bills 
+              SET bill_date = ?, financial_year = ?, basic_pay = ?, da = ?, hra = ?, num_els = ?, total_amount = ?, is_terminal = ?
+              WHERE id = ?
+            `).bind(
+              record.bill_date,
+              record.financial_year,
+              record.basic_pay || 0,
+              record.da || 0,
+              record.hra || 0,
+              record.num_els,
+              record.total_amount || 0,
+              record.is_terminal ? 1 : 0,
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved, is_terminal)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, ?)
+              ON CONFLICT(emp_id, bill_date) DO UPDATE SET
+                financial_year = excluded.financial_year,
+                basic_pay = excluded.basic_pay,
+                da = excluded.da,
+                hra = excluded.hra,
+                num_els = excluded.num_els,
+                total_amount = excluded.total_amount,
+                is_approved = 2,
+                is_terminal = excluded.is_terminal
+            `).bind(
+              record.emp_id,
+              record.bill_date,
+              record.financial_year,
+              record.basic_pay || 0,
+              record.da || 0,
+              record.hra || 0,
+              record.num_els,
+              record.total_amount || 0,
+              record.is_terminal ? 1 : 0
+            )
+          );
+        }
+      } else {
+        // If leaves set to 0, delete the record
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM surrender_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date) {
+          statements.push(
+            db.prepare("DELETE FROM surrender_bills WHERE emp_id = ? AND bill_date = ?").bind(record.emp_id, record.bill_date)
           );
         }
       }
@@ -129,9 +154,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.num_els && record.num_els > 0) {
-          await logActivity(db, userEmail, 'Save Surrender Bill', `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
-        } else if (record.bill_date) {
-          await logActivity(db, userEmail, 'Delete Surrender Bill', `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Save Surrender Bill', `Saved/Updated surrender bill for employee ${record.emp_id} with date ${record.bill_date} (${record.num_els} ELs)`);
+        } else if (record.bill_date || record.bill_id) {
+          await logActivity(db, userEmail, 'Delete Surrender Bill', `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date || 'N/A'}`);
         }
       }
     }

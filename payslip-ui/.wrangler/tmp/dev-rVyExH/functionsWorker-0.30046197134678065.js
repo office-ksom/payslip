@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-mSyBBF/checked-fetch.js
+// .wrangler/tmp/bundle-6iTS9Z/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-KIl5KL/functionsWorker-0.12150428862834795.mjs
+// .wrangler/tmp/pages-tdSd0E/functionsWorker-0.30046197134678065.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -361,7 +361,7 @@ async function onRequestGet6(context) {
 }
 __name(onRequestGet6, "onRequestGet6");
 __name2(onRequestGet6, "onRequestGet");
-async function logActivity2(db, userEmail, action, description) {
+async function logActivity(db, userEmail, action, description) {
   const now = /* @__PURE__ */ new Date();
   const istOffset = 5.5 * 60 * 60 * 1e3;
   const istDate = new Date(now.getTime() + istOffset);
@@ -383,8 +383,8 @@ async function logActivity2(db, userEmail, action, description) {
     }
   }
 }
-__name(logActivity2, "logActivity2");
-__name2(logActivity2, "logActivity");
+__name(logActivity, "logActivity");
+__name2(logActivity, "logActivity");
 async function onRequestPost(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
@@ -430,7 +430,7 @@ async function onRequestPost(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    await logActivity2(db, userEmail, "Contract Paybill Action", `${actionMap[action] || action} contract paybill for ${monthYear}`);
+    await logActivity(db, userEmail, "Contract Paybill Action", `${actionMap[action] || action} contract paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -510,7 +510,7 @@ async function onRequestPost2(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    await logActivity2(db, userEmail, "Daily Wage Paybill Action", `${actionMap[action] || action} daily wage paybill for ${monthYear}`);
+    await logActivity(db, userEmail, "Daily Wage Paybill Action", `${actionMap[action] || action} daily wage paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -590,7 +590,7 @@ async function onRequestPost3(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    await logActivity2(db, userEmail, "Visiting Paybill Action", `${actionMap[action] || action} visiting paybill for ${monthYear}`);
+    await logActivity(db, userEmail, "Visiting Paybill Action", `${actionMap[action] || action} visiting paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -695,7 +695,7 @@ async function onRequestPost4(context) {
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
     const typeText = arrearType ? ` (${arrearType})` : "";
     const catText = category ? ` for ${category}` : "";
-    await logActivity2(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText}${catText} for ${monthYear}`);
+    await logActivity(db, userEmail, "Arrear Bill Action", `${actionText} arrear bill(s)${typeText}${catText} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -737,6 +737,75 @@ async function onRequestGet10(context) {
 }
 __name(onRequestGet10, "onRequestGet10");
 __name2(onRequestGet10, "onRequestGet");
+async function ensureConsentTable(db) {
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS edit_consents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        module TEXT NOT NULL,
+        period_key TEXT NOT NULL,
+        granted_by TEXT NOT NULL,
+        granted_at TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
+        notes TEXT,
+        UNIQUE(module, period_key)
+      )
+    `).run();
+  } catch (e) {
+    console.error("ensureConsentTable error:", e);
+  }
+}
+__name(ensureConsentTable, "ensureConsentTable");
+__name2(ensureConsentTable, "ensureConsentTable");
+async function hasAdminConsent2(db, module, periodKey) {
+  try {
+    await ensureConsentTable(db);
+    const row = await db.prepare(
+      "SELECT status FROM edit_consents WHERE module = ? AND period_key = ? AND status = 'active' LIMIT 1"
+    ).bind(module, periodKey).first();
+    return !!row;
+  } catch (err) {
+    console.error("hasAdminConsent check error:", err);
+    return false;
+  }
+}
+__name(hasAdminConsent2, "hasAdminConsent2");
+__name2(hasAdminConsent2, "hasAdminConsent");
+async function getConsentStatus(db, module, periodKey) {
+  try {
+    await ensureConsentTable(db);
+    const row = await db.prepare(
+      "SELECT module, period_key, granted_by, granted_at, status, notes FROM edit_consents WHERE module = ? AND period_key = ? LIMIT 1"
+    ).bind(module, periodKey).first();
+    return row || null;
+  } catch (err) {
+    console.error("getConsentStatus error:", err);
+    return null;
+  }
+}
+__name(getConsentStatus, "getConsentStatus");
+__name2(getConsentStatus, "getConsentStatus");
+async function setConsentStatus(db, module, periodKey, grantedBy, status = "active", notes = "") {
+  try {
+    await ensureConsentTable(db);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    await db.prepare(`
+      INSERT INTO edit_consents (module, period_key, granted_by, granted_at, status, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(module, period_key) DO UPDATE SET
+        granted_by = excluded.granted_by,
+        granted_at = excluded.granted_at,
+        status = excluded.status,
+        notes = excluded.notes
+    `).bind(module, periodKey, grantedBy, now, status, notes).run();
+    return { success: true, module, period_key: periodKey, granted_by: grantedBy, granted_at: now, status, notes };
+  } catch (err) {
+    console.error("setConsentStatus error:", err);
+    throw err;
+  }
+}
+__name(setConsentStatus, "setConsentStatus");
+__name2(setConsentStatus, "setConsentStatus");
 async function onRequestGet11(context) {
   try {
     const monthYear = context.params.month_year;
@@ -775,8 +844,9 @@ async function onRequestPost5(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -852,8 +922,9 @@ async function onRequestPost6(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -928,8 +999,9 @@ async function onRequestPost7(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -1008,8 +1080,9 @@ async function onRequestPost8(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -1054,7 +1127,7 @@ async function onRequestPost8(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      await logActivity2(db, userEmail, "Update Contract Paybill", `Updated contract paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, "Update Contract Paybill", `Updated contract paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1081,13 +1154,14 @@ async function onRequestDelete(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const deleteEarnings = db.prepare("DELETE FROM contract_monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM contract_monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    await logActivity2(db, userEmail, "Delete Contract Paybill Record", `Deleted contract paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, "Delete Contract Paybill Record", `Deleted contract paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -1141,8 +1215,9 @@ async function onRequestPost9(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -1194,7 +1269,7 @@ async function onRequestPost9(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      await logActivity2(db, userEmail, "Update Daily Wage Paybill", `Updated daily wage paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, "Update Daily Wage Paybill", `Updated daily wage paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1221,13 +1296,14 @@ async function onRequestDelete2(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const deleteEarnings = db.prepare("DELETE FROM daily_wage_monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM daily_wage_monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    await logActivity2(db, userEmail, "Delete Daily Wage Paybill Record", `Deleted daily wage paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, "Delete Daily Wage Paybill Record", `Deleted daily wage paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -1280,8 +1356,9 @@ async function onRequestPost10(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -1324,7 +1401,7 @@ async function onRequestPost10(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      await logActivity2(db, userEmail, "Update Visiting Paybill", `Updated visiting paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, "Update Visiting Paybill", `Updated visiting paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -1351,13 +1428,14 @@ async function onRequestDelete3(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const deleteEarnings = db.prepare("DELETE FROM visiting_monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM visiting_monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    await logActivity2(db, userEmail, "Delete Visiting Paybill Record", `Deleted visiting paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, "Delete Visiting Paybill Record", `Deleted visiting paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -1428,7 +1506,7 @@ async function onRequestPost11(context) {
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
     const catText = category ? ` (${category})` : "";
-    await logActivity2(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s)${catText} for ${monthYear}`);
+    await logActivity(db, userEmail, "Festival Allowance Bill Action", `${actionText} festival allowance bill(s)${catText} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1520,7 +1598,7 @@ async function onRequestPost12(context) {
       WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    await logActivity2(db, userEmail, "Supplementary Paybill Action", `${actionMap[action] || action} ${category} supplementary paybill for ${monthYear}`);
+    await logActivity(db, userEmail, "Supplementary Paybill Action", `${actionMap[action] || action} ${category} supplementary paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -1616,7 +1694,7 @@ async function onRequestPost13(context) {
     }
     await db.prepare(updateQuery).bind(...updateParams).run();
     const actionText = action === "reject" ? "Rejected" : "Verified & Locked";
-    await logActivity2(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
+    await logActivity(db, userEmail, "Surrender Bill Action", `${actionText} surrender bill(s) for ${monthYear}`);
     return new Response(JSON.stringify({ success: true, approved_on: action === "reject" ? null : now, approved_by: action === "reject" ? null : userEmail }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1773,7 +1851,7 @@ async function onRequestPost14(context) {
       headers: { "Content-Type": "application/json" }
     });
     response.headers.append("Set-Cookie", `payslip_auth=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`);
-    await logActivity2(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
+    await logActivity(env.ksom_payslip_db, user.email, "Login", `Successfully logged in with role ${user.role}`);
     return response;
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
@@ -2180,7 +2258,7 @@ async function onRequestPost20(context) {
         SET is_approved = 1, approved_on = ?, approved_by = ?
         WHERE month_year = ? AND employee_category = ?
       `).bind(now, userEmail, month_year, category).run();
-      await logActivity2(db, userEmail, "EPF Lock", `Verified & Locked EPF entries for ${month_year} (${category})`);
+      await logActivity(db, userEmail, "EPF Lock", `Verified & Locked EPF entries for ${month_year} (${category})`);
       return new Response(JSON.stringify({ success: true, is_approved: 1, approved_on: now, approved_by: userEmail }), {
         headers: { "Content-Type": "application/json" }
       });
@@ -2193,7 +2271,7 @@ async function onRequestPost20(context) {
         SET is_approved = 0, approved_on = NULL, approved_by = NULL
         WHERE month_year = ? AND employee_category = ?
       `).bind(month_year, category).run();
-      await logActivity2(db, userEmail, "EPF Unlock", `Unlocked EPF entries for ${month_year} (${category})`);
+      await logActivity(db, userEmail, "EPF Unlock", `Unlocked EPF entries for ${month_year} (${category})`);
       return new Response(JSON.stringify({ success: true, is_approved: 0 }), {
         headers: { "Content-Type": "application/json" }
       });
@@ -2532,7 +2610,7 @@ async function onRequestPost23(context) {
     }
     if ("require_approval" in data) {
       const mode = data.require_approval === "1" ? "Enabled (Approval Required)" : "Disabled (Direct Lock Allowed)";
-      await logActivity2(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
+      await logActivity(db, userEmail, "Update System Settings", `Changed approval requirement to ${mode}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
@@ -2651,7 +2729,7 @@ async function onRequestPost25(context) {
       WHERE month_year = ?
     `).bind(statusValue, approvedOnValue, approvedByValue, monthYear).run();
     const actionMap = { "submit": "Submitted", "reject": "Rejected", "approve": "Verified & Locked" };
-    await logActivity2(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
+    await logActivity(db, userEmail, "Paybill Action", `${actionMap[action] || action} paybill for ${monthYear}`);
     return new Response(JSON.stringify({
       success: true,
       is_approved: statusValue,
@@ -2767,42 +2845,69 @@ async function onRequestPost26(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
+    const consentGeneral = await hasAdminConsent2(db, "arrears", monthYear);
     const statements = [];
     for (const record of records) {
       if (!record.arrear_type) continue;
+      const consentSpecific = await hasAdminConsent2(db, "arrears", `${monthYear}_${record.arrear_type}`);
+      const consentGranted = consentGeneral || consentSpecific;
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM arrear_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND arrear_type = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear, record.arrear_type).first("is_approved");
-      if (isApprovedRecord === 1 && userRole !== "super_admin") {
+      if (isApprovedRecord === 1 && userRole !== "super_admin" && !consentGranted) {
         continue;
       }
       if (record.arrear_amount && record.arrear_amount > 0) {
-        statements.push(
-          db.prepare(`
-            INSERT INTO arrear_bills (emp_id, arrear_type, arrear_type_other, category, arrear_amount, income_tax, net_amount, bill_date, description, is_approved)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2)
-            ON CONFLICT(emp_id, bill_date, arrear_type) DO UPDATE SET
-              arrear_type_other = excluded.arrear_type_other,
-              category = excluded.category,
-              arrear_amount = excluded.arrear_amount,
-              income_tax = excluded.income_tax,
-              net_amount = excluded.net_amount,
-              description = excluded.description,
-              is_approved = 2
-          `).bind(
-            record.emp_id,
-            record.arrear_type,
-            record.arrear_type_other || null,
-            record.category,
-            record.arrear_amount || 0,
-            record.income_tax || 0,
-            record.net_amount || 0,
-            record.bill_date,
-            record.description || null
-          )
-        );
+        if (record.bill_id) {
+          statements.push(
+            db.prepare(`
+              UPDATE arrear_bills 
+              SET arrear_type = ?, arrear_type_other = ?, category = ?, arrear_amount = ?, income_tax = ?, net_amount = ?, bill_date = ?, description = ?
+              WHERE id = ?
+            `).bind(
+              record.arrear_type,
+              record.arrear_type_other || null,
+              record.category,
+              record.arrear_amount || 0,
+              record.income_tax || 0,
+              record.net_amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO arrear_bills (emp_id, arrear_type, arrear_type_other, category, arrear_amount, income_tax, net_amount, bill_date, description, is_approved)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2)
+              ON CONFLICT(emp_id, bill_date, arrear_type) DO UPDATE SET
+                arrear_type_other = excluded.arrear_type_other,
+                category = excluded.category,
+                arrear_amount = excluded.arrear_amount,
+                income_tax = excluded.income_tax,
+                net_amount = excluded.net_amount,
+                description = excluded.description,
+                is_approved = 2
+            `).bind(
+              record.emp_id,
+              record.arrear_type,
+              record.arrear_type_other || null,
+              record.category,
+              record.arrear_amount || 0,
+              record.income_tax || 0,
+              record.net_amount || 0,
+              record.bill_date,
+              record.description || null
+            )
+          );
+        }
       } else {
-        if (record.bill_date && record.arrear_type) {
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM arrear_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date && record.arrear_type) {
           statements.push(
             db.prepare(`
               DELETE FROM arrear_bills 
@@ -2816,9 +2921,9 @@ async function onRequestPost26(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.arrear_amount && record.arrear_amount > 0) {
-          await logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
-        } else if (record.bill_date && record.arrear_type) {
-          await logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, "Save Arrear Bill", `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with date ${record.bill_date} (amount Rs. ${record.arrear_amount})`);
+        } else if (record.bill_id || record.bill_date && record.arrear_type) {
+          await logActivity(db, userEmail, "Delete Arrear Bill", `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date || "N/A"}`);
         }
       }
     }
@@ -2870,8 +2975,9 @@ async function onRequestPost27(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent(db, "paybill_permanent", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -2965,8 +3071,9 @@ async function onRequestPost28(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_permanent", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -3045,7 +3152,7 @@ async function onRequestPost28(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      await logActivity2(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, "Update Paybill", `Updated paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -3072,13 +3179,14 @@ async function onRequestDelete4(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "paybill_permanent", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const deleteEarnings = db.prepare("DELETE FROM monthly_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM monthly_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    await logActivity2(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, "Delete Paybill Record", `Deleted paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -3109,21 +3217,17 @@ async function onRequestGet34(context) {
     const catColumn = isPerm ? "e.category" : `'${category}' as category`;
     let query = `
       SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
-             f.id as bill_id, f.bill_date, f.amount, f.description,
+             f.id as bill_id, f.amount, f.bill_date, f.description,
              f.is_approved, f.approved_on, f.approved_by
       FROM ${tableName} e
       LEFT JOIN festival_allowance_bills f ON e.emp_id = f.emp_id AND substr(f.bill_date, 1, 7) = ?
     `;
     let params = [monthYear];
-    let whereClauses = [];
     if (userRole === "viewer" && userEmail) {
-      whereClauses.push("LOWER(e.email_id) = LOWER(?)");
+      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
       params.push(userEmail);
     } else {
-      whereClauses.push("(e.is_active = 1 OR f.id IS NOT NULL)");
-    }
-    if (whereClauses.length > 0) {
-      query += " WHERE " + whereClauses.join(" AND ");
+      query += ` WHERE (e.is_active = 1 OR f.id IS NOT NULL)`;
     }
     query += ` ORDER BY (CASE WHEN e.is_active = 0 THEN 1 ELSE 0 END) ASC, e.sort_order ASC, e.name ASC`;
     const { results } = await context.env.ksom_payslip_db.prepare(query).bind(...params).all();
@@ -3146,34 +3250,55 @@ async function onRequestPost29(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
+    const consentGranted = await hasAdminConsent2(db, "festival", monthYear);
     const statements = [];
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM festival_allowance_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear).first("is_approved");
-      if (isApprovedRecord === 1 && userRole !== "super_admin") {
+      if (isApprovedRecord === 1 && userRole !== "super_admin" && !consentGranted) {
         continue;
       }
       if (record.amount && record.amount > 0) {
-        statements.push(
-          db.prepare(`
-            INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, category, is_approved)
-            VALUES (?, ?, ?, ?, ?, 2)
-            ON CONFLICT(emp_id, bill_date) DO UPDATE SET
-              amount = excluded.amount,
-              description = excluded.description,
-              category = excluded.category,
-              is_approved = 2
-          `).bind(
-            record.emp_id,
-            record.amount || 0,
-            record.bill_date,
-            record.description || null,
-            record.category || "permanent"
-          )
-        );
+        if (record.bill_id) {
+          statements.push(
+            db.prepare(`
+              UPDATE festival_allowance_bills 
+              SET amount = ?, bill_date = ?, description = ?, category = ?
+              WHERE id = ?
+            `).bind(
+              record.amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.category || "permanent",
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, category, is_approved)
+              VALUES (?, ?, ?, ?, ?, 2)
+              ON CONFLICT(emp_id, bill_date) DO UPDATE SET
+                amount = excluded.amount,
+                description = excluded.description,
+                category = excluded.category,
+                is_approved = 2
+            `).bind(
+              record.emp_id,
+              record.amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.category || "permanent"
+            )
+          );
+        }
       } else {
-        if (record.bill_date) {
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM festival_allowance_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date) {
           statements.push(
             db.prepare(`
               DELETE FROM festival_allowance_bills 
@@ -3187,9 +3312,9 @@ async function onRequestPost29(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.amount && record.amount > 0) {
-          await logActivity2(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
-        } else if (record.bill_date) {
-          await logActivity2(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, "Save Festival Allowance", `Saved/Updated festival allowance for employee ${record.emp_id} with date ${record.bill_date} (amount Rs. ${record.amount})`);
+        } else if (record.bill_id || record.bill_date) {
+          await logActivity(db, userEmail, "Delete Festival Allowance", `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date || "N/A"}`);
         }
       }
     }
@@ -3262,8 +3387,9 @@ async function onRequestPost30(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "supplementary", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const statements = [];
     for (const record of records) {
@@ -3352,7 +3478,7 @@ async function onRequestPost30(context) {
     }
     if (statements.length > 0) {
       await db.batch(statements);
-      await logActivity2(db, userEmail, "Update Supplementary Paybill", `Updated supplementary paybill records for ${monthYear}`);
+      await logActivity(db, userEmail, "Update Supplementary Paybill", `Updated supplementary paybill records for ${monthYear}`);
     }
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -3379,13 +3505,14 @@ async function onRequestDelete5(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "This month is approved and locked. Only super_admin can modify it." }), { status: 403 });
+    const consentGranted = await hasAdminConsent2(db, "supplementary", monthYear);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
     const deleteEarnings = db.prepare("DELETE FROM supplementary_earnings WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     const deleteDeductions = db.prepare("DELETE FROM supplementary_deductions WHERE emp_id = ? AND month_year = ?").bind(empId, monthYear);
     await db.batch([deleteEarnings, deleteDeductions]);
-    await logActivity2(db, userEmail, "Delete Supplementary Paybill Record", `Deleted supplementary paybill record for employee ${empId} for ${monthYear}`);
+    await logActivity(db, userEmail, "Delete Supplementary Paybill Record", `Deleted supplementary paybill record for employee ${empId} for ${monthYear}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 200
@@ -3451,12 +3578,13 @@ async function onRequestPost31(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
+    const consentGranted = await hasAdminConsent2(db, "surrender", monthYear);
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM surrender_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear).first("is_approved");
-      if (isApprovedRecord === 1 && userRole !== "super_admin") {
-        return new Response(JSON.stringify({ error: `Record for employee ${record.emp_id} is approved and locked. Only super_admin can modify it.` }), { status: 403 });
+      if (isApprovedRecord === 1 && userRole !== "super_admin" && !consentGranted) {
+        return new Response(JSON.stringify({ error: `Record for employee ${record.emp_id} is approved and locked. Super Admin consent is required to modify it.` }), { status: 403 });
       }
     }
     const statements = [];
@@ -3466,38 +3594,59 @@ async function onRequestPost31(context) {
         if (record.num_els > maxEls) {
           return new Response(JSON.stringify({ error: `Maximum ${maxEls} Earned Leaves can be surrendered.` }), { status: 400 });
         }
-        statements.push(
-          db.prepare(`
-            INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved, is_terminal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, ?)
-            ON CONFLICT(emp_id, bill_date) DO UPDATE SET
-              financial_year = excluded.financial_year,
-              basic_pay = excluded.basic_pay,
-              da = excluded.da,
-              hra = excluded.hra,
-              num_els = excluded.num_els,
-              total_amount = excluded.total_amount,
-              is_approved = 2,
-              is_terminal = excluded.is_terminal
-          `).bind(
-            record.emp_id,
-            record.bill_date,
-            record.financial_year,
-            record.basic_pay || 0,
-            record.da || 0,
-            record.hra || 0,
-            record.num_els,
-            record.total_amount || 0,
-            record.is_terminal ? 1 : 0
-          )
-        );
-      } else {
-        if (record.bill_date) {
+        if (record.bill_id) {
           statements.push(
             db.prepare(`
-              DELETE FROM surrender_bills 
-              WHERE emp_id = ? AND bill_date = ?
-            `).bind(record.emp_id, record.bill_date)
+              UPDATE surrender_bills 
+              SET bill_date = ?, financial_year = ?, basic_pay = ?, da = ?, hra = ?, num_els = ?, total_amount = ?, is_terminal = ?
+              WHERE id = ?
+            `).bind(
+              record.bill_date,
+              record.financial_year,
+              record.basic_pay || 0,
+              record.da || 0,
+              record.hra || 0,
+              record.num_els,
+              record.total_amount || 0,
+              record.is_terminal ? 1 : 0,
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO surrender_bills (emp_id, bill_date, financial_year, basic_pay, da, hra, num_els, total_amount, is_approved, is_terminal)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, ?)
+              ON CONFLICT(emp_id, bill_date) DO UPDATE SET
+                financial_year = excluded.financial_year,
+                basic_pay = excluded.basic_pay,
+                da = excluded.da,
+                hra = excluded.hra,
+                num_els = excluded.num_els,
+                total_amount = excluded.total_amount,
+                is_approved = 2,
+                is_terminal = excluded.is_terminal
+            `).bind(
+              record.emp_id,
+              record.bill_date,
+              record.financial_year,
+              record.basic_pay || 0,
+              record.da || 0,
+              record.hra || 0,
+              record.num_els,
+              record.total_amount || 0,
+              record.is_terminal ? 1 : 0
+            )
+          );
+        }
+      } else {
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM surrender_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date) {
+          statements.push(
+            db.prepare("DELETE FROM surrender_bills WHERE emp_id = ? AND bill_date = ?").bind(record.emp_id, record.bill_date)
           );
         }
       }
@@ -3506,9 +3655,9 @@ async function onRequestPost31(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.num_els && record.num_els > 0) {
-          await logActivity2(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with ${record.num_els} ELs`);
-        } else if (record.bill_date) {
-          await logActivity2(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, "Save Surrender Bill", `Saved/Updated surrender bill for employee ${record.emp_id} with date ${record.bill_date} (${record.num_els} ELs)`);
+        } else if (record.bill_date || record.bill_id) {
+          await logActivity(db, userEmail, "Delete Surrender Bill", `Deleted surrender bill for employee ${record.emp_id} on date ${record.bill_date || "N/A"}`);
         }
       }
     }
@@ -3678,7 +3827,66 @@ async function onRequestPost32(context) {
 }
 __name(onRequestPost32, "onRequestPost32");
 __name2(onRequestPost32, "onRequestPost");
+async function onRequestGet38(context) {
+  try {
+    const url = new URL(context.request.url);
+    const module = url.searchParams.get("module");
+    const periodKey = url.searchParams.get("period_key");
+    const db = context.env.ksom_payslip_db;
+    if (!module || !periodKey) {
+      return new Response(JSON.stringify({ error: "Missing module or period_key parameter" }), { status: 400 });
+    }
+    const consent = await getConsentStatus(db, module, periodKey);
+    const isActive = consent ? consent.status === "active" : false;
+    return new Response(JSON.stringify({
+      has_consent: isActive,
+      consent
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestGet38, "onRequestGet38");
+__name2(onRequestGet38, "onRequestGet");
 async function onRequestPost33(context) {
+  const userRole = context.request.headers.get("X-User-Role");
+  const userEmail = context.request.headers.get("X-User-Email");
+  try {
+    const body = await context.request.json().catch(() => ({}));
+    const { module, period_key, action, notes } = body;
+    const db = context.env.ksom_payslip_db;
+    if (!module || !period_key) {
+      return new Response(JSON.stringify({ error: "Missing module or period_key" }), { status: 400 });
+    }
+    if (action === "request") {
+      if (userRole !== "admin" && userRole !== "super_admin") {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+      }
+      await logActivity(db, userEmail, "Request Edit Permission", `Admin requested edit consent for locked ${module} (${period_key}): ${notes || "No note"}`);
+      return new Response(JSON.stringify({ success: true, message: "Edit request submitted to Super Admin." }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    if (userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Only Super Admins can grant or revoke edit consent." }), { status: 403 });
+    }
+    const newStatus = action === "revoke" ? "revoked" : "active";
+    const result = await setConsentStatus(db, module, period_key, userEmail, newStatus, notes || "");
+    const logAction = newStatus === "active" ? "Grant Edit Consent" : "Revoke Edit Consent";
+    const logDesc = `${newStatus === "active" ? "Granted" : "Revoked"} edit consent to Admin for locked ${module} (${period_key})`;
+    await logActivity(db, userEmail, logAction, logDesc);
+    return new Response(JSON.stringify({ success: true, consent: result }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+  }
+}
+__name(onRequestPost33, "onRequestPost33");
+__name2(onRequestPost33, "onRequestPost");
+async function onRequestPost34(context) {
   const userRole = context.request.headers.get("X-User-Role");
   if (userRole === "viewer") {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
@@ -3723,9 +3931,9 @@ async function onRequestPost33(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost33, "onRequestPost33");
-__name2(onRequestPost33, "onRequestPost");
-async function onRequestGet38(context) {
+__name(onRequestPost34, "onRequestPost34");
+__name2(onRequestPost34, "onRequestPost");
+async function onRequestGet39(context) {
   try {
     const userEmail = context.request.headers.get("X-User-Email");
     const userRole = context.request.headers.get("X-User-Role");
@@ -3777,9 +3985,9 @@ async function onRequestGet38(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet38, "onRequestGet38");
-__name2(onRequestGet38, "onRequestGet");
-async function onRequestPost34(context) {
+__name(onRequestGet39, "onRequestGet39");
+__name2(onRequestGet39, "onRequestGet");
+async function onRequestPost35(context) {
   try {
     const data = await context.request.json();
     const { emp_id, name, designation, date_of_birth, date_of_joining, scale_of_pay, category, email_id, mob_no, is_active, epf_uan, title, sort_order, appointment_type } = data;
@@ -3798,8 +4006,8 @@ async function onRequestPost34(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost34, "onRequestPost34");
-__name2(onRequestPost34, "onRequestPost");
+__name(onRequestPost35, "onRequestPost35");
+__name2(onRequestPost35, "onRequestPost");
 async function onRequestPut4(context) {
   try {
     const data = await context.request.json();
@@ -3823,7 +4031,7 @@ async function onRequestPut4(context) {
 }
 __name(onRequestPut4, "onRequestPut4");
 __name2(onRequestPut4, "onRequestPut");
-async function onRequestGet39(context) {
+async function onRequestGet40(context) {
   try {
     const url = new URL(context.request.url);
     const month_year = url.searchParams.get("month_year");
@@ -3980,16 +4188,23 @@ async function onRequestGet39(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet39, "onRequestGet39");
-__name2(onRequestGet39, "onRequestGet");
-async function onRequestPost35(context) {
+__name(onRequestGet40, "onRequestGet40");
+__name2(onRequestGet40, "onRequestGet");
+async function onRequestPost36(context) {
   try {
     const data = await context.request.json();
     const { month_year, category, entries } = data;
     if (!month_year || !category || !Array.isArray(entries)) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400 });
     }
+    const userRole = context.request.headers.get("X-User-Role");
+    const userEmail = context.request.headers.get("X-User-Email");
     const db = context.env.ksom_payslip_db;
+    const approvalCheck = await db.prepare("SELECT is_approved FROM epf_entries WHERE month_year = ? AND employee_category = ? AND is_approved = 1 LIMIT 1").bind(month_year, category).first();
+    const consentGranted = await hasAdminConsent2(db, "epf", month_year) || await hasAdminConsent2(db, "epf", `${month_year}_${category}`);
+    if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
+      return new Response(JSON.stringify({ error: "This EPF sheet is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
+    }
     const statements = [];
     statements.push(
       db.prepare("DELETE FROM epf_entries WHERE month_year = ? AND employee_category = ?").bind(month_year, category)
@@ -4037,9 +4252,9 @@ async function onRequestPost35(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost35, "onRequestPost35");
-__name2(onRequestPost35, "onRequestPost");
-async function onRequestGet40(context) {
+__name(onRequestPost36, "onRequestPost36");
+__name2(onRequestPost36, "onRequestPost");
+async function onRequestGet41(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM allowances_settings ORDER BY effective_from DESC"
@@ -4051,9 +4266,9 @@ async function onRequestGet40(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet40, "onRequestGet40");
-__name2(onRequestGet40, "onRequestGet");
-async function onRequestPost36(context) {
+__name(onRequestGet41, "onRequestGet41");
+__name2(onRequestGet41, "onRequestGet");
+async function onRequestPost37(context) {
   const userRole = context.request.headers.get("X-User-Role");
   const userEmail = context.request.headers.get("X-User-Email");
   if (userRole === "viewer") {
@@ -4071,7 +4286,7 @@ async function onRequestPost36(context) {
         hra_state_percentage=excluded.hra_state_percentage,
         hra_ugc_percentage=excluded.hra_ugc_percentage`
     ).bind(effective_from, da_state_percentage || 0, da_ugc_percentage || 0, hra_state_percentage || 0, hra_ugc_percentage || 0).run();
-    await logActivity2(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, "Update Allowance Settings", `Updated global allowances for ${effective_from} (State DA: ${da_state_percentage}%, UGC DA: ${da_ugc_percentage}%, State HRA: ${hra_state_percentage}%, UGC HRA: ${hra_ugc_percentage}%)`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
       status: 201
@@ -4080,9 +4295,9 @@ async function onRequestPost36(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost36, "onRequestPost36");
-__name2(onRequestPost36, "onRequestPost");
-async function onRequestGet41(context) {
+__name(onRequestPost37, "onRequestPost37");
+__name2(onRequestPost37, "onRequestPost");
+async function onRequestGet42(context) {
   try {
     const { results } = await context.env.ksom_payslip_db.prepare(
       "SELECT * FROM users ORDER BY created_at DESC"
@@ -4094,9 +4309,9 @@ async function onRequestGet41(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestGet41, "onRequestGet41");
-__name2(onRequestGet41, "onRequestGet");
-async function onRequestPost37(context) {
+__name(onRequestGet42, "onRequestGet42");
+__name2(onRequestGet42, "onRequestGet");
+async function onRequestPost38(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
     const data = await context.request.json();
@@ -4112,7 +4327,7 @@ async function onRequestPost37(context) {
          name=excluded.name, 
          designation=excluded.designation`
     ).bind(email.toLowerCase(), role, status || "active", name || null, designation || null).run();
-    await logActivity2(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, "Save/Update User", `Saved/Updated user ${email} (Role: ${role}, Status: ${status || "active"})`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -4120,8 +4335,8 @@ async function onRequestPost37(context) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
-__name(onRequestPost37, "onRequestPost37");
-__name2(onRequestPost37, "onRequestPost");
+__name(onRequestPost38, "onRequestPost38");
+__name2(onRequestPost38, "onRequestPost");
 async function onRequestDelete6(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
@@ -4130,7 +4345,7 @@ async function onRequestDelete6(context) {
     if (!id) return new Response(JSON.stringify({ error: "ID required." }), { status: 400 });
     const userToDel = await context.env.ksom_payslip_db.prepare("SELECT email FROM users WHERE id = ?").bind(id).first();
     await context.env.ksom_payslip_db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
-    await logActivity2(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
+    await logActivity(context.env.ksom_payslip_db, userEmail, "Delete User", `Deleted user with ID ${id}${userToDel ? ` (${userToDel.email})` : ""}`);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -4779,25 +4994,39 @@ var routes = [
     modules: [onRequestPost32]
   },
   {
+    routePath: "/api/edit-consent",
+    mountPath: "/api/edit-consent",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet38]
+  },
+  {
+    routePath: "/api/edit-consent",
+    mountPath: "/api/edit-consent",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost33]
+  },
+  {
     routePath: "/api/email",
     mountPath: "/api/email",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost33]
+    modules: [onRequestPost34]
   },
   {
     routePath: "/api/employees",
     mountPath: "/api/employees",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet38]
+    modules: [onRequestGet39]
   },
   {
     routePath: "/api/employees",
     mountPath: "/api/employees",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost34]
+    modules: [onRequestPost35]
   },
   {
     routePath: "/api/employees",
@@ -4811,28 +5040,28 @@ var routes = [
     mountPath: "/api",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet39]
+    modules: [onRequestGet40]
   },
   {
     routePath: "/api/epf-entries",
     mountPath: "/api",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost35]
+    modules: [onRequestPost36]
   },
   {
     routePath: "/api/settings",
     mountPath: "/api/settings",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet40]
+    modules: [onRequestGet41]
   },
   {
     routePath: "/api/settings",
     mountPath: "/api/settings",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost36]
+    modules: [onRequestPost37]
   },
   {
     routePath: "/api/users",
@@ -4846,14 +5075,14 @@ var routes = [
     mountPath: "/api/users",
     method: "GET",
     middlewares: [],
-    modules: [onRequestGet41]
+    modules: [onRequestGet42]
   },
   {
     routePath: "/api/users",
     mountPath: "/api/users",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost37]
+    modules: [onRequestPost38]
   },
   {
     routePath: "/",
@@ -5528,7 +5757,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-mSyBBF/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-6iTS9Z/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -5560,7 +5789,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-mSyBBF/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-6iTS9Z/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -5660,4 +5889,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.12150428862834795.js.map
+//# sourceMappingURL=functionsWorker-0.30046197134678065.js.map

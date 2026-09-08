@@ -1,3 +1,6 @@
+import { logActivity } from '../../lib/logger.js';
+import { hasAdminConsent } from '../../lib/consent_helper.js';
+
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -92,47 +95,77 @@ export async function onRequestPost(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
 
+    const consentGeneral = await hasAdminConsent(db, 'arrears', monthYear);
+
     const statements = [];
 
     for (const record of records) {
       if (!record.arrear_type) continue;
 
+      const consentSpecific = await hasAdminConsent(db, 'arrears', `${monthYear}_${record.arrear_type}`);
+      const consentGranted = consentGeneral || consentSpecific;
+
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM arrear_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND arrear_type = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear, record.arrear_type).first('is_approved');
 
-      if (isApprovedRecord === 1 && userRole !== 'super_admin') {
-        continue; // Skip approved records silently from saving
+      if (isApprovedRecord === 1 && userRole !== 'super_admin' && !consentGranted) {
+        continue; // Skip approved records silently if no consent
       }
 
       if (record.arrear_amount && record.arrear_amount > 0) {
-        statements.push(
-          db.prepare(`
-            INSERT INTO arrear_bills (emp_id, arrear_type, arrear_type_other, category, arrear_amount, income_tax, net_amount, bill_date, description, is_approved)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2)
-            ON CONFLICT(emp_id, bill_date, arrear_type) DO UPDATE SET
-              arrear_type_other = excluded.arrear_type_other,
-              category = excluded.category,
-              arrear_amount = excluded.arrear_amount,
-              income_tax = excluded.income_tax,
-              net_amount = excluded.net_amount,
-              description = excluded.description,
-              is_approved = 2
-          `).bind(
-            record.emp_id,
-            record.arrear_type,
-            record.arrear_type_other || null,
-            record.category,
-            record.arrear_amount || 0,
-            record.income_tax || 0,
-            record.net_amount || 0,
-            record.bill_date,
-            record.description || null
-          )
-        );
+        if (record.bill_id) {
+          // If bill_id is present, update the existing record by ID to allow date or detail modifications without duplication
+          statements.push(
+            db.prepare(`
+              UPDATE arrear_bills 
+              SET arrear_type = ?, arrear_type_other = ?, category = ?, arrear_amount = ?, income_tax = ?, net_amount = ?, bill_date = ?, description = ?
+              WHERE id = ?
+            `).bind(
+              record.arrear_type,
+              record.arrear_type_other || null,
+              record.category,
+              record.arrear_amount || 0,
+              record.income_tax || 0,
+              record.net_amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO arrear_bills (emp_id, arrear_type, arrear_type_other, category, arrear_amount, income_tax, net_amount, bill_date, description, is_approved)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 2)
+              ON CONFLICT(emp_id, bill_date, arrear_type) DO UPDATE SET
+                arrear_type_other = excluded.arrear_type_other,
+                category = excluded.category,
+                arrear_amount = excluded.arrear_amount,
+                income_tax = excluded.income_tax,
+                net_amount = excluded.net_amount,
+                description = excluded.description,
+                is_approved = 2
+            `).bind(
+              record.emp_id,
+              record.arrear_type,
+              record.arrear_type_other || null,
+              record.category,
+              record.arrear_amount || 0,
+              record.income_tax || 0,
+              record.net_amount || 0,
+              record.bill_date,
+              record.description || null
+            )
+          );
+        }
       } else {
         // If amount set to 0, delete the record if it exists
-        if (record.bill_date && record.arrear_type) {
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM arrear_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date && record.arrear_type) {
           statements.push(
             db.prepare(`
               DELETE FROM arrear_bills 
@@ -147,9 +180,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.arrear_amount && record.arrear_amount > 0) {
-          await logActivity(db, userEmail, 'Save Arrear Bill', `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with amount Rs. ${record.arrear_amount}`);
-        } else if (record.bill_date && record.arrear_type) {
-          await logActivity(db, userEmail, 'Delete Arrear Bill', `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Save Arrear Bill', `Saved/Updated arrear bill (${record.arrear_type}) for employee ${record.emp_id} with date ${record.bill_date} (amount Rs. ${record.arrear_amount})`);
+        } else if (record.bill_id || (record.bill_date && record.arrear_type)) {
+          await logActivity(db, userEmail, 'Delete Arrear Bill', `Deleted arrear bill (${record.arrear_type}) for employee ${record.emp_id} on date ${record.bill_date || 'N/A'}`);
         }
       }
     }

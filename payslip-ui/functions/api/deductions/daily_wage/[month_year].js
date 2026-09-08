@@ -1,3 +1,5 @@
+import { hasAdminConsent } from '../../../lib/consent_helper.js';
+
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;
@@ -43,8 +45,9 @@ export async function onRequestPost(context) {
 
     // Check if month is approved (status is stored in daily_wage_monthly_earnings)
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    if (approvalCheck && userRole !== 'super_admin') {
-      return new Response(JSON.stringify({ error: 'This month is approved and locked. Only super_admin can modify it.' }), { status: 403 });
+    const consentGranted = await hasAdminConsent(db, 'paybill_daily_wage', monthYear) || await hasAdminConsent(db, 'paybill', monthYear);
+    if (approvalCheck && userRole !== 'super_admin' && !consentGranted) {
+      return new Response(JSON.stringify({ error: 'This month is approved and locked. Super Admin consent is required to modify it.' }), { status: 403 });
     }
 
     const statements = [];

@@ -75,6 +75,8 @@ import { onRequestGet as __api_surrender__month_year__js_onRequestGet } from "D:
 import { onRequestPost as __api_surrender__month_year__js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\surrender\\[month_year].js"
 import { onRequestGet as __api_backup_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\backup.js"
 import { onRequestPost as __api_backup_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\backup.js"
+import { onRequestGet as __api_edit_consent_index_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\edit-consent\\index.js"
+import { onRequestPost as __api_edit_consent_index_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\edit-consent\\index.js"
 import { onRequestPost as __api_email_index_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\email\\index.js"
 import { onRequestGet as __api_employees_index_js_onRequestGet } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\index.js"
 import { onRequestPost as __api_employees_index_js_onRequestPost } from "D:\\KSOM\\Website\\Web Apps\\Payslip\\payslip.git\\payslip-ui\\functions\\api\\employees\\index.js"
@@ -627,6 +629,20 @@ export const routes = [
       method: "POST",
       middlewares: [],
       modules: [__api_backup_js_onRequestPost],
+    },
+  {
+      routePath: "/api/edit-consent",
+      mountPath: "/api/edit-consent",
+      method: "GET",
+      middlewares: [],
+      modules: [__api_edit_consent_index_js_onRequestGet],
+    },
+  {
+      routePath: "/api/edit-consent",
+      mountPath: "/api/edit-consent",
+      method: "POST",
+      middlewares: [],
+      modules: [__api_edit_consent_index_js_onRequestPost],
     },
   {
       routePath: "/api/email",

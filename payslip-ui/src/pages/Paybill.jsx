@@ -39,6 +39,9 @@ const Paybill = (props) => {
   const [isRejected, setIsRejected] = useState(false);
   const [approvalInfo, setApprovalInfo] = useState(null);
   const [approving, setApproving] = useState(false);
+  const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [togglingConsent, setTogglingConsent] = useState(false);
+  const [requestingConsent, setRequestingConsent] = useState(false);
   const [requireApproval, setRequireApproval] = useState(true);
   const [usersList, setUsersList] = useState([]);
 
@@ -140,6 +143,19 @@ const Paybill = (props) => {
         setIsSubmitted(false);
         setIsRejected(false);
         setApprovalInfo(null);
+      }
+
+      // Check Super Admin consent
+      try {
+        const consentRes = await fetch(`/api/edit-consent?module=paybill_${activeTab}&period_key=${targetMonth}`);
+        if (consentRes.ok) {
+          const consentData = await consentRes.json();
+          setAdminConsentActive(consentData.has_consent === true);
+        } else {
+          setAdminConsentActive(false);
+        }
+      } catch (ce) {
+        setAdminConsentActive(false);
       }
 
       const combined = earnData.map(empEarn => {
@@ -735,6 +751,59 @@ const Paybill = (props) => {
       setApproving(false);
     }
   };
+
+  const handleToggleConsent = async () => {
+    if (user?.role !== 'super_admin') return;
+    setTogglingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: `paybill_${activeTab}`,
+          period_key: monthYear,
+          action: adminConsentActive ? 'revoke' : 'grant'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminConsentActive(!adminConsentActive);
+        alert(adminConsentActive ? 'Edit consent revoked from Admin.' : 'Edit consent successfully granted to Admin! Admins can now edit locked entries.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to update consent.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setTogglingConsent(false);
+    }
+  };
+
+  const handleRequestConsent = async () => {
+    setRequestingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: `paybill_${activeTab}`,
+          period_key: monthYear,
+          action: 'request',
+          notes: `Admin requested edit permission for Paybill (${activeTab} - ${monthYear})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Edit permission request submitted to Super Admin.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to submit request.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setRequestingConsent(false);
+    }
+  };
   
   // -- Modal logic --
   const openModal = (emp) => {
@@ -934,7 +1003,7 @@ const Paybill = (props) => {
                   : approvalInfo.approved_by;
               })()}</strong> on <strong>{approvalInfo?.approved_on ? new Date(approvalInfo.approved_on).toLocaleString() : 'N/A'}</strong>.
               {user?.role === 'super_admin' && (
-                <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button 
                     className="btn btn-sm" 
                     onClick={() => setIsOverrideActive(!isOverrideActive)}
@@ -953,11 +1022,63 @@ const Paybill = (props) => {
                     }}
                   >
                     {isOverrideActive ? <X size={14} /> : <Save size={14} />}
-                    {isOverrideActive ? 'Cancel Editing (Lock)' : 'Unlock for Editing'}
+                    {isOverrideActive ? 'Cancel Editing (Lock)' : 'Unlock for Editing (Super Admin)'}
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleToggleConsent}
+                    disabled={togglingConsent}
+                    style={{
+                      backgroundColor: adminConsentActive ? '#d97706' : '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {togglingConsent ? 'Updating...' : (adminConsentActive ? 'Revoke Admin Edit Consent' : 'Grant Edit Consent to Admin')}
                   </button>
                 </div>
               )}
-              {user?.role !== 'super_admin' && (isApproved ? ' Records are finalized.' : '')}
+              {user?.role === 'admin' && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  {adminConsentActive ? (
+                    <span style={{ 
+                      display: 'inline-block', 
+                      padding: '4px 10px', 
+                      backgroundColor: '#10b981', 
+                      color: '#fff', 
+                      borderRadius: '4px', 
+                      fontSize: '0.8rem', 
+                      fontWeight: 600 
+                    }}>
+                      ✓ Super Admin Consent Granted: You can edit and save records
+                    </span>
+                  ) : (
+                    <button
+                      className="btn btn-sm"
+                      onClick={handleRequestConsent}
+                      disabled={requestingConsent}
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {requestingConsent ? 'Requesting...' : 'Request Edit Permission from Super Admin'}
+                    </button>
+                  )}
+                </div>
+              )}
+              {user?.role !== 'super_admin' && user?.role !== 'admin' && (isApproved ? ' Records are finalized.' : '')}
             </p>
           </div>
         </div>
@@ -972,11 +1093,11 @@ const Paybill = (props) => {
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <>
-                <button className="btn btn-secondary" onClick={handleCopyPreviousMonth} disabled={isApproved && (!isOverrideActive || user?.role !== 'super_admin')}>
+                <button className="btn btn-secondary" onClick={handleCopyPreviousMonth} disabled={isApproved && !adminConsentActive && (!isOverrideActive || user?.role !== 'super_admin')}>
                   <Copy size={18} /> Copy Previous Month
                 </button>
                 {activeTab === 'permanent' && (
-                  <button className="btn btn-secondary" onClick={applyCalculations} disabled={isApproved && (!isOverrideActive || user?.role !== 'super_admin')}>
+                  <button className="btn btn-secondary" onClick={applyCalculations} disabled={isApproved && !adminConsentActive && (!isOverrideActive || user?.role !== 'super_admin')}>
                     <Calculator size={18} /> Auto Calculate DA & HRA
                   </button>
                 )}
@@ -992,16 +1113,16 @@ const Paybill = (props) => {
                 <Search size={18} /> Preview Full Sheet
               </button>
             )}
-            {((user?.role === 'admin' && !isApproved) || (user?.role === 'super_admin' && (!isApproved || isOverrideActive))) && (
+            {((user?.role === 'admin' && (!isApproved || adminConsentActive)) || (user?.role === 'super_admin' && (!isApproved || isOverrideActive))) && (
               <>
-                <button className="btn btn-primary" onClick={handleSave} disabled={saving || (isApproved && !isOverrideActive)}>
+                <button className="btn btn-primary" onClick={handleSave} disabled={saving || (isApproved && !isOverrideActive && !adminConsentActive)}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Paybill'}
                 </button>
                 {!requireApproval ? (
                   <button 
                     className="btn" 
                     onClick={handleApprove} 
-                    disabled={saving || approving || (isApproved && !isOverrideActive)}
+                    disabled={saving || approving || (isApproved && !isOverrideActive && !adminConsentActive)}
                     style={{ 
                       backgroundColor: 'var(--color-success)', 
                       color: '#fff', 
@@ -1021,7 +1142,7 @@ const Paybill = (props) => {
                     <button 
                       className="btn" 
                       onClick={handleSubmit} 
-                      disabled={saving || (isApproved && !isOverrideActive)}
+                      disabled={saving || (isApproved && !isOverrideActive && !adminConsentActive)}
                       style={{ 
                         backgroundColor: '#f97316', 
                         color: '#fff', 
@@ -1121,7 +1242,7 @@ const Paybill = (props) => {
               style={{ width: '120px', padding: '0.4rem 0.8rem' }} 
               value={dailyWageMaxLimit} 
               onChange={(e) => handleMaxLimitChange(e.target.value)} 
-              disabled={isApproved && (!isOverrideActive || user?.role !== 'super_admin')}
+              disabled={isApproved && !adminConsentActive && (!isOverrideActive || user?.role !== 'super_admin')}
             />
           </div>
         )}
@@ -1184,7 +1305,7 @@ const Paybill = (props) => {
                     const gross = (emp.basic_pay||0)+(emp.dp_gp||0)+da+hra+(emp.cca||0)+(emp.spl_pay||0)+(emp.tr_allow||0)+(emp.spl_allow||0)+(emp.fest_allow||0)+(emp.other_earnings||0);
                     const dedux = (emp.epf||0)+(emp.cpf||0)+(emp.professional_tax||0)+(emp.income_tax||0)+(emp.sli||0)+(emp.gis||0)+(emp.lic||0)+(emp.onam_advance||0)+(emp.hra_recovery||0)+(emp.other_deductions||0);
                     const net = gross - dedux;
-                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin' && !adminConsentActive) || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
                     
                     const inp = (field) => {
@@ -1346,7 +1467,7 @@ const Paybill = (props) => {
                     const gross = (emp.basic_pay || 0) + (emp.other_earnings || 0);
                     const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
-                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin' && !adminConsentActive) || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
 
                     const inp = (field) => {
@@ -1488,7 +1609,7 @@ const Paybill = (props) => {
                     const gross = (emp.total_wage || 0) + (emp.other_earnings || 0);
                     const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.epf || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
-                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin' && !adminConsentActive) || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
 
                     const inp = (field) => {
@@ -1639,7 +1760,7 @@ const Paybill = (props) => {
                     const gross = (emp.basic_pay || 0) + (emp.other_earnings || 0);
                     const dedux = (emp.income_tax || 0) + (emp.hra || 0) + (emp.other_deductions || 0);
                     const net = gross - dedux;
-                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin') || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
+                    const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin' && !adminConsentActive) || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
                     const isRowGrey = isSubmitted && (user?.role === 'admin' || user?.role === 'super_admin');
 
                     const inp = (field) => {

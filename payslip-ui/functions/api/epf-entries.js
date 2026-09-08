@@ -1,3 +1,5 @@
+import { hasAdminConsent } from '../lib/consent_helper.js';
+
 export async function onRequestGet(context) {
   try {
     const url = new URL(context.request.url);
@@ -193,7 +195,16 @@ export async function onRequestPost(context) {
       return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400 });
     }
 
+    const userRole = context.request.headers.get('X-User-Role');
+    const userEmail = context.request.headers.get('X-User-Email');
     const db = context.env.ksom_payslip_db;
+
+    // Check if month & category is locked
+    const approvalCheck = await db.prepare("SELECT is_approved FROM epf_entries WHERE month_year = ? AND employee_category = ? AND is_approved = 1 LIMIT 1").bind(month_year, category).first();
+    const consentGranted = await hasAdminConsent(db, 'epf', month_year) || await hasAdminConsent(db, 'epf', `${month_year}_${category}`);
+    if (approvalCheck && userRole !== 'super_admin' && !consentGranted) {
+      return new Response(JSON.stringify({ error: 'This EPF sheet is approved and locked. Super Admin consent is required to modify it.' }), { status: 403 });
+    }
 
     const statements = [];
 

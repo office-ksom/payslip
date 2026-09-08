@@ -1,4 +1,5 @@
 import { logActivity } from '../../lib/logger.js';
+import { hasAdminConsent } from '../../lib/consent_helper.js';
 
 export async function onRequestGet(context) {
   try {
@@ -24,23 +25,18 @@ export async function onRequestGet(context) {
 
     let query = `
       SELECT e.emp_id, e.name, e.designation, ${payColumn}, ${catColumn}, e.is_active, e.email_id, e.title, e.sort_order,
-             f.id as bill_id, f.bill_date, f.amount, f.description,
+             f.id as bill_id, f.amount, f.bill_date, f.description,
              f.is_approved, f.approved_on, f.approved_by
       FROM ${tableName} e
       LEFT JOIN festival_allowance_bills f ON e.emp_id = f.emp_id AND substr(f.bill_date, 1, 7) = ?
     `;
     let params = [monthYear];
 
-    let whereClauses = [];
     if (userRole === 'viewer' && userEmail) {
-      whereClauses.push("LOWER(e.email_id) = LOWER(?)");
+      query += ` WHERE LOWER(e.email_id) = LOWER(?)`;
       params.push(userEmail);
     } else {
-      whereClauses.push("(e.is_active = 1 OR f.id IS NOT NULL)");
-    }
-
-    if (whereClauses.length > 0) {
-      query += " WHERE " + whereClauses.join(" AND ");
+      query += ` WHERE (e.is_active = 1 OR f.id IS NOT NULL)`;
     }
 
     query += ` ORDER BY (CASE WHEN e.is_active = 0 THEN 1 ELSE 0 END) ASC, e.sort_order ASC, e.name ASC`;
@@ -67,38 +63,61 @@ export async function onRequestPost(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
 
+    const consentGranted = await hasAdminConsent(db, 'festival', monthYear);
+
     const statements = [];
- 
+
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM festival_allowance_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND is_approved = 1 LIMIT 1"
       ).bind(record.emp_id, monthYear).first('is_approved');
- 
-      if (isApprovedRecord === 1 && userRole !== 'super_admin') {
-        continue; // Skip approved records silently from saving
+
+      if (isApprovedRecord === 1 && userRole !== 'super_admin' && !consentGranted) {
+        continue; // Skip approved records silently if no consent
       }
- 
+
       if (record.amount && record.amount > 0) {
-        statements.push(
-          db.prepare(`
-            INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, category, is_approved)
-            VALUES (?, ?, ?, ?, ?, 2)
-            ON CONFLICT(emp_id, bill_date) DO UPDATE SET
-              amount = excluded.amount,
-              description = excluded.description,
-              category = excluded.category,
-              is_approved = 2
-          `).bind(
-            record.emp_id,
-            record.amount || 0,
-            record.bill_date,
-            record.description || null,
-            record.category || 'permanent'
-          )
-        );
+        if (record.bill_id) {
+          // Update existing record by ID to allow modifying bill_date without duplicates
+          statements.push(
+            db.prepare(`
+              UPDATE festival_allowance_bills 
+              SET amount = ?, bill_date = ?, description = ?, category = ?
+              WHERE id = ?
+            `).bind(
+              record.amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.category || 'permanent',
+              record.bill_id
+            )
+          );
+        } else {
+          statements.push(
+            db.prepare(`
+              INSERT INTO festival_allowance_bills (emp_id, amount, bill_date, description, category, is_approved)
+              VALUES (?, ?, ?, ?, ?, 2)
+              ON CONFLICT(emp_id, bill_date) DO UPDATE SET
+                amount = excluded.amount,
+                description = excluded.description,
+                category = excluded.category,
+                is_approved = 2
+            `).bind(
+              record.emp_id,
+              record.amount || 0,
+              record.bill_date,
+              record.description || null,
+              record.category || 'permanent'
+            )
+          );
+        }
       } else {
         // If amount set to 0, delete the record if it exists
-        if (record.bill_date) {
+        if (record.bill_id) {
+          statements.push(
+            db.prepare("DELETE FROM festival_allowance_bills WHERE id = ?").bind(record.bill_id)
+          );
+        } else if (record.bill_date) {
           statements.push(
             db.prepare(`
               DELETE FROM festival_allowance_bills 
@@ -113,9 +132,9 @@ export async function onRequestPost(context) {
       await db.batch(statements);
       for (const record of records) {
         if (record.amount && record.amount > 0) {
-          await logActivity(db, userEmail, 'Save Festival Allowance', `Saved/Updated festival allowance for employee ${record.emp_id} with amount Rs. ${record.amount}`);
-        } else if (record.bill_date) {
-          await logActivity(db, userEmail, 'Delete Festival Allowance', `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date}`);
+          await logActivity(db, userEmail, 'Save Festival Allowance', `Saved/Updated festival allowance for employee ${record.emp_id} with date ${record.bill_date} (amount Rs. ${record.amount})`);
+        } else if (record.bill_id || record.bill_date) {
+          await logActivity(db, userEmail, 'Delete Festival Allowance', `Deleted festival allowance for employee ${record.emp_id} on date ${record.bill_date || 'N/A'}`);
         }
       }
     }

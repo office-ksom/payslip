@@ -47,6 +47,9 @@ const SupplementaryPaybill = (props) => {
   const [isRejected, setIsRejected] = useState(false);
   const [approvalInfo, setApprovalInfo] = useState(null);
   const [approving, setApproving] = useState(false);
+  const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [togglingConsent, setTogglingConsent] = useState(false);
+  const [requestingConsent, setRequestingConsent] = useState(false);
   const [requireApproval, setRequireApproval] = useState(true);
   const [usersList, setUsersList] = useState([]);
 
@@ -140,6 +143,19 @@ const SupplementaryPaybill = (props) => {
         setIsSubmitted(false);
         setIsRejected(false);
         setApprovalInfo(null);
+      }
+
+      // Check Super Admin consent
+      try {
+        const consentRes = await fetch(`/api/edit-consent?module=supplementary&period_key=${targetMonth}`);
+        if (consentRes.ok) {
+          const consentData = await consentRes.json();
+          setAdminConsentActive(consentData.has_consent === true);
+        } else {
+          setAdminConsentActive(false);
+        }
+      } catch (ce) {
+        setAdminConsentActive(false);
       }
 
       const combined = suppData.map(empEarn => {
@@ -517,6 +533,59 @@ const SupplementaryPaybill = (props) => {
     }
   };
 
+  const handleToggleConsent = async () => {
+    if (user?.role !== 'super_admin') return;
+    setTogglingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'supplementary',
+          period_key: monthYear,
+          action: adminConsentActive ? 'revoke' : 'grant'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminConsentActive(!adminConsentActive);
+        alert(adminConsentActive ? 'Edit consent revoked from Admin.' : 'Edit consent successfully granted to Admin! Admins can now edit locked entries.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to update consent.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setTogglingConsent(false);
+    }
+  };
+
+  const handleRequestConsent = async () => {
+    setRequestingConsent(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'supplementary',
+          period_key: monthYear,
+          action: 'request',
+          notes: `Admin requested edit permission for Supplementary Paybill (${monthYear})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Edit permission request submitted to Super Admin.');
+      } else {
+        alert('Error: ' + (data.error || 'Failed to submit request.'));
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setRequestingConsent(false);
+    }
+  };
+
   // -- Modal logic --
   const openModal = (emp) => {
     setModalEmp({ ...emp });
@@ -573,7 +642,7 @@ const SupplementaryPaybill = (props) => {
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
 
 
-  const isReadOnly = isApproved && (!isOverrideActive || user?.role !== 'super_admin');
+  const isReadOnly = user?.role === 'viewer' || (isApproved && !adminConsentActive && (!isOverrideActive || user?.role !== 'super_admin'));
 
   const renderCategoryTabs = () => (
     <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
@@ -675,7 +744,7 @@ const SupplementaryPaybill = (props) => {
                   : approvalInfo.approved_by;
               })()}</strong> on <strong>{approvalInfo?.approved_on ? new Date(approvalInfo.approved_on).toLocaleString() : 'N/A'}</strong>.
               {user?.role === 'super_admin' && (
-                <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button 
                     className="btn btn-sm" 
                     onClick={() => setIsOverrideActive(!isOverrideActive)}
@@ -694,11 +763,63 @@ const SupplementaryPaybill = (props) => {
                     }}
                   >
                     {isOverrideActive ? <X size={14} /> : <Save size={14} />}
-                    {isOverrideActive ? 'Cancel Editing (Lock)' : 'Unlock for Editing'}
+                    {isOverrideActive ? 'Cancel Editing (Lock)' : 'Unlock for Editing (Super Admin)'}
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleToggleConsent}
+                    disabled={togglingConsent}
+                    style={{
+                      backgroundColor: adminConsentActive ? '#d97706' : '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {togglingConsent ? 'Updating...' : (adminConsentActive ? 'Revoke Admin Edit Consent' : 'Grant Edit Consent to Admin')}
                   </button>
                 </div>
               )}
-              {user?.role !== 'super_admin' && (isApproved ? ' Records are finalized.' : '')}
+              {user?.role === 'admin' && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  {adminConsentActive ? (
+                    <span style={{ 
+                      display: 'inline-block', 
+                      padding: '4px 10px', 
+                      backgroundColor: '#10b981', 
+                      color: '#fff', 
+                      borderRadius: '4px', 
+                      fontSize: '0.8rem', 
+                      fontWeight: 600 
+                    }}>
+                      ✓ Super Admin Consent Granted: You can edit and save records
+                    </span>
+                  ) : (
+                    <button
+                      className="btn btn-sm"
+                      onClick={handleRequestConsent}
+                      disabled={requestingConsent}
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {requestingConsent ? 'Requesting...' : 'Request Edit Permission from Super Admin'}
+                    </button>
+                  )}
+                </div>
+              )}
+              {user?.role !== 'super_admin' && user?.role !== 'admin' && (isApproved ? ' Records are finalized.' : '')}
             </p>
           </div>
         </div>
@@ -758,7 +879,7 @@ const SupplementaryPaybill = (props) => {
                 <Search size={18} /> Preview Full Sheet
               </button>
             )}
-            {((user?.role === 'admin' && !isApproved) || (user?.role === 'super_admin' && (!isApproved || isOverrideActive))) && (
+            {((user?.role === 'admin' && (!isApproved || adminConsentActive)) || (user?.role === 'super_admin' && (!isApproved || isOverrideActive))) && (
               <>
                 <button className="btn btn-primary" onClick={handleSave} disabled={saving || isReadOnly}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Paybill'}
