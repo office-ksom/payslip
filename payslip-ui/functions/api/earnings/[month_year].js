@@ -101,41 +101,54 @@ export async function onRequestPost(context) {
         )
       );
 
-      // 2. Insert/Update Deductions
-      statements.push(
-        db.prepare(`
-          INSERT INTO monthly_deductions (
-            emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
-            cpf, hra_recovery, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            epf = excluded.epf,
-            professional_tax = excluded.professional_tax,
-            sli = excluded.sli,
-            gis = excluded.gis,
-            lic = excluded.lic,
-            income_tax = excluded.income_tax,
-            onam_advance = excluded.onam_advance,
-            other_deductions = excluded.other_deductions,
-            cpf = excluded.cpf,
-            hra_recovery = excluded.hra_recovery,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.epf || 0,
-          record.professional_tax || 0,
-          record.sli || 0,
-          record.gis || 0,
-          record.lic || 0,
-          record.income_tax || 0,
-          record.onam_advance || 0,
-          record.other_deductions || 0,
-          record.cpf || 0,
-          record.hra_recovery || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      // 2. Insert/Update Deductions only if provided in record
+      const hasDeductions = record.epf !== undefined || record.income_tax !== undefined || record.professional_tax !== undefined || record.cpf !== undefined || record.other_deductions !== undefined;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO monthly_deductions (
+              emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
+              cpf, hra_recovery, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              epf = excluded.epf,
+              professional_tax = excluded.professional_tax,
+              sli = excluded.sli,
+              gis = excluded.gis,
+              lic = excluded.lic,
+              income_tax = excluded.income_tax,
+              onam_advance = excluded.onam_advance,
+              other_deductions = excluded.other_deductions,
+              cpf = excluded.cpf,
+              hra_recovery = excluded.hra_recovery,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.epf || 0,
+            record.professional_tax || 0,
+            record.sli || 0,
+            record.gis || 0,
+            record.lic || 0,
+            record.income_tax || 0,
+            record.onam_advance || 0,
+            record.other_deductions || 0,
+            record.cpf || 0,
+            record.hra_recovery || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO monthly_deductions (
+              emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
+              cpf, hra_recovery, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
 
     if (statements.length > 0) {

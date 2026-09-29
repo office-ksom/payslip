@@ -1,3 +1,5 @@
+import { hasAdminConsent } from '../../lib/consent_helper.js';
+
 export async function onRequestGet(context) {
   try {
     const monthYear = context.params.month_year;

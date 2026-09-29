@@ -2514,15 +2514,16 @@ const Reports = () => {
         sumTotDed += dedux; sumNet += net;
 
         const row = sheet.getRow(currentRow);
+        const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
         const scaleOrPayType = isPermanent ? (emp.scale_of_pay || '') : (emp.pay_type || '');
         
         let values = [];
         if (isPermanent) {
-          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, cpf, it, gis, sli, lic, pt, hraOnam];
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, epf, cpf, it, gis, sli, lic, pt, hraOnam];
         } else if (isContract || isDailyWage) {
-          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, epf, it, hraOnam];
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, epf, it, hraOnam];
         } else {
-          values = [null, i + 1, emp.name || '', emp.designation || '', scaleOrPayType, it, hraOnam];
+          values = [null, i + 1, fullName, emp.designation || '', scaleOrPayType, it, hraOnam];
         }
 
         if (dynamicDeduxKeys.length > 0) {

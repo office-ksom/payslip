@@ -541,7 +541,14 @@ const Paybill = (props) => {
           cca: emp.cca, other_earnings: emp.other_earnings,
           spl_pay: emp.spl_pay, tr_allow: emp.tr_allow,
           spl_allow: emp.spl_allow, fest_allow: emp.fest_allow,
-          other_earnings_breakdown: emp.other_earnings_breakdown
+          other_earnings_breakdown: emp.other_earnings_breakdown,
+          epf: emp.epf, cpf: emp.cpf,
+          professional_tax: emp.professional_tax,
+          sli: emp.sli, gis: emp.gis, lic: emp.lic,
+          income_tax: emp.income_tax,
+          onam_advance: emp.onam_advance, hra_recovery: emp.hra_recovery,
+          other_deductions: emp.other_deductions,
+          other_deductions_breakdown: emp.other_deductions_breakdown
         }));
 
         deductionsPayload = employees.map(emp => ({
@@ -561,7 +568,12 @@ const Paybill = (props) => {
           other_earnings_breakdown: emp.other_earnings_breakdown,
           days_worked: emp.days_worked || 0,
           daily_wage: emp.daily_wage || 0,
-          total_wage: emp.total_wage || 0
+          total_wage: emp.total_wage || 0,
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          epf: emp.epf || 0,
+          other_deductions: emp.other_deductions || 0,
+          other_deductions_breakdown: emp.other_deductions_breakdown
         }));
 
         deductionsPayload = employees.map(emp => ({
@@ -577,7 +589,12 @@ const Paybill = (props) => {
           emp_id: emp.emp_id, 
           basic_pay: emp.basic_pay || 0,
           other_earnings: emp.other_earnings || 0,
-          other_earnings_breakdown: emp.other_earnings_breakdown
+          other_earnings_breakdown: emp.other_earnings_breakdown,
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          epf: emp.epf || 0,
+          other_deductions: emp.other_deductions || 0,
+          other_deductions_breakdown: emp.other_deductions_breakdown
         }));
 
         deductionsPayload = employees.map(emp => ({
@@ -593,7 +610,11 @@ const Paybill = (props) => {
           emp_id: emp.emp_id, 
           basic_pay: emp.basic_pay || 0,
           other_earnings: emp.other_earnings || 0,
-          other_earnings_breakdown: emp.other_earnings_breakdown
+          other_earnings_breakdown: emp.other_earnings_breakdown,
+          income_tax: emp.income_tax || 0,
+          hra: emp.hra || 0,
+          other_deductions: emp.other_deductions || 0,
+          other_deductions_breakdown: emp.other_deductions_breakdown
         }));
 
         deductionsPayload = employees.map(emp => ({
@@ -866,6 +887,8 @@ const Paybill = (props) => {
   const [yr, mn] = (monthYear || '').split('-');
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const monthDisplay = mn ? `${monthNames[parseInt(mn)-1]} ${yr}` : monthYear;
+
+  const isReadOnly = user?.role === 'approver' || user?.role === 'viewer' || (isApproved && user?.role === 'admin' && !adminConsentActive) || (isApproved && user?.role === 'super_admin' && !isOverrideActive);
 
   if (user?.role === 'approver' && !isSubmitted && !isApproved) {
     return (
@@ -1386,7 +1409,7 @@ const Paybill = (props) => {
                         <td>{inp('sli')}</td>
                         <td>{inp('gis')}</td>
                         <td>{inp('lic')}</td>
-                        <td>{emp.onam_advance ? inp('onam_advance') : (parseFloat(emp.onam_advance||0)).toFixed(2)}</td>
+                        <td>{inp('onam_advance')}</td>
                         <td>{inp('hra_recovery')}</td>
                         <td>{inp('other_deductions')}</td>
                         <td style={{ fontWeight: 'bold', minWidth: '100px', color: isRowGrey ? '#9ca3af' : ((user?.role === 'approver' && !isApproved) ? '#000' : (isReadOnly ? '#fff' : (net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'))) }}>
@@ -2131,7 +2154,7 @@ const Paybill = (props) => {
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', gap: '1rem' }}>
               <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-              {(user?.role === 'admin' || user?.role === 'super_admin') && !(isApproved && user?.role !== 'super_admin') && (
+              {(user?.role === 'admin' || user?.role === 'super_admin') && !isReadOnly && (
                 <button className="btn btn-primary" onClick={commitModalSave} style={{ width: '120px' }}>OK</button>
               )}
             </div>
@@ -2217,7 +2240,10 @@ const Paybill = (props) => {
               ];
 
               const activeCols = columns.filter(col => {
-                if (col.key === 'basic_pay' || col.key === 'days_worked' || col.key === 'daily_wage' || col.key === 'total_wage' || col.key === 'gross' || col.key === 'net') return true;
+                if (['basic_pay', 'days_worked', 'daily_wage', 'total_wage', 'gross', 'net'].includes(col.key)) return true;
+                if (activeTab === 'permanent' && ['epf', 'cpf', 'professional_tax', 'income_tax'].includes(col.key)) return true;
+                if ((activeTab === 'contract' || activeTab === 'daily_wage') && ['income_tax', 'hra', 'epf'].includes(col.key)) return true;
+                if (activeTab === 'visiting' && ['income_tax', 'hra'].includes(col.key)) return true;
                 return employees.some(emp => {
                   const val = col.calc ? col.calc(emp) : (emp[col.key] || 0);
                   return Math.abs(val) > 0.01;
@@ -2245,16 +2271,20 @@ const Paybill = (props) => {
                     <tr style={{ backgroundColor: '#e5e7eb', borderBottom: '2px solid #000' }}>
                       <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px', textAlign: 'left' }}>Employee Name</th>
                       <th colSpan={earnCols.length} style={{ textAlign: 'center', border: '1px solid #000', padding: '6px' }}>EARNINGS</th>
-                      <th colSpan={deduxCols.length} style={{ textAlign: 'center', border: '1px solid #000', padding: '6px' }}>DEDUCTIONS</th>
+                      <th colSpan={Math.max(1, deduxCols.length)} style={{ textAlign: 'center', border: '1px solid #000', padding: '6px' }}>DEDUCTIONS</th>
                       <th rowSpan="2" style={{ border: '1px solid #000', padding: '12px 8px' }}>Net Pay</th>
                     </tr>
                     <tr style={{ backgroundColor: '#f3f4f6' }}>
                       {earnCols.map(c => (
                         <th key={c.key} style={{ border: '1px solid #000', padding: '6px', fontWeight: c.isBold ? 'bold' : '600' }}>{c.label}</th>
                       ))}
-                      {deduxCols.map(c => (
-                        <th key={c.key} style={{ border: '1px solid #000', padding: '6px' }}>{c.label}</th>
-                      ))}
+                      {deduxCols.length > 0 ? (
+                        deduxCols.map(c => (
+                          <th key={c.key} style={{ border: '1px solid #000', padding: '6px' }}>{c.label}</th>
+                        ))
+                      ) : (
+                        <th style={{ border: '1px solid #000', padding: '6px' }}>Nil</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -2291,11 +2321,15 @@ const Paybill = (props) => {
                               {(Number(getVal(c)) || 0).toFixed(2)}
                             </td>
                           ))}
-                          {deduxCols.map(c => (
-                            <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                              {(Number(getVal(c)) || 0).toFixed(2)}
-                            </td>
-                          ))}
+                          {deduxCols.length > 0 ? (
+                            deduxCols.map(c => (
+                              <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
+                                {(Number(getVal(c)) || 0).toFixed(2)}
+                              </td>
+                            ))
+                          ) : (
+                            <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>0.00</td>
+                          )}
                           <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#000' }}>₹{(Number(net) || 0).toFixed(2)}</td>
                         </tr>
                       );
@@ -2324,16 +2358,20 @@ const Paybill = (props) => {
                           </td>
                         );
                       })}
-                      {deduxCols.map(c => {
-                        const total = employees.reduce((sum, emp) => {
-                          return sum + (emp[c.key] || 0);
-                        }, 0);
-                        return (
-                          <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
-                            {(Number(total) || 0).toFixed(2)}
-                          </td>
-                        );
-                      })}
+                      {deduxCols.length > 0 ? (
+                        deduxCols.map(c => {
+                          const total = employees.reduce((sum, emp) => {
+                            return sum + (emp[c.key] || 0);
+                          }, 0);
+                          return (
+                            <td key={c.key} style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>
+                              {(Number(total) || 0).toFixed(2)}
+                            </td>
+                          );
+                        })
+                      ) : (
+                        <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#000' }}>0.00</td>
+                      )}
                       <td style={{ border: '1px solid #000', padding: '10px 8px', textAlign: 'right', color: '#000' }}>
                         ₹{(employees.reduce((sum, emp) => {
                           const da = activeTab === 'permanent' ? (emp.category === 'ugc/csir' ? (emp.da_ugc || 0) : (emp.da_state || 0)) : 0;

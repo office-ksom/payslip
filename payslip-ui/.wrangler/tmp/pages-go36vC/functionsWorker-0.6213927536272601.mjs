@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-EXNgTt/checked-fetch.js
+// ../.wrangler/tmp/bundle-F2OdKF/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -736,7 +736,7 @@ async function ensureConsentTable(db) {
   }
 }
 __name(ensureConsentTable, "ensureConsentTable");
-async function hasAdminConsent2(db, module, periodKey) {
+async function hasAdminConsent(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
     const row = await db.prepare(
@@ -748,7 +748,7 @@ async function hasAdminConsent2(db, module, periodKey) {
     return false;
   }
 }
-__name(hasAdminConsent2, "hasAdminConsent");
+__name(hasAdminConsent, "hasAdminConsent");
 async function getConsentStatus(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
@@ -821,7 +821,7 @@ async function onRequestPost5(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_contract", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -899,7 +899,7 @@ async function onRequestPost6(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_daily_wage", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -976,7 +976,7 @@ async function onRequestPost7(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_visiting", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1057,7 +1057,7 @@ async function onRequestPost8(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_contract", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1080,27 +1080,39 @@ async function onRequestPost8(context) {
           record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
         )
       );
-      statements.push(
-        db.prepare(`
-          INSERT INTO contract_monthly_deductions (
-            emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            income_tax = excluded.income_tax,
-            hra = excluded.hra,
-            epf = excluded.epf,
-            other_deductions = excluded.other_deductions,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.income_tax || 0,
-          record.hra || 0,
-          record.epf || 0,
-          record.other_deductions || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      const hasDeductions = record.income_tax !== void 0 || record.hra !== void 0 || record.epf !== void 0 || record.other_deductions !== void 0;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO contract_monthly_deductions (
+              emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              income_tax = excluded.income_tax,
+              hra = excluded.hra,
+              epf = excluded.epf,
+              other_deductions = excluded.other_deductions,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.income_tax || 0,
+            record.hra || 0,
+            record.epf || 0,
+            record.other_deductions || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO contract_monthly_deductions (
+              emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
     if (statements.length > 0) {
       await db.batch(statements);
@@ -1130,7 +1142,7 @@ async function onRequestDelete(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM contract_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_contract", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_contract", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1191,7 +1203,7 @@ async function onRequestPost9(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_daily_wage", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1221,27 +1233,39 @@ async function onRequestPost9(context) {
           record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
         )
       );
-      statements.push(
-        db.prepare(`
-          INSERT INTO daily_wage_monthly_deductions (
-            emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            income_tax = excluded.income_tax,
-            hra = excluded.hra,
-            epf = excluded.epf,
-            other_deductions = excluded.other_deductions,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.income_tax || 0,
-          record.hra || 0,
-          record.epf || 0,
-          record.other_deductions || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      const hasDeductions = record.income_tax !== void 0 || record.hra !== void 0 || record.epf !== void 0 || record.other_deductions !== void 0;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO daily_wage_monthly_deductions (
+              emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              income_tax = excluded.income_tax,
+              hra = excluded.hra,
+              epf = excluded.epf,
+              other_deductions = excluded.other_deductions,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.income_tax || 0,
+            record.hra || 0,
+            record.epf || 0,
+            record.other_deductions || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO daily_wage_monthly_deductions (
+              emp_id, month_year, income_tax, hra, epf, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
     if (statements.length > 0) {
       await db.batch(statements);
@@ -1271,7 +1295,7 @@ async function onRequestDelete2(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM daily_wage_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_daily_wage", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_daily_wage", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1331,7 +1355,7 @@ async function onRequestPost10(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_visiting", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -1354,25 +1378,37 @@ async function onRequestPost10(context) {
           record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
         )
       );
-      statements.push(
-        db.prepare(`
-          INSERT INTO visiting_monthly_deductions (
-            emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            income_tax = excluded.income_tax,
-            hra = excluded.hra,
-            other_deductions = excluded.other_deductions,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.income_tax || 0,
-          record.hra || 0,
-          record.other_deductions || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      const hasDeductions = record.income_tax !== void 0 || record.hra !== void 0 || record.other_deductions !== void 0;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO visiting_monthly_deductions (
+              emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              income_tax = excluded.income_tax,
+              hra = excluded.hra,
+              other_deductions = excluded.other_deductions,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.income_tax || 0,
+            record.hra || 0,
+            record.other_deductions || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO visiting_monthly_deductions (
+              emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
     if (statements.length > 0) {
       await db.batch(statements);
@@ -1402,7 +1438,7 @@ async function onRequestDelete3(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM visiting_monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_visiting", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_visiting", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -2823,11 +2859,11 @@ async function onRequestPost26(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
-    const consentGeneral = await hasAdminConsent2(db, "arrears", monthYear);
+    const consentGeneral = await hasAdminConsent(db, "arrears", monthYear);
     const statements = [];
     for (const record of records) {
       if (!record.arrear_type) continue;
-      const consentSpecific = await hasAdminConsent2(db, "arrears", `${monthYear}_${record.arrear_type}`);
+      const consentSpecific = await hasAdminConsent(db, "arrears", `${monthYear}_${record.arrear_type}`);
       const consentGranted = consentGeneral || consentSpecific;
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM arrear_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND arrear_type = ? AND is_approved = 1 LIMIT 1"
@@ -3049,7 +3085,7 @@ async function onRequestPost28(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_permanent", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_permanent", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -3093,40 +3129,53 @@ async function onRequestPost28(context) {
           record.other_earnings_breakdown ? JSON.stringify(record.other_earnings_breakdown) : null
         )
       );
-      statements.push(
-        db.prepare(`
-          INSERT INTO monthly_deductions (
-            emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
-            cpf, hra_recovery, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            epf = excluded.epf,
-            professional_tax = excluded.professional_tax,
-            sli = excluded.sli,
-            gis = excluded.gis,
-            lic = excluded.lic,
-            income_tax = excluded.income_tax,
-            onam_advance = excluded.onam_advance,
-            other_deductions = excluded.other_deductions,
-            cpf = excluded.cpf,
-            hra_recovery = excluded.hra_recovery,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.epf || 0,
-          record.professional_tax || 0,
-          record.sli || 0,
-          record.gis || 0,
-          record.lic || 0,
-          record.income_tax || 0,
-          record.onam_advance || 0,
-          record.other_deductions || 0,
-          record.cpf || 0,
-          record.hra_recovery || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      const hasDeductions = record.epf !== void 0 || record.income_tax !== void 0 || record.professional_tax !== void 0 || record.cpf !== void 0 || record.other_deductions !== void 0;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO monthly_deductions (
+              emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
+              cpf, hra_recovery, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              epf = excluded.epf,
+              professional_tax = excluded.professional_tax,
+              sli = excluded.sli,
+              gis = excluded.gis,
+              lic = excluded.lic,
+              income_tax = excluded.income_tax,
+              onam_advance = excluded.onam_advance,
+              other_deductions = excluded.other_deductions,
+              cpf = excluded.cpf,
+              hra_recovery = excluded.hra_recovery,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.epf || 0,
+            record.professional_tax || 0,
+            record.sli || 0,
+            record.gis || 0,
+            record.lic || 0,
+            record.income_tax || 0,
+            record.onam_advance || 0,
+            record.other_deductions || 0,
+            record.cpf || 0,
+            record.hra_recovery || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO monthly_deductions (
+              emp_id, month_year, epf, professional_tax, sli, gis, lic, income_tax, onam_advance, other_deductions,
+              cpf, hra_recovery, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
     if (statements.length > 0) {
       await db.batch(statements);
@@ -3156,7 +3205,7 @@ async function onRequestDelete4(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM monthly_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "paybill_permanent", monthYear) || await hasAdminConsent2(db, "paybill", monthYear);
+    const consentGranted = await hasAdminConsent(db, "paybill_permanent", monthYear) || await hasAdminConsent(db, "paybill", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -3227,7 +3276,7 @@ async function onRequestPost29(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
-    const consentGranted = await hasAdminConsent2(db, "festival", monthYear);
+    const consentGranted = await hasAdminConsent(db, "festival", monthYear);
     const statements = [];
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
@@ -3364,7 +3413,7 @@ async function onRequestPost30(context) {
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "supplementary", monthYear);
+    const consentGranted = await hasAdminConsent(db, "supplementary", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -3481,7 +3530,7 @@ async function onRequestDelete5(context) {
     }
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1 LIMIT 1").bind(monthYear).first();
-    const consentGranted = await hasAdminConsent2(db, "supplementary", monthYear);
+    const consentGranted = await hasAdminConsent(db, "supplementary", monthYear);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This month is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -3554,7 +3603,7 @@ async function onRequestPost31(context) {
     const monthYear = context.params.month_year;
     const { records } = await context.request.json();
     const db = context.env.ksom_payslip_db;
-    const consentGranted = await hasAdminConsent2(db, "surrender", monthYear);
+    const consentGranted = await hasAdminConsent(db, "surrender", monthYear);
     for (const record of records) {
       const isApprovedRecord = await db.prepare(
         "SELECT is_approved FROM surrender_bills WHERE emp_id = ? AND substr(bill_date, 1, 7) = ? AND is_approved = 1 LIMIT 1"
@@ -4176,7 +4225,7 @@ async function onRequestPost36(context) {
     const userEmail = context.request.headers.get("X-User-Email");
     const db = context.env.ksom_payslip_db;
     const approvalCheck = await db.prepare("SELECT is_approved FROM epf_entries WHERE month_year = ? AND employee_category = ? AND is_approved = 1 LIMIT 1").bind(month_year, category).first();
-    const consentGranted = await hasAdminConsent2(db, "epf", month_year) || await hasAdminConsent2(db, "epf", `${month_year}_${category}`);
+    const consentGranted = await hasAdminConsent(db, "epf", month_year) || await hasAdminConsent(db, "epf", `${month_year}_${category}`);
     if (approvalCheck && userRole !== "super_admin" && !consentGranted) {
       return new Response(JSON.stringify({ error: "This EPF sheet is approved and locked. Super Admin consent is required to modify it." }), { status: 403 });
     }
@@ -4427,7 +4476,7 @@ function forbiddenResponse() {
 }
 __name(forbiddenResponse, "forbiddenResponse");
 
-// ../.wrangler/tmp/pages-tdSd0E/functionsRoutes-0.36250642773388486.mjs
+// ../.wrangler/tmp/pages-go36vC/functionsRoutes-0.5642499921065118.mjs
 var routes = [
   {
     routePath: "/api/reports/contract/consolidated",
@@ -5555,7 +5604,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-EXNgTt/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-F2OdKF/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -5587,7 +5636,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-EXNgTt/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-F2OdKF/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -5687,4 +5736,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.30046197134678065.mjs.map
+//# sourceMappingURL=functionsWorker-0.6213927536272601.mjs.map

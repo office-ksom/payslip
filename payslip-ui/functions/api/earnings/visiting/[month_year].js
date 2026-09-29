@@ -77,26 +77,38 @@ export async function onRequestPost(context) {
         )
       );
 
-      // 2. Insert/Update Visiting Deductions
-      statements.push(
-        db.prepare(`
-          INSERT INTO visiting_monthly_deductions (
-            emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
-          ) VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(emp_id, month_year) DO UPDATE SET
-            income_tax = excluded.income_tax,
-            hra = excluded.hra,
-            other_deductions = excluded.other_deductions,
-            other_deductions_breakdown = excluded.other_deductions_breakdown
-        `).bind(
-          record.emp_id,
-          monthYear,
-          record.income_tax || 0,
-          record.hra || 0,
-          record.other_deductions || 0,
-          record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
-        )
-      );
+      // 2. Insert/Update Visiting Deductions only if provided in record
+      const hasDeductions = record.income_tax !== undefined || record.hra !== undefined || record.other_deductions !== undefined;
+      if (hasDeductions) {
+        statements.push(
+          db.prepare(`
+            INSERT INTO visiting_monthly_deductions (
+              emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(emp_id, month_year) DO UPDATE SET
+              income_tax = excluded.income_tax,
+              hra = excluded.hra,
+              other_deductions = excluded.other_deductions,
+              other_deductions_breakdown = excluded.other_deductions_breakdown
+          `).bind(
+            record.emp_id,
+            monthYear,
+            record.income_tax || 0,
+            record.hra || 0,
+            record.other_deductions || 0,
+            record.other_deductions_breakdown ? JSON.stringify(record.other_deductions_breakdown) : null
+          )
+        );
+      } else {
+        statements.push(
+          db.prepare(`
+            INSERT INTO visiting_monthly_deductions (
+              emp_id, month_year, income_tax, hra, other_deductions, other_deductions_breakdown
+            ) VALUES (?, ?, 0, 0, 0, NULL)
+            ON CONFLICT(emp_id, month_year) DO NOTHING
+          `).bind(record.emp_id, monthYear)
+        );
+      }
     }
 
     if (statements.length > 0) {
