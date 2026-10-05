@@ -451,16 +451,12 @@ const EPFReports = (props) => {
           : 0;
           
         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+        const admin_charges = isDep ? 0 : (epf_wage * 0.005);
         const isBefore2014 = doj && doj < '2014-09-01';
         const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
         const edli = isDep 
           ? 0 
-          : (monthYear >= '2026-09' && isBefore2014
-              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
-              : (emp.edli !== undefined && emp.edli !== null 
-                  ? Number(emp.edli) 
-                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+          : (Math.min(epf_wage, edliCeiling) * 0.005);
         const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
         
         const ee_contrib = emp.employee_contribution || 0;
@@ -487,11 +483,11 @@ const EPFReports = (props) => {
           sheet.getCell(`H${r}`).value = 0.00;
           sheet.getCell(`I${r}`).value = 0.00;
           sheet.getCell(`J${r}`).value = { 
-            formula: `IF(E${r}>0,ROUND(E${r}*0.5%,0),"")`,
+            formula: `IF(E${r}>0,E${r}*0.5%,"")`,
             result: admin_charges
           };
           sheet.getCell(`K${r}`).value = { 
-            formula: `IF(E${r}>0,ROUND(MIN(E${r},${edliCeiling})*0.5%,0),"")`,
+            formula: `IF(E${r}>0,MIN(E${r},${edliCeiling})*0.5%,"")`,
             result: edli
           };
           sheet.getCell(`L${r}`).value = null;
@@ -562,14 +558,10 @@ const EPFReports = (props) => {
               : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
           : 0;
         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+        const admin_charges = isDep ? 0 : (epf_wage * 0.005);
         const edli = isDep 
           ? 0 
-          : (monthYear >= '2026-09' && isBefore2014
-              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
-              : (emp.edli !== undefined && emp.edli !== null 
-                  ? Number(emp.edli) 
-                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+          : (Math.min(epf_wage, edliCeiling) * 0.005);
         const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
         const ee_contrib = emp.employee_contribution || 0;
         const total_remit = total_er + ee_contrib;
@@ -594,8 +586,8 @@ const EPFReports = (props) => {
       sheet.getCell(`G${totalRow}`).value = { formula: `SUM(G8:G${totalRow-1})`, result: sumG };
       sheet.getCell(`H${totalRow}`).value = { formula: `SUM(H8:H${totalRow-1})`, result: 0.00 };
       sheet.getCell(`I${totalRow}`).value = { formula: `SUM(I8:I${totalRow-1})`, result: 0.00 };
-      sheet.getCell(`J${totalRow}`).value = { formula: `ROUND(SUM(J8:J${totalRow-1}),0)`, result: sumJ };
-      sheet.getCell(`K${totalRow}`).value = { formula: `ROUND(SUM(K8:K${totalRow-1}),0)`, result: sumK };
+      sheet.getCell(`J${totalRow}`).value = { formula: `ROUND(SUM(J8:J${totalRow-1}),0)`, result: Math.round(sumJ) };
+      sheet.getCell(`K${totalRow}`).value = { formula: `ROUND(SUM(K8:K${totalRow-1}),0)`, result: Math.round(sumK) };
       
       sheet.getCell(`L${totalRow}`).value = { formula: `ROUND(SUM(L8:L${totalRow-1}),0)`, result: 0.00 };
       sheet.mergeCells(`L${totalRow}:L${totalRow2}`);
@@ -625,7 +617,7 @@ const EPFReports = (props) => {
       sheet.getCell(`H${totalRow2}`).value = { formula: `SUM(H${totalRow}:I${totalRow})`, result: 0.00 };
       sheet.mergeCells(`H${totalRow2}:I${totalRow2}`);
       
-      sheet.getCell(`J${totalRow2}`).value = { formula: `SUM(J${totalRow}:K${totalRow})`, result: sumJ + sumK };
+      sheet.getCell(`J${totalRow2}`).value = { formula: `SUM(J${totalRow}:K${totalRow})`, result: Math.round(sumJ) + Math.round(sumK) };
       sheet.mergeCells(`J${totalRow2}:K${totalRow2}`);
 
       for (let r = totalRow; r <= totalRow2; r++) {
@@ -1137,14 +1129,14 @@ const EPFReports = (props) => {
       sheet.getCell(`M${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`M${r}`).numFmt = '0.00';
 
-      // N: EDLI (.5% of value of column G)
-      sheet.getCell(`N${r}`).value = { formula: `ROUND(G${r}*0.5%,0)` };
+      // N: EDLI (.5% of value of column G - unrounded for individual)
+      sheet.getCell(`N${r}`).value = { formula: `G${r}*0.5%` };
       sheet.getCell(`N${r}`).font = { name: 'Calibri', size: 11 };
       sheet.getCell(`N${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`N${r}`).numFmt = '0.00';
 
-      // O: Admin Charge (.5% of value of column E)
-      sheet.getCell(`O${r}`).value = { formula: `ROUND(E${r}*0.5%,0)` };
+      // O: Admin Charge (.5% of value of column E - unrounded for individual)
+      sheet.getCell(`O${r}`).value = { formula: `E${r}*0.5%` };
       sheet.getCell(`O${r}`).font = { name: 'Calibri', size: 11 };
       sheet.getCell(`O${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`O${r}`).numFmt = '0.00';
@@ -1164,10 +1156,13 @@ const EPFReports = (props) => {
     sheet.mergeCells(`A${totalRow}:C${totalRow}`);
     sheet.getCell(`A${totalRow}`).value = 'TOTAL';
 
-    // SUM formulas for Total Row (D to O)
-    ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'].forEach((col) => {
+    // SUM formulas for Total Row (D to M)
+    ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'].forEach((col) => {
       sheet.getCell(`${col}${totalRow}`).value = { formula: `SUM(${col}6:${col}${lastEmpRow})` };
     });
+    // Rounding off required for total of EDLI (N) and Admin charge (O)
+    sheet.getCell(`N${totalRow}`).value = { formula: `ROUND(SUM(N6:N${lastEmpRow}),0)` };
+    sheet.getCell(`O${totalRow}`).value = { formula: `ROUND(SUM(O6:O${lastEmpRow}),0)` };
     sheet.getCell(`P${totalRow}`).value = { formula: `I${totalRow}+J${totalRow}` };
 
     // Apply Dark Red font and middle-aligned styling to all cells in the totals row (1 to 16)
@@ -1431,10 +1426,10 @@ const EPFReports = (props) => {
         : 0;
         
       const erDiff = erShare - epsRemitted;
-      // EDLI = .5% of value of column G
-      const edli = Math.round(ceilingLimit * 0.005);
-      // Admin charge = .5% of value of column E
-      const adminCharges = Math.round(epf_wage * 0.005);
+      // EDLI = .5% of value of column G (unrounded for individual)
+      const edli = ceilingLimit * 0.005;
+      // Admin charge = .5% of value of column E (unrounded for individual)
+      const adminCharges = epf_wage * 0.005;
       const totalEeEr = eeShare + erShare;
 
       return {
@@ -1823,8 +1818,8 @@ const EPFReports = (props) => {
                       <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.epsContrib)}</td>
                       <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.epsRemitted)}</td>
                       <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.erDiff)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.edli)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.adminCharges)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(Math.round(previewTotals.edli || 0))}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(Math.round(previewTotals.adminCharges || 0))}</td>
                       <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.totalEeEr)}</td>
                     </tr>
 
@@ -2056,16 +2051,12 @@ const EPFReports = (props) => {
                         : 0;
                         
                       const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-                      const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+                      const admin_charges = isDep ? 0 : (epf_wage * 0.005);
                       const isBefore2014 = doj && doj < '2014-09-01';
                       const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
                       const edli = isDep 
                         ? 0 
-                        : (monthYear >= '2026-09' && isBefore2014
-                            ? Math.round(Math.min(epf_wage, 25000) * 0.005)
-                            : (emp.edli !== undefined && emp.edli !== null 
-                                ? Number(emp.edli) 
-                                : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+                        : (Math.min(epf_wage, edliCeiling) * 0.005);
                       const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
                       
                       const ee_contrib = emp.employee_contribution || 0;
@@ -2125,16 +2116,12 @@ const EPFReports = (props) => {
                               : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                           : 0;
                         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-                        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+                        const admin_charges = isDep ? 0 : (epf_wage * 0.005);
                         const isBefore2014 = doj && doj < '2014-09-01';
                         const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
                         const edli = isDep 
                           ? 0 
-                          : (monthYear >= '2026-09' && isBefore2014
-                              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
-                              : (emp.edli !== undefined && emp.edli !== null 
-                                  ? Number(emp.edli) 
-                                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+                          : (Math.min(epf_wage, edliCeiling) * 0.005);
                         const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
                         
                         const ee_contrib = emp.employee_contribution || 0;
@@ -2157,7 +2144,11 @@ const EPFReports = (props) => {
                       const depRowIndex = rawPermanentData.findIndex(emp => emp.appointment_type === 'Deputation');
                       const depEmp = depRowIndex !== -1 ? rawPermanentData[depRowIndex] : null;
                       const depRemit = depEmp ? (depEmp.employee_contribution || 0) : 0;
-                      const epfoRemit = t.total_remit - depRemit;
+                      const roundedAdminCharges = Math.round(t.admin_charges);
+                      const roundedEdli = Math.round(t.edli);
+                      const roundedTotalEr = t.pf_contrib + t.eps_contrib + roundedAdminCharges + roundedEdli;
+                      const roundedTotalRemit = roundedTotalEr + t.total_ee;
+                      const epfoRemit = roundedTotalRemit - depRemit;
 
                       return (
                         <>
@@ -2170,29 +2161,29 @@ const EPFReports = (props) => {
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.eps_contrib)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.admin_charges)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.edli)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(roundedAdminCharges)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(roundedEdli)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_er)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(roundedTotalEr)}</td>
                             <td style={{ border: '1px solid #BFBFBF', backgroundColor: '#FFFFFF' }}></td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.ee_contrib)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_ee)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_remit)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(roundedTotalRemit)}</td>
                           </tr>
                           {/* Row 22 Equivalent */}
                           <tr style={{ height: '22px', backgroundColor: '#E2DDCD', fontWeight: 'bold', color: '#C00000' }}>
                             <td colSpan="5" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>TOTAL</td>
                             <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{formatCurrency(t.pf_contrib + t.eps_contrib)}</td>
                             <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>0.00</td>
-                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{formatCurrency(t.admin_charges + t.edli)}</td>
+                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{formatCurrency(roundedAdminCharges + roundedEdli)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_er)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(roundedTotalEr)}</td>
                             <td style={{ border: '1px solid #BFBFBF', backgroundColor: '#FFFFFF' }}></td>
                             <td colSpan="3" style={{ border: '1px solid #BFBFBF' }}></td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_ee)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_remit)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(roundedTotalRemit)}</td>
                           </tr>
 
                           {/* Remittance summary rows */}
@@ -2212,7 +2203,7 @@ const EPFReports = (props) => {
                           <tr style={{ height: '28px', backgroundColor: '#F2F2F2', fontSize: '13px', fontWeight: 'bold' }}>
                             <td colSpan="2" style={{ border: 'none' }}></td>
                             <td colSpan="4" style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>TOTAL</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{formatCurrency(t.total_remit)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{formatCurrency(roundedTotalRemit)}</td>
                             <td colSpan="12" style={{ border: 'none' }}></td>
                           </tr>
                           
