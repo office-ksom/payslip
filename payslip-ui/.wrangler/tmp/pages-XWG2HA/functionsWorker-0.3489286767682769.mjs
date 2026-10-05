@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-p835o2/checked-fetch.js
+// ../.wrangler/tmp/bundle-0wPLYQ/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -4178,18 +4178,23 @@ async function onRequestGet40(context) {
           status = "after_2014_before_2025";
         }
       }
+      const getWageCeiling = /* @__PURE__ */ __name((my) => {
+        if (!my || my < "2026-09") return 15e3;
+        return 25e3;
+      }, "getWageCeiling");
+      const wageCeiling = getWageCeiling(month_year);
       let epf_wage = wages;
       if (status === "after_2014_before_2025" || status === "after_2025") {
-        epf_wage = Math.min(wages, 15e3);
+        epf_wage = Math.min(wages, wageCeiling);
       }
       let eps_wage = 0;
       if (status === "before_2014") {
         eps_wage = wages;
       } else if (status === "after_2014_before_2025") {
-        eps_wage = Math.min(wages, 15e3);
+        eps_wage = Math.min(wages, wageCeiling);
       }
       const isDeputation = row.appointment_type === "Deputation";
-      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, 15e3) * 5e-3);
+      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, wageCeiling) * 5e-3);
       const employee_contribution = row.employee_contribution || 0;
       const employer_contribution = isDeputation ? 0 : Math.round(epf_wage * 0.12);
       const admin_charges = isDeputation ? 0 : Math.round(epf_wage * 5e-3);
@@ -5604,7 +5609,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-p835o2/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-0wPLYQ/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -5636,7 +5641,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-p835o2/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-0wPLYQ/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

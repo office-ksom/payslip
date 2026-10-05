@@ -4202,18 +4202,23 @@ async function onRequestGet40(context) {
           status = "after_2014_before_2025";
         }
       }
+      const getWageCeiling = /* @__PURE__ */ __name2((my) => {
+        if (!my || my < "2026-09") return 15e3;
+        return 25e3;
+      }, "getWageCeiling");
+      const wageCeiling = getWageCeiling(month_year);
       let epf_wage = wages;
       if (status === "after_2014_before_2025" || status === "after_2025") {
-        epf_wage = Math.min(wages, 15e3);
+        epf_wage = Math.min(wages, wageCeiling);
       }
       let eps_wage = 0;
       if (status === "before_2014") {
         eps_wage = wages;
       } else if (status === "after_2014_before_2025") {
-        eps_wage = Math.min(wages, 15e3);
+        eps_wage = Math.min(wages, wageCeiling);
       }
       const isDeputation = row.appointment_type === "Deputation";
-      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, 15e3) * 5e-3);
+      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, wageCeiling) * 5e-3);
       const employee_contribution = row.employee_contribution || 0;
       const employer_contribution = isDeputation ? 0 : Math.round(epf_wage * 0.12);
       const admin_charges = isDeputation ? 0 : Math.round(epf_wage * 5e-3);

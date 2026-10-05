@@ -135,24 +135,31 @@ export async function onRequestGet(context) {
         }
       }
 
-      // Formula 1: EPF Wage = 15000 for joined after 01-09-2014, and basic+DA (wages) for others
+      // Wage ceiling limit increased from Rs. 15,000 to Rs. 25,000 w.e.f 17-09-2026 (2026-09 onwards)
+      const getWageCeiling = (my) => {
+        if (!my || my < '2026-09') return 15000;
+        return 25000;
+      };
+      const wageCeiling = getWageCeiling(month_year);
+
+      // Formula 1: EPF Wage = wage ceiling for joined after 01-09-2014, and basic+DA (wages) for others
       let epf_wage = wages;
       if (status === 'after_2014_before_2025' || status === 'after_2025') {
-        epf_wage = Math.min(wages, 15000);
+        epf_wage = Math.min(wages, wageCeiling);
       }
 
-      // Formula 2: EPS Wage = basic+DA (wages) for joined before 01-09-2014, Rs. 15000 for joined after 01-09-2014 and before 01-08-2025, 0 for joined after 01-08-2025
+      // Formula 2: EPS Wage = basic+DA (wages) for joined before 01-09-2014, wage ceiling for joined after 01-09-2014 and before 01-08-2025, 0 for joined after 01-08-2025
       let eps_wage = 0;
       if (status === 'before_2014') {
         eps_wage = wages;
       } else if (status === 'after_2014_before_2025') {
-        eps_wage = Math.min(wages, 15000);
+        eps_wage = Math.min(wages, wageCeiling);
       }
 
       const isDeputation = row.appointment_type === 'Deputation';
 
-      // EDLI = 0.5% of EPF Wage subject to maximum EPF Wage of 15000 (0 for Deputation)
-      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, 15000) * 0.005);
+      // EDLI = 0.5% of EPF Wage subject to maximum EPF Wage ceiling (0 for Deputation)
+      const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, wageCeiling) * 0.005);
 
       // EPF Employee Contribution = populated from paybill
       const employee_contribution = row.employee_contribution || 0;

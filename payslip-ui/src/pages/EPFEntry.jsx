@@ -126,11 +126,17 @@ const EPFEntry = (props) => {
       [field]: rawVal
     };
 
+    const getWageCeiling = (my) => {
+      if (!my || my < '2026-09') return 15000;
+      return 25000;
+    };
+
     if (field === 'epf_wage') {
       const epfWage = parseFloat(value) || 0;
       const isDeputation = updated[index].appointment_type === 'Deputation';
-      // EDLI capped at Rs 15,000 maximum EPF wage (0 for Deputation)
-      updated[index].edli = isDeputation ? 0 : Math.round(Math.min(epfWage, 15000) * 0.005);
+      const ceiling = getWageCeiling(monthYear);
+      // EDLI capped at maximum EPF wage ceiling (0 for Deputation)
+      updated[index].edli = isDeputation ? 0 : Math.round(Math.min(epfWage, ceiling) * 0.005);
       updated[index].employer_contribution = isDeputation ? 0 : Math.round(epfWage * 0.12);
       updated[index].admin_charges = isDeputation ? 0 : Math.round(epfWage * 0.005);
     }
@@ -155,22 +161,28 @@ const EPFEntry = (props) => {
       }
     }
 
+    const getWageCeiling = (my) => {
+      if (!my || my < '2026-09') return 15000;
+      return 25000;
+    };
+    const ceiling = getWageCeiling(monthYear);
+
     let epf_wage = wages;
     if (status === 'after_2014_before_2025' || status === 'after_2025') {
-      epf_wage = Math.min(wages, 15000);
+      epf_wage = Math.min(wages, ceiling);
     }
 
     let eps_wage = 0;
     if (status === 'before_2014') {
       eps_wage = wages;
     } else if (status === 'after_2014_before_2025') {
-      eps_wage = Math.min(wages, 15000);
+      eps_wage = Math.min(wages, ceiling);
     }
 
     const isDeputation = row.appointment_type === 'Deputation';
 
-    // EDLI capped at Rs 15,000 maximum EPF wage (0 for Deputation)
-    const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, 15000) * 0.005);
+    // EDLI capped at maximum EPF wage ceiling (0 for Deputation)
+    const edli = isDeputation ? 0 : Math.round(Math.min(epf_wage, ceiling) * 0.005);
     const employer_contribution = isDeputation ? 0 : Math.round(epf_wage * 0.12);
     const admin_charges = isDeputation ? 0 : Math.round(epf_wage * 0.005);
 
@@ -203,8 +215,13 @@ const EPFEntry = (props) => {
     if (field === 'epf_wage') {
       const epfWage = parseFloat(value) || 0;
       const isDeputation = updatedEmp.appointment_type === 'Deputation';
-      // EDLI capped at Rs 15,000 maximum EPF wage (0 for Deputation)
-      updatedEmp.edli = isDeputation ? 0 : Math.round(Math.min(epfWage, 15000) * 0.005);
+      const getWageCeiling = (my) => {
+        if (!my || my < '2026-09') return 15000;
+        return 25000;
+      };
+      const ceiling = getWageCeiling(monthYear);
+      // EDLI capped at maximum EPF wage ceiling (0 for Deputation)
+      updatedEmp.edli = isDeputation ? 0 : Math.round(Math.min(epfWage, ceiling) * 0.005);
       updatedEmp.employer_contribution = isDeputation ? 0 : Math.round(epfWage * 0.12);
       updatedEmp.admin_charges = isDeputation ? 0 : Math.round(epfWage * 0.005);
     }

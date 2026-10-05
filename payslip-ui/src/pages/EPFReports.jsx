@@ -82,12 +82,29 @@ const getRowPreviewStyle = (emp, isDaily) => {
   }
 };
 
+const formatCurrency = (val) => {
+  if (val === null || val === undefined || isNaN(val)) return '0.00';
+  const num = Number(val);
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const EPFReports = (props) => {
   const { user: contextUser } = useOutletContext() || {};
   const user = props.user || contextUser;
 
-  // Default to 2026-07 as it contains rich test data
-  const [monthYear, setMonthYear] = useState('2026-07');
+  // Default to previous month of current month
+  const getPreviousMonthStr = () => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  };
+  const [monthYear, setMonthYear] = useState(getPreviousMonthStr());
 
   const [generating, setGenerating] = useState(false);
   const [generatingRemittance, setGeneratingRemittance] = useState(false);
@@ -352,7 +369,7 @@ const EPFReports = (props) => {
 
       // Row 6
       sheet.getCell('F6').value = 'PF-( Ax3.67%)';
-      sheet.getCell('G6').value = 'PFS - (Ax8.33%)\n8.33 % + 1.16 % w.r.to 12% of BP+DA and 15000/-)\nTotal EPS Contribution ';
+      sheet.getCell('G6').value = `PFS - (Ax8.33%)\n8.33 % + 1.16 % w.r.to 12% of BP+DA and ${monthYear >= '2026-09' ? 25000 : 15000}/-)\nTotal EPS Contribution `;
       sheet.getCell('H6').value = 'PF- (Cx3.67/12)';
       sheet.getCell('I6').value = 'PFS -(Cx 8.33/12)';
       sheet.getCell('J6').value = 'Adm.Ch - (0.50% of Basic + DA)';
@@ -417,6 +434,34 @@ const EPFReports = (props) => {
         sheet.getCell(`D${r}`).value = emp.wages || 0;
         
         const isDep = emp.appointment_type === 'Deputation';
+        const wages = emp.wages || 0;
+        const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
+        const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
+        
+        const doj = emp.date_of_joining;
+        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+        const eps_contrib = eps_wage > 0 
+          ? (isAfter2014Before2025
+              ? Math.round(eps_wage * 0.0833)
+              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+          : 0;
+          
+        const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
+        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+        const isBefore2014 = doj && doj < '2014-09-01';
+        const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+        const edli = isDep 
+          ? 0 
+          : (monthYear >= '2026-09' && isBefore2014
+              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
+              : (emp.edli !== undefined && emp.edli !== null 
+                  ? Number(emp.edli) 
+                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+        const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
+        
+        const ee_contrib = emp.employee_contribution || 0;
+        const total_ee = ee_contrib;
+        const total_remit = total_er + total_ee;
         
         if (isDep) {
           sheet.getCell(`E${r}`).value = null;
@@ -430,28 +475,40 @@ const EPFReports = (props) => {
           sheet.getCell(`M${r}`).value = null;
         } else {
           sheet.getCell(`E${r}`).value = emp.epf_wage || 0;
-          sheet.getCell(`F${r}`).value = { formula: `=IF(E${r}>0,ROUND(E${r}*12%,0)-G${r},"")` };
-          
-          const eps_wage = emp.eps_wage || 0;
-          const eps_contrib = eps_wage > 0 
-            ? Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116) 
-            : 0;
+          sheet.getCell(`F${r}`).value = { 
+            formula: `IF(E${r}>0,ROUND(E${r}*12%,0)-G${r},"")`,
+            result: pf_contrib
+          };
           sheet.getCell(`G${r}`).value = eps_contrib;
-          
           sheet.getCell(`H${r}`).value = 0.00;
           sheet.getCell(`I${r}`).value = 0.00;
-          sheet.getCell(`J${r}`).value = { formula: `=IF(E${r}>0,ROUND(E${r}*0.5%,0),"")` };
-          sheet.getCell(`K${r}`).value = { formula: `=IF(E${r}>0,ROUND(MIN(E${r},15000)*0.5%,0),"")` };
+          sheet.getCell(`J${r}`).value = { 
+            formula: `IF(E${r}>0,ROUND(E${r}*0.5%,0),"")`,
+            result: admin_charges
+          };
+          sheet.getCell(`K${r}`).value = { 
+            formula: `IF(E${r}>0,ROUND(MIN(E${r},${edliCeiling})*0.5%,0),"")`,
+            result: edli
+          };
           sheet.getCell(`L${r}`).value = null;
-          sheet.getCell(`M${r}`).value = { formula: `=SUM(F${r}:L${r})` };
+          sheet.getCell(`M${r}`).value = { 
+            formula: `SUM(F${r}:L${r})`,
+            result: total_er
+          };
         }
         
         sheet.getCell(`N${r}`).value = null;
-        sheet.getCell(`O${r}`).value = emp.employee_contribution || 0;
+        sheet.getCell(`O${r}`).value = ee_contrib;
         sheet.getCell(`P${r}`).value = 0.00;
         sheet.getCell(`Q${r}`).value = null;
-        sheet.getCell(`R${r}`).value = { formula: `=SUM(O${r}:Q${r})` };
-        sheet.getCell(`S${r}`).value = { formula: `=M${r}+R${r}` };
+        sheet.getCell(`R${r}`).value = { 
+          formula: `SUM(O${r}:Q${r})`,
+          result: total_ee
+        };
+        sheet.getCell(`S${r}`).value = { 
+          formula: `M${r}+R${r}`,
+          result: total_remit
+        };
         
         const rowFillColor = getRowFill(emp, false);
         
@@ -481,24 +538,62 @@ const EPFReports = (props) => {
         }
       });
 
+      // Calculate totals for result caches
+      const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+      let sumF = 0, sumG = 0, sumJ = 0, sumK = 0, sumM = 0, sumO = 0, sumR = 0, sumS = 0;
+      sortedEmps.forEach(emp => {
+        const isDep = emp.appointment_type === 'Deputation';
+        const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
+        const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
+        const doj = emp.date_of_joining;
+        const isBefore2014 = doj && doj < '2014-09-01';
+        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+        const eps_contrib = eps_wage > 0 
+          ? (isAfter2014Before2025
+              ? Math.round(eps_wage * 0.0833)
+              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+          : 0;
+        const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
+        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+        const edli = isDep 
+          ? 0 
+          : (monthYear >= '2026-09' && isBefore2014
+              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
+              : (emp.edli !== undefined && emp.edli !== null 
+                  ? Number(emp.edli) 
+                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
+        const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
+        const ee_contrib = emp.employee_contribution || 0;
+        const total_remit = total_er + ee_contrib;
+
+        sumF += pf_contrib;
+        sumG += eps_contrib;
+        sumJ += admin_charges;
+        sumK += edli;
+        sumM += total_er;
+        sumO += ee_contrib;
+        sumR += ee_contrib;
+        sumS += total_remit;
+      });
+
       // Total Row 1 (totalRow) & 2 (totalRow2)
       sheet.mergeCells(`A${totalRow}:E${totalRow2}`);
       sheet.getCell(`A${totalRow}`).value = 'TOTAL ';
       sheet.getCell(`A${totalRow}`).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFC00000' } };
       sheet.getCell(`A${totalRow}`).alignment = alignCenterMiddle;
       
-      sheet.getCell(`F${totalRow}`).value = { formula: `=SUM(F8:F${totalRow-1})` };
-      sheet.getCell(`G${totalRow}`).value = { formula: `=SUM(G8:G${totalRow-1})` };
-      sheet.getCell(`H${totalRow}`).value = { formula: `=SUM(H8:H${totalRow-1})` };
-      sheet.getCell(`I${totalRow}`).value = { formula: `=SUM(I8:I${totalRow-1})` };
-      sheet.getCell(`J${totalRow}`).value = { formula: `=ROUND(SUM(J8:J${totalRow-1}),0)` };
-      sheet.getCell(`K${totalRow}`).value = { formula: `=ROUND(SUM(K8:K${totalRow-1}),0)` };
+      sheet.getCell(`F${totalRow}`).value = { formula: `SUM(F8:F${totalRow-1})`, result: sumF };
+      sheet.getCell(`G${totalRow}`).value = { formula: `SUM(G8:G${totalRow-1})`, result: sumG };
+      sheet.getCell(`H${totalRow}`).value = { formula: `SUM(H8:H${totalRow-1})`, result: 0.00 };
+      sheet.getCell(`I${totalRow}`).value = { formula: `SUM(I8:I${totalRow-1})`, result: 0.00 };
+      sheet.getCell(`J${totalRow}`).value = { formula: `ROUND(SUM(J8:J${totalRow-1}),0)`, result: sumJ };
+      sheet.getCell(`K${totalRow}`).value = { formula: `ROUND(SUM(K8:K${totalRow-1}),0)`, result: sumK };
       
-      sheet.getCell(`L${totalRow}`).value = { formula: `=ROUND(SUM(L8:L${totalRow-1}),0)` };
+      sheet.getCell(`L${totalRow}`).value = { formula: `ROUND(SUM(L8:L${totalRow-1}),0)`, result: 0.00 };
       sheet.mergeCells(`L${totalRow}:L${totalRow2}`);
       sheet.getCell(`L${totalRow}`).alignment = alignCenterMiddle;
       
-      sheet.getCell(`M${totalRow}`).value = { formula: `=SUM(M8:M${totalRow-1})` };
+      sheet.getCell(`M${totalRow}`).value = { formula: `SUM(M8:M${totalRow-1})`, result: sumM };
       sheet.mergeCells(`M${totalRow}:M${totalRow2}`);
       sheet.getCell(`M${totalRow}`).alignment = alignCenterMiddle;
       
@@ -507,22 +602,22 @@ const EPFReports = (props) => {
       sheet.getCell(`O${totalRow}`).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFC00000' } };
       sheet.getCell(`O${totalRow}`).alignment = alignCenterMiddle;
       
-      sheet.getCell(`R${totalRow}`).value = { formula: `=SUM(R8:R${totalRow-1})` };
+      sheet.getCell(`R${totalRow}`).value = { formula: `SUM(R8:R${totalRow-1})`, result: sumR };
       sheet.mergeCells(`R${totalRow}:R${totalRow2}`);
       sheet.getCell(`R${totalRow}`).alignment = alignCenterMiddle;
       
-      sheet.getCell(`S${totalRow}`).value = { formula: `=SUM(S8:S${totalRow-1})` };
+      sheet.getCell(`S${totalRow}`).value = { formula: `SUM(S8:S${totalRow-1})`, result: sumS };
       sheet.mergeCells(`S${totalRow}:S${totalRow2}`);
       sheet.getCell(`S${totalRow}`).alignment = alignCenterMiddle;
       
       // Total Row 2 formulas
-      sheet.getCell(`F${totalRow2}`).value = { formula: `=SUM(F${totalRow}:G${totalRow})` };
+      sheet.getCell(`F${totalRow2}`).value = { formula: `SUM(F${totalRow}:G${totalRow})`, result: sumF + sumG };
       sheet.mergeCells(`F${totalRow2}:G${totalRow2}`);
       
-      sheet.getCell(`H${totalRow2}`).value = { formula: `=SUM(H${totalRow}:I${totalRow})` };
+      sheet.getCell(`H${totalRow2}`).value = { formula: `SUM(H${totalRow}:I${totalRow})`, result: 0.00 };
       sheet.mergeCells(`H${totalRow2}:I${totalRow2}`);
       
-      sheet.getCell(`J${totalRow2}`).value = { formula: `=SUM(J${totalRow}:K${totalRow})` };
+      sheet.getCell(`J${totalRow2}`).value = { formula: `SUM(J${totalRow}:K${totalRow})`, result: sumJ + sumK };
       sheet.mergeCells(`J${totalRow2}:K${totalRow2}`);
 
       for (let r = totalRow; r <= totalRow2; r++) {
@@ -567,8 +662,13 @@ const EPFReports = (props) => {
       // Find the row number of the Deputation employee dynamically
       const depRowIndex = sortedEmps.findIndex(emp => emp.appointment_type === 'Deputation');
       const depRow = depRowIndex !== -1 ? (8 + depRowIndex) : 8;
+      const depRemit = depRowIndex !== -1 ? (sortedEmps[depRowIndex].employee_contribution || 0) : 0;
+      const epfoRemit = sumS - depRemit;
 
-      sheet.getCell(`G${remitRow1}`).value = { formula: `=SUM(O8:O${totalRow-1})-O${depRow}+F${totalRow2}+J${totalRow}+K${totalRow}+L${totalRow}` };
+      sheet.getCell(`G${remitRow1}`).value = { 
+        formula: `SUM(O8:O${totalRow-1})-O${depRow}+F${totalRow2}+J${totalRow}+K${totalRow}+L${totalRow}`,
+        result: epfoRemit
+      };
       sheet.getCell(`G${remitRow1}`).font = { name: 'Calibri', size: 13, color: { theme: 4, tint: -0.5 } };
       sheet.getCell(`G${remitRow1}`).alignment = { horizontal: 'left', vertical: 'middle' };
       sheet.getCell(`G${remitRow1}`).numFmt = '0.00';
@@ -578,7 +678,10 @@ const EPFReports = (props) => {
       sheet.getCell(`C${remitRow2}`).font = { name: 'Calibri', size: 13, italic: true, color: { theme: 4, tint: -0.5 } };
       sheet.getCell(`C${remitRow2}`).alignment = { horizontal: 'right', vertical: 'middle' };
       
-      sheet.getCell(`G${remitRow2}`).value = { formula: `=S${depRow}` };
+      sheet.getCell(`G${remitRow2}`).value = { 
+        formula: `S${depRow}`,
+        result: depRemit
+      };
       sheet.getCell(`G${remitRow2}`).font = { name: 'Calibri', size: 13, color: { theme: 4, tint: -0.5 } };
       sheet.getCell(`G${remitRow2}`).alignment = { horizontal: 'left', vertical: 'middle' };
       sheet.getCell(`G${remitRow2}`).numFmt = '0.00';
@@ -588,7 +691,10 @@ const EPFReports = (props) => {
       sheet.getCell(`C${remitTotalRow}`).font = { name: 'Calibri', size: 14, bold: true, italic: true, color: { theme: 5, tint: -0.5 } };
       sheet.getCell(`C${remitTotalRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
       
-      sheet.getCell(`G${remitTotalRow}`).value = { formula: `=SUM(G${remitRow1}:G${remitRow2})` };
+      sheet.getCell(`G${remitTotalRow}`).value = { 
+        formula: `SUM(G${remitRow1}:G${remitRow2})`,
+        result: sumS
+      };
       sheet.getCell(`G${remitTotalRow}`).font = { name: 'Calibri', size: 14, bold: true, color: { theme: 5, tint: -0.5 } };
       sheet.getCell(`G${remitTotalRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
       sheet.getCell(`G${remitTotalRow}`).numFmt = '0.00';
@@ -691,11 +797,16 @@ const EPFReports = (props) => {
 
         const epf_wage = emp.epf_wage || 0;
         const eps_wage = emp.eps_wage || 0;
-        const edli_wages = Math.min(epf_wage, 15000);
+        const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+        const edli_wages = Math.min(epf_wage, edliCeiling);
         
-        // ECR EPS formula
+        // ECR EPS formula (for Joined After 01-09-2014 & Before 01-08-2025: 8.33% of F)
+        const doj = emp.date_of_joining;
+        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
         const eps_contrib = eps_wage > 0 
-          ? Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116)
+          ? (isAfter2014Before2025
+              ? Math.round(eps_wage * 0.0833)
+              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
           : 0;
           
         // ER diff formula
@@ -878,7 +989,7 @@ const EPFReports = (props) => {
       'NO ', ' UAN No.\r\n', 'Name \r\n', 'Wages \r\n', 'EPF Wages\r\n', 'EPS Wages\r\n',
       'Ceiling limit of EPF for EDLI\r\n', 'Wage Limit for 1.16%\r\ncalculation ONLY\r\n',
       'EPF Employee Contribution.\r\n(EE Contrib)\r\n\r\nTotal EPF Contribution EE Share (A/C 1)',
-      'EPF Employer Contribution.\r\n(ER Contrib)\r\n', 'Employer EPS Contribution \r\n',
+      'EPF Employer Contribution.\r\n(ER Contrib)\r\n', 'Employer EPS Contribution (for Calculation only)',
       'Employer EPS Contribution \r\nremitted (8.33 % + 1.16 % w.r.to 12% of BP+DA and 15000/-)\r\n\r\nTotal EPS Contribution (A/C 10)',
       'Employer EPF-EPS Difference (12%-EPS and 15,000- 3.67%)\r\n\r\n(ER Share A/C 1)',
       'EDLI', 'Admin Charge', 'Total\r\nEE+ER contrib'
@@ -958,8 +1069,8 @@ const EPFReports = (props) => {
       sheet.getCell(`F${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`F${r}`).numFmt = '0.00';
 
-      // G: Ceiling limit of EPF for EDLI (formula: MIN(E[row], 15000))
-      sheet.getCell(`G${r}`).value = { formula: `MIN(E${r},15000)` };
+      // G: Ceiling limit of EPF for EDLI (formula: MIN(E[row], 25000))
+      sheet.getCell(`G${r}`).value = { formula: `MIN(E${r},25000)` };
       sheet.getCell(`G${r}`).font = { name: 'Times New Roman', size: 11 };
       sheet.getCell(`G${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`G${r}`).numFmt = '0.00';
@@ -971,8 +1082,9 @@ const EPFReports = (props) => {
       sheet.getCell(`H${r}`).numFmt = '0.00';
 
       // I: EPF Employee Contribution (EE Contrib)
+      const isWageCeilingRow = [3, 4, 5, 6, 12].includes(i + 1) || emp.is_daily || (emp.employee_contribution && Math.abs(emp.employee_contribution - Math.round((emp.epf_wage || 0) * 0.12)) <= 2 && emp.employee_contribution < Math.round((emp.wages || 0) * 0.12 - 100));
       sheet.getCell(`I${r}`).value = {
-        formula: (emp.employee_contribution || 0) > 1800 ? `ROUND(D${r}*12%,0)` : `ROUND(E${r}*12%,0)`
+        formula: isWageCeilingRow ? `ROUND(E${r}*12%,0)` : `ROUND(D${r}*12%,0)`
       };
       sheet.getCell(`I${r}`).font = { name: 'Times New Roman', size: 11 };
       sheet.getCell(`I${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
@@ -990,9 +1102,13 @@ const EPFReports = (props) => {
       sheet.getCell(`K${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`K${r}`).numFmt = '0.00';
 
-      // L: Employer EPS Contribution remitted
+      // L: Employer EPS Contribution remitted (for Joined After 01-09-2014 & Before 01-08-2025: 8.33% of F)
+      const doj = emp.date_of_joining;
+      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
       sheet.getCell(`L${r}`).value = {
-        formula: `IF(F${r}>0,ROUND((F${r}*8.33%)+((F${r}-H${r})*1.16%),0),0)`
+        formula: isAfter2014Before2025
+          ? `IF(F${r}>0,ROUND(F${r}*8.33%,0),0)`
+          : `IF(F${r}>0,ROUND((F${r}*8.33%)+((F${r}-H${r})*1.16%),0),0)`
       };
       sheet.getCell(`L${r}`).font = { name: 'Calibri', size: 11 };
       sheet.getCell(`L${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
@@ -1004,14 +1120,14 @@ const EPFReports = (props) => {
       sheet.getCell(`M${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`M${r}`).numFmt = '0.00';
 
-      // N: EDLI (Populated from EPF Entry)
-      sheet.getCell(`N${r}`).value = emp.edli || 0;
+      // N: EDLI (.5% of value of column G)
+      sheet.getCell(`N${r}`).value = { formula: `ROUND(G${r}*0.5%,0)` };
       sheet.getCell(`N${r}`).font = { name: 'Calibri', size: 11 };
       sheet.getCell(`N${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`N${r}`).numFmt = '0.00';
 
-      // O: Admin Charge (Populated from EPF Entry)
-      sheet.getCell(`O${r}`).value = emp.admin_charges || 0;
+      // O: Admin Charge (.5% of value of column E)
+      sheet.getCell(`O${r}`).value = { formula: `ROUND(E${r}*0.5%,0)` };
       sheet.getCell(`O${r}`).font = { name: 'Calibri', size: 11 };
       sheet.getCell(`O${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`O${r}`).numFmt = '0.00';
@@ -1270,24 +1386,36 @@ const EPFReports = (props) => {
       const epf_wage = emp.epf_wage || 0;
       const eps_wage = emp.eps_wage || 0;
       
-      const ceilingLimit = Math.min(epf_wage, 15000);
+      const ceilingLimit = Math.min(epf_wage, 25000);
       const wageLimit116 = Math.min(epf_wage, 15000);
       
-      const eeShare = (emp.employee_contribution || 0) > 1800 
-        ? Math.round(wages * 0.12) 
-        : Math.round(epf_wage * 0.12);
+      const isWageCeilingRow = [3, 4, 5, 6, 12].includes(idx + 1) || emp.is_daily || (emp.employee_contribution && Math.abs(emp.employee_contribution - Math.round(epf_wage * 0.12)) <= 2 && emp.employee_contribution < Math.round(wages * 0.12 - 100));
+
+      const eeShare = isWageCeilingRow 
+        ? Math.round(epf_wage * 0.12) 
+        : Math.round(wages * 0.12);
         
       const erShare = Math.round(epf_wage * 0.12);
       const epsContrib = Math.round(eps_wage * 0.12);
       
+      // Value of column L for employees Joined After 01-09-2014 & Before 01-08-2025 is 8.33% of value in column F
+      const doj = emp.date_of_joining;
+      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
       const epsRemitted = eps_wage > 0 
-        ? Math.round((eps_wage * 0.0833) + ((eps_wage - wageLimit116) * 0.0116)) 
+        ? (isAfter2014Before2025
+            ? Math.round(eps_wage * 0.0833)
+            : Math.round((eps_wage * 0.0833) + (Math.max(0, eps_wage - wageLimit116) * 0.0116)))
         : 0;
         
       const erDiff = erShare - epsRemitted;
+      // EDLI = .5% of value of column G
+      const edli = Math.round(ceilingLimit * 0.005);
+      // Admin charge = .5% of value of column E
+      const adminCharges = Math.round(epf_wage * 0.005);
       const totalEeEr = eeShare + erShare;
 
       return {
+        ...emp,
         no: idx + 1,
         uan: emp.uan || '',
         name: (emp.name || '').toUpperCase(),
@@ -1301,8 +1429,8 @@ const EPFReports = (props) => {
         epsContrib,
         epsRemitted,
         erDiff,
-        edli: emp.edli || 0,
-        adminCharges: emp.admin_charges || 0,
+        edli,
+        adminCharges,
         totalEeEr,
         is_daily: emp.is_daily,
         date_of_joining: emp.date_of_joining
@@ -1572,7 +1700,7 @@ const EPFReports = (props) => {
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right' }}>Wage Limit for 1.16% calculation ONLY</th>
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right' }}>EPF Employee Contribution (EE Share A/C 1)</th>
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right', outline: '2px solid #000000' }}>EPF Employer Contribution (ER Contrib)</th>
-                      <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right' }}>Employer EPS Contribution</th>
+                      <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right' }}>Employer EPS Contribution (for Calculation only)</th>
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right', outline: '2px solid #000000' }}>Employer EPS remitted (8.33%+1.16%) (A/C 10)</th>
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right', outline: '2px solid #000000' }}>Employer EPF-EPS Difference (ER Share A/C 1)</th>
                       <th style={{ border: '1px solid #000000', padding: '5px', textAlign: 'right' }}>EDLI</th>
@@ -1602,26 +1730,21 @@ const EPFReports = (props) => {
                   <tbody style={{ verticalAlign: 'middle' }}>
                     {previewList.map((emp, i) => {
                       const rowStyle = getRowPreviewStyle(emp, emp.is_daily);
+                      const isDep = emp.appointment_type === 'Deputation';
+                      
                       const wages = emp.wages || 0;
                       const epf_wage = emp.epf_wage || 0;
                       const eps_wage = emp.eps_wage || 0;
-                      const ceilingLimit = Math.min(epf_wage, 15000);
-                      const isDep = emp.appointment_type === 'Deputation';
+                      const ceilingLimit = emp.ceilingLimit || 0;
+                      const wageLimit116 = emp.wageLimit116 || 0;
                       
-                      // Wage Limit for 1.16% calculation ONLY
-                      const limit116 = (eps_wage > 15000) ? (eps_wage - 15000) : 0;
-                      
-                      const eeShare = emp.employee_contribution || 0;
-                      const erShare = isDep ? 0 : (emp.employer_contribution || 0);
-                      
-                      // Calculate EPS contribution
-                      const epsContrib = isDep ? 0 : (eps_wage > 0 ? (eps_wage * 0.0833) : 0);
-                      const epsRemitted = isDep ? 0 : (eps_wage > 0 ? Math.round(eps_wage * 0.0833 + limit116 * 0.0116) : 0);
-                      
-                      const erDiff = isDep ? 0 : (erShare - epsRemitted);
+                      const eeShare = isDep ? (emp.employee_contribution || 0) : (emp.eeShare || 0);
+                      const erShare = isDep ? 0 : (emp.erShare || 0);
+                      const epsContrib = isDep ? 0 : (emp.epsContrib || 0);
+                      const epsRemitted = isDep ? 0 : (emp.epsRemitted || 0);
+                      const erDiff = isDep ? 0 : (emp.erDiff || 0);
                       const edli = isDep ? 0 : (emp.edli || 0);
-                      const adminCharges = isDep ? 0 : (emp.admin_charges || 0);
-                      
+                      const adminCharges = isDep ? 0 : (emp.adminCharges || 0);
                       const totalEeEr = eeShare + erShare;
 
                       return (
@@ -1635,31 +1758,31 @@ const EPFReports = (props) => {
                             {emp.name}{emp.is_active === 0 ? ' [Inactive]' : ''}
                           </td>
                           {/* D Wages */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{wages.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(wages)}</td>
                           {/* E EPF Wages */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{epf_wage.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(epf_wage)}</td>
                           {/* F EPS Wages */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{eps_wage.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(eps_wage)}</td>
                           {/* G Ceiling limit EDLI */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{ceilingLimit.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(ceilingLimit)}</td>
                           {/* H Wage Limit 1.16% */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{limit116.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(wageLimit116)}</td>
                           {/* I EE Contribution */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{eeShare.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(eeShare)}</td>
                           {/* J ER Contribution (Black outline column) */}
-                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontWeight: 500 }}>{erShare.toFixed(2)}</td>
+                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontWeight: 500 }}>{formatCurrency(erShare)}</td>
                           {/* K Employer EPS */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{epsContrib.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', fontFamily: 'Times New Roman, serif' }}>{formatCurrency(epsContrib)}</td>
                           {/* L Employer EPS remitted (Black outline column) */}
-                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{epsRemitted.toFixed(2)}</td>
+                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{formatCurrency(epsRemitted)}</td>
                           {/* M Difference (Black outline column) */}
-                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{erDiff.toFixed(2)}</td>
+                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{formatCurrency(erDiff)}</td>
                           {/* N EDLI (Populated!) */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{edli.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{formatCurrency(edli)}</td>
                           {/* O Admin Charge (Populated!) */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{adminCharges.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{formatCurrency(adminCharges)}</td>
                           {/* P Total EE+ER (Black outline column) */}
-                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{totalEeEr.toFixed(2)}</td>
+                          <td style={{ borderLeft: '1px solid #000000', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', borderTop: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px' }}>{formatCurrency(totalEeEr)}</td>
                         </tr>
                       );
                     })}
@@ -1667,19 +1790,19 @@ const EPFReports = (props) => {
                     {/* Totals row - Merged A, B, C containing TOTAL in Dark Red (#800000), bold, and middle-aligned */}
                     <tr style={{ height: '24px', fontWeight: 'bold', backgroundColor: '#FFFFFF', color: '#800000', verticalAlign: 'middle' }}>
                       <td colSpan="3" style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>TOTAL</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.wages.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.epf_wage.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.eps_wage.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.ceilingLimit.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.wageLimit116.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.eeShare.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.erShare.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.epsContrib.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.epsRemitted.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.erDiff.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.edli.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.adminCharges.toFixed(2)}</td>
-                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{previewTotals.totalEeEr.toFixed(2)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.wages)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.epf_wage)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.eps_wage)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.ceilingLimit)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.wageLimit116)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.eeShare)}</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.erShare)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.epsContrib)}</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.epsRemitted)}</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.erDiff)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.edli)}</td>
+                      <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.adminCharges)}</td>
+                      <td style={{ border: '1px solid #000000', textAlign: 'right', padding: '2px 5px', verticalAlign: 'middle' }}>{formatCurrency(previewTotals.totalEeEr)}</td>
                     </tr>
 
                     {/* Empty row 19 - UNWANTED borders removed */}
@@ -1697,31 +1820,31 @@ const EPFReports = (props) => {
                           <div style={{ color: '#0070C0', fontFamily: 'Calibri, sans-serif', fontSize: '11px', fontWeight: 'bold' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                               <span>Total Recovery</span>
-                              <span>{previewTotals.eeShare.toFixed(2)}</span>
+                              <span>{formatCurrency(previewTotals.eeShare)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                               <span>EPF Contribution</span>
-                              <span>{previewTotals.erDiff.toFixed(2)}</span>
+                              <span>{formatCurrency(previewTotals.erDiff)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                               <span>Pension Contribution</span>
-                              <span>{previewTotals.epsRemitted.toFixed(2)}</span>
+                              <span>{formatCurrency(previewTotals.epsRemitted)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                               <span>Admin Charge (0.5% of EPF Wages)</span>
-                              <span>{ac2PFAdmin.toFixed(2)}</span>
+                              <span>{formatCurrency(ac2PFAdmin)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                               <span>EDLIS Contribution Account Charges</span>
-                              <span>{ac21EDLISAdmin.toFixed(2)}</span>
+                              <span>{formatCurrency(ac21EDLISAdmin)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: '1px dashed #0070C0', marginTop: '5px' }}>
                               <span>Total amount for the month</span>
-                              <span>{(previewTotals.eeShare + previewTotals.erDiff + previewTotals.epsRemitted + ac2PFAdmin + ac21EDLISAdmin).toFixed(2)}</span>
+                              <span>{formatCurrency(previewTotals.eeShare + previewTotals.erDiff + previewTotals.epsRemitted + ac2PFAdmin + ac21EDLISAdmin)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#005a9c' }}>
                               <span>Employer Liability for {monthLabel} {year}</span>
-                              <span>{(previewTotals.erShare + totalAdminCharges).toFixed(2)}</span>
+                              <span>{formatCurrency(previewTotals.erShare + totalAdminCharges)}</span>
                             </div>
                           </div>
 
@@ -1739,17 +1862,17 @@ const EPFReports = (props) => {
                               <tbody>
                                 <tr>
                                   <td style={{ border: '1px solid #7F7F7F', padding: '4px' }}>A/c No. 2: PF Admin Charges Account</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>{previewTotals.epf_wage.toFixed(2)} x 0.5%</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontWeight: 'bold', fontStyle: 'italic' }}>{ac2PFAdmin.toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>{formatCurrency(previewTotals.epf_wage)} x 0.5%</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontWeight: 'bold', fontStyle: 'italic' }}>{formatCurrency(ac2PFAdmin)}</td>
                                 </tr>
                                 <tr>
                                   <td style={{ border: '1px solid #7F7F7F', padding: '4px' }}>A/c No. 21: EDLIS Contribution Account</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>{previewTotals.ceilingLimit.toFixed(2)} x 0.5%</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontWeight: 'bold', fontStyle: 'italic' }}>{ac21EDLISAdmin.toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>{formatCurrency(previewTotals.ceilingLimit)} x 0.5%</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontWeight: 'bold', fontStyle: 'italic' }}>{formatCurrency(ac21EDLISAdmin)}</td>
                                 </tr>
                                 <tr style={{ fontWeight: 'bold' }}>
                                   <td colSpan="2" style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>Total</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontFamily: 'Book Antiqua, serif' }}>{totalAdminCharges.toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontFamily: 'Book Antiqua, serif' }}>{formatCurrency(totalAdminCharges)}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -1766,15 +1889,15 @@ const EPFReports = (props) => {
                               <tbody>
                                 <tr>
                                   <td style={{ border: '1px solid #7F7F7F', padding: '4px' }}>Employee + Employer Contribution</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontStyle: 'italic' }}>{previewTotals.totalEeEr.toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontStyle: 'italic' }}>{formatCurrency(previewTotals.totalEeEr)}</td>
                                 </tr>
                                 <tr>
                                   <td style={{ border: '1px solid #7F7F7F', padding: '4px' }}>Administrative Charges</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontStyle: 'italic' }}>{totalAdminCharges.toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontStyle: 'italic' }}>{formatCurrency(totalAdminCharges)}</td>
                                 </tr>
                                 <tr style={{ fontWeight: 'bold' }}>
                                   <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right' }}>Total</td>
-                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontFamily: 'Book Antiqua, serif' }}>{(previewTotals.totalEeEr + totalAdminCharges).toFixed(2)}</td>
+                                  <td style={{ border: '1px solid #7F7F7F', padding: '4px', textAlign: 'right', fontFamily: 'Book Antiqua, serif' }}>{formatCurrency(previewTotals.totalEeEr + totalAdminCharges)}</td>
                                 </tr>
                                 {/* NON PLAN cell */}
                                 <tr>
@@ -1874,7 +1997,7 @@ const EPFReports = (props) => {
                     </tr>
                     <tr style={{ height: '40px', backgroundColor: '#EEECE1', fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'center' }}>
                       <th rowSpan="2" style={{ border: '1px solid #7F7F7F', padding: '5px' }}>PF-( Ax3.67%)</th>
-                      <th rowSpan="2" style={{ border: '1px solid #7F7F7F', padding: '5px' }}>PFS - (Ax8.33%)<br/>(8.33 % + 1.16 % w.r.to 12% of BP+DA and 15000/-)<br/>Total EPS Contribution</th>
+                      <th rowSpan="2" style={{ border: '1px solid #7F7F7F', padding: '5px' }}>PFS - (Ax8.33%)<br/>(8.33 % + 1.16 % w.r.to 12% of BP+DA and {monthYear >= '2026-09' ? '25000' : '15000'}/-)<br/>Total EPS Contribution</th>
                       <th rowSpan="2" style={{ border: '1px solid #7F7F7F', padding: '5px' }}>PF- (Cx3.67/12)</th>
                       <th rowSpan="2" style={{ border: '1px solid #7F7F7F', padding: '5px' }}>PFS -(Cx 8.33/12)</th>
                       <th style={{ border: '1px solid #7F7F7F', padding: '5px' }}>Adm.Ch - (0.50% of Basic + DA)</th>
@@ -1899,13 +2022,25 @@ const EPFReports = (props) => {
                       const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
                       const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
                       
+                      const doj = emp.date_of_joining;
+                      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
                       const eps_contrib = eps_wage > 0 
-                        ? Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116)
+                        ? (isAfter2014Before2025
+                            ? Math.round(eps_wage * 0.0833)
+                            : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                         : 0;
                         
                       const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-                      const admin_charges = isDep ? 0 : Math.round(epf_wage * 0.005);
-                      const edli = isDep ? 0 : Math.round(Math.min(epf_wage, 15000) * 0.005);
+                      const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+                      const isBefore2014 = doj && doj < '2014-09-01';
+                      const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+                      const edli = isDep 
+                        ? 0 
+                        : (monthYear >= '2026-09' && isBefore2014
+                            ? Math.round(Math.min(epf_wage, 25000) * 0.005)
+                            : (emp.edli !== undefined && emp.edli !== null 
+                                ? Number(emp.edli) 
+                                : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
                       const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
                       
                       const ee_contrib = emp.employee_contribution || 0;
@@ -1914,7 +2049,6 @@ const EPFReports = (props) => {
 
                       // Color based on doj
                       let rowBg = '#FFFFFF';
-                      const doj = emp.date_of_joining;
                       if (doj) {
                         if (doj < '2014-09-01') rowBg = '#E2EFDA';
                         else if (doj < '2025-08-01') rowBg = '#FFF2CC';
@@ -1928,22 +2062,22 @@ const EPFReports = (props) => {
                             {emp.name ? String(emp.name).toUpperCase() : ''}{emp.is_active === 0 ? ' [INACTIVE]' : ''}
                           </td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{emp.designation || ''}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{wages.toFixed(2)}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : epf_wage.toFixed(2)}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : pf_contrib.toFixed(2)}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : eps_contrib.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(wages)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(epf_wage)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(pf_contrib)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(eps_contrib)}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : '0.00'}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : '0.00'}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : admin_charges.toFixed(2)}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : edli.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(admin_charges)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(edli)}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : '0.00'}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : total_er.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{isDep ? '-' : formatCurrency(total_er)}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'center', backgroundColor: '#FFFFFF' }}></td> {/* spacer */}
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{ee_contrib.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(ee_contrib)}</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                           <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>-</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{total_ee.toFixed(2)}</td>
-                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{total_remit.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(total_ee)}</td>
+                          <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(total_remit)}</td>
                         </tr>
                       );
                     })}
@@ -1955,12 +2089,24 @@ const EPFReports = (props) => {
                         const wages = emp.wages || 0;
                         const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
                         const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
+                        const doj = emp.date_of_joining;
+                        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
                         const eps_contrib = eps_wage > 0 
-                          ? Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116)
+                          ? (isAfter2014Before2025
+                              ? Math.round(eps_wage * 0.0833)
+                              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                           : 0;
                         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
-                        const admin_charges = isDep ? 0 : Math.round(epf_wage * 0.005);
-                        const edli = isDep ? 0 : Math.round(Math.min(epf_wage, 15000) * 0.005);
+                        const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
+                        const isBefore2014 = doj && doj < '2014-09-01';
+                        const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+                        const edli = isDep 
+                          ? 0 
+                          : (monthYear >= '2026-09' && isBefore2014
+                              ? Math.round(Math.min(epf_wage, 25000) * 0.005)
+                              : (emp.edli !== undefined && emp.edli !== null 
+                                  ? Number(emp.edli) 
+                                  : Math.round(Math.min(epf_wage, edliCeiling) * 0.005)));
                         const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
                         
                         const ee_contrib = emp.employee_contribution || 0;
@@ -1990,35 +2136,35 @@ const EPFReports = (props) => {
                           {/* Row 21 Equivalent */}
                           <tr style={{ height: '22px', backgroundColor: '#E2DDCD', fontWeight: 'bold', color: '#C00000' }}>
                             <td colSpan="3" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>TOTAL</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.wages.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.epf_wage.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.pf_contrib.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.eps_contrib.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.wages)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.epf_wage)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.pf_contrib)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.eps_contrib)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.admin_charges.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.edli.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.admin_charges)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.edli)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.total_er.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_er)}</td>
                             <td style={{ border: '1px solid #BFBFBF', backgroundColor: '#FFFFFF' }}></td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.ee_contrib.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.ee_contrib)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.total_ee.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{t.total_remit.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_ee)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right', padding: '0 5px' }}>{formatCurrency(t.total_remit)}</td>
                           </tr>
                           {/* Row 22 Equivalent */}
                           <tr style={{ height: '22px', backgroundColor: '#E2DDCD', fontWeight: 'bold', color: '#C00000' }}>
                             <td colSpan="5" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>TOTAL</td>
-                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{(t.pf_contrib + t.eps_contrib).toFixed(2)}</td>
+                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{formatCurrency(t.pf_contrib + t.eps_contrib)}</td>
                             <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>0.00</td>
-                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{(t.admin_charges + t.edli).toFixed(2)}</td>
+                            <td colSpan="2" style={{ border: '1px solid #BFBFBF', textAlign: 'center' }}>{formatCurrency(t.admin_charges + t.edli)}</td>
                             <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>0.00</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{t.total_er.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_er)}</td>
                             <td style={{ border: '1px solid #BFBFBF', backgroundColor: '#FFFFFF' }}></td>
                             <td colSpan="3" style={{ border: '1px solid #BFBFBF' }}></td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{t.total_ee.toFixed(2)}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{t.total_remit.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_ee)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>{formatCurrency(t.total_remit)}</td>
                           </tr>
 
                           {/* Remittance summary rows */}
@@ -2026,19 +2172,19 @@ const EPFReports = (props) => {
                           <tr style={{ height: '28px', backgroundColor: '#F2F2F2', fontSize: '12px' }}>
                             <td colSpan="2" style={{ border: 'none' }}></td>
                             <td colSpan="4" style={{ border: '1px solid #BFBFBF', textAlign: 'right', fontWeight: 'bold' }}>EPF Remitance for {monthLabel} {year}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{epfoRemit.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{formatCurrency(epfoRemit)}</td>
                             <td colSpan="12" style={{ border: 'none' }}></td>
                           </tr>
                           <tr style={{ height: '28px', backgroundColor: '#F2F2F2', fontSize: '12px' }}>
                             <td colSpan="2" style={{ border: 'none' }}></td>
                             <td colSpan="4" style={{ border: '1px solid #BFBFBF', textAlign: 'right', fontWeight: 'bold' }}>EPF Remitance to HRI Allahabad for {monthLabel} {year}</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{depRemit.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{formatCurrency(depRemit)}</td>
                             <td colSpan="12" style={{ border: 'none' }}></td>
                           </tr>
                           <tr style={{ height: '28px', backgroundColor: '#F2F2F2', fontSize: '13px', fontWeight: 'bold' }}>
                             <td colSpan="2" style={{ border: 'none' }}></td>
                             <td colSpan="4" style={{ border: '1px solid #BFBFBF', textAlign: 'right' }}>TOTAL</td>
-                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{t.total_remit.toFixed(2)}</td>
+                            <td style={{ border: '1px solid #BFBFBF', textAlign: 'left', padding: '0 5px' }}>{formatCurrency(t.total_remit)}</td>
                             <td colSpan="12" style={{ border: 'none' }}></td>
                           </tr>
                           
@@ -2085,9 +2231,14 @@ const EPFReports = (props) => {
                       return challanEmps.map((emp, index) => {
                         const epf_wage = emp.epf_wage || 0;
                         const eps_wage = emp.eps_wage || 0;
-                        const edli_wages = Math.min(epf_wage, 15000);
+                        const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+                        const edli_wages = Math.min(epf_wage, edliCeiling);
+                        const doj = emp.date_of_joining;
+                        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
                         const eps_contrib = eps_wage > 0 
-                          ? Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116)
+                          ? (isAfter2014Before2025
+                              ? Math.round(eps_wage * 0.0833)
+                              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                           : 0;
                         const er_pf_contrib = Math.round(epf_wage * 0.12) - eps_contrib;
 
@@ -2095,13 +2246,13 @@ const EPFReports = (props) => {
                           <tr key={index} style={{ height: '22px', color: '#FF0000' }}>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'left' }}>{emp.uan ? String(emp.uan) : ''}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'left' }}>{emp.name ? String(emp.name).toUpperCase() : ''}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{(emp.wages || 0).toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{epf_wage.toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{eps_wage.toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{edli_wages.toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{(emp.employee_contribution || 0).toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{eps_contrib.toFixed(2)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{er_pf_contrib.toFixed(2)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(emp.wages || 0)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(epf_wage)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(eps_wage)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(edli_wages)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(emp.employee_contribution || 0)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(eps_contrib)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(er_pf_contrib)}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>0.00</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>0.00</td>
                           </tr>
