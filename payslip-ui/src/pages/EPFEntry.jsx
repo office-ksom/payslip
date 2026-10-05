@@ -218,9 +218,11 @@ const EPFEntry = (props) => {
       setModalOpen(false);
       return;
     }
-    const updated = [...entries];
-    updated[modalIndex] = { ...modalEmp };
-    setEntries(updated);
+    if (modalIndex >= 0 && modalIndex < entries.length) {
+      const updated = [...entries];
+      updated[modalIndex] = { ...modalEmp };
+      setEntries(updated);
+    }
     setModalOpen(false);
   };
 
@@ -859,9 +861,18 @@ const EPFEntry = (props) => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={isLocked}
+                onClick={saveModalData}
+                style={{ minWidth: '100px' }}
+              >
+                OK
               </button>
             </div>
           </div>
