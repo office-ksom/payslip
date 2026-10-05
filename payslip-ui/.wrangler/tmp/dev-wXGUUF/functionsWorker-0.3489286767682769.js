@@ -4195,12 +4195,8 @@ async function onRequestGet40(context) {
       const wages = row.wages || 0;
       const doj = row.date_of_joining;
       let status = "before_2014";
-      if (doj) {
-        if (doj >= "2025-08-01") {
-          status = "after_2025";
-        } else if (doj >= "2014-09-01") {
-          status = "after_2014_before_2025";
-        }
+      if (doj && doj >= "2014-09-01") {
+        status = "after_2014";
       }
       const getWageCeiling = /* @__PURE__ */ __name2((my) => {
         if (!my || my < "2026-09") return 15e3;
@@ -4208,13 +4204,13 @@ async function onRequestGet40(context) {
       }, "getWageCeiling");
       const wageCeiling = getWageCeiling(month_year);
       let epf_wage = wages;
-      if (status === "after_2014_before_2025" || status === "after_2025") {
+      if (status === "after_2014") {
         epf_wage = Math.min(wages, wageCeiling);
       }
       let eps_wage = 0;
       if (status === "before_2014") {
         eps_wage = wages;
-      } else if (status === "after_2014_before_2025") {
+      } else if (status === "after_2014") {
         eps_wage = Math.min(wages, wageCeiling);
       }
       const isDeputation = row.appointment_type === "Deputation";

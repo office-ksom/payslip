@@ -439,11 +439,15 @@ const EPFReports = (props) => {
         const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
         
         const doj = emp.date_of_joining;
-        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
-        const eps_contrib = eps_wage > 0 
-          ? (isAfter2014Before2025
-              ? Math.round(eps_wage * 0.0833)
-              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+        const isAfter2014 = doj && doj >= '2014-09-01';
+        let eps_wage_val = isDep ? 0 : (emp.eps_wage || 0);
+        if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+          eps_wage_val = Math.min(epf_wage, monthYear >= '2026-09' ? 25000 : 15000);
+        }
+        const eps_contrib = eps_wage_val > 0 
+          ? (isAfter2014
+              ? Math.round(eps_wage_val * 0.0833)
+              : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
           : 0;
           
         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
@@ -547,11 +551,15 @@ const EPFReports = (props) => {
         const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
         const doj = emp.date_of_joining;
         const isBefore2014 = doj && doj < '2014-09-01';
-        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
-        const eps_contrib = eps_wage > 0 
-          ? (isAfter2014Before2025
-              ? Math.round(eps_wage * 0.0833)
-              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+        const isAfter2014 = doj && doj >= '2014-09-01';
+        let eps_wage_val = isDep ? 0 : (emp.eps_wage || 0);
+        if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+          eps_wage_val = Math.min(epf_wage, edliCeiling);
+        }
+        const eps_contrib = eps_wage_val > 0 
+          ? (isAfter2014
+              ? Math.round(eps_wage_val * 0.0833)
+              : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
           : 0;
         const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
         const admin_charges = isDep ? 0 : (emp.admin_charges !== undefined && emp.admin_charges !== null ? Number(emp.admin_charges) : Math.round(epf_wage * 0.005));
@@ -800,13 +808,17 @@ const EPFReports = (props) => {
         const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
         const edli_wages = Math.min(epf_wage, edliCeiling);
         
-        // ECR EPS formula (for Joined After 01-09-2014 & Before 01-08-2025: 8.33% of F)
+        // ECR EPS formula (for Joined After 01-09-2014: 8.33% of F)
         const doj = emp.date_of_joining;
-        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
-        const eps_contrib = eps_wage > 0 
-          ? (isAfter2014Before2025
-              ? Math.round(eps_wage * 0.0833)
-              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+        const isAfter2014 = doj && doj >= '2014-09-01';
+        let eps_wage_val = emp.eps_wage || 0;
+        if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+          eps_wage_val = Math.min(epf_wage, edliCeiling);
+        }
+        const eps_contrib = eps_wage_val > 0 
+          ? (isAfter2014
+              ? Math.round(eps_wage_val * 0.0833)
+              : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
           : 0;
           
         // ER diff formula
@@ -816,7 +828,7 @@ const EPFReports = (props) => {
         sheet.getCell(`B${r}`).value = emp.name ? String(emp.name).toUpperCase() : '';
         sheet.getCell(`C${r}`).value = emp.wages || 0;
         sheet.getCell(`D${r}`).value = epf_wage;
-        sheet.getCell(`E${r}`).value = eps_wage;
+        sheet.getCell(`E${r}`).value = eps_wage_val;
         sheet.getCell(`F${r}`).value = edli_wages;
         sheet.getCell(`G${r}`).value = emp.employee_contribution || 0;
         sheet.getCell(`H${r}`).value = eps_contrib;
@@ -1064,7 +1076,12 @@ const EPFReports = (props) => {
       sheet.getCell(`E${r}`).numFmt = '0.00';
 
       // F: EPS Wages
-      sheet.getCell(`F${r}`).value = emp.eps_wage || 0;
+      const isAfter2014Emp = emp.date_of_joining && emp.date_of_joining >= '2014-09-01';
+      let sheetEpsWage = emp.eps_wage || 0;
+      if (sheetEpsWage === 0 && isAfter2014Emp && (emp.epf_wage || 0) > 0) {
+        sheetEpsWage = Math.min(emp.epf_wage || 0, monthYear >= '2026-09' ? 25000 : 15000);
+      }
+      sheet.getCell(`F${r}`).value = sheetEpsWage;
       sheet.getCell(`F${r}`).font = { name: 'Times New Roman', size: 11 };
       sheet.getCell(`F${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`F${r}`).numFmt = '0.00';
@@ -1102,11 +1119,11 @@ const EPFReports = (props) => {
       sheet.getCell(`K${r}`).alignment = { horizontal: 'right', vertical: 'middle' };
       sheet.getCell(`K${r}`).numFmt = '0.00';
 
-      // L: Employer EPS Contribution remitted (for Joined After 01-09-2014 & Before 01-08-2025: 8.33% of F)
+      // L: Employer EPS Contribution remitted (for Joined After 01-09-2014: 8.33% of F)
       const doj = emp.date_of_joining;
-      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+      const isAfter2014 = doj && doj >= '2014-09-01';
       sheet.getCell(`L${r}`).value = {
-        formula: isAfter2014Before2025
+        formula: isAfter2014
           ? `IF(F${r}>0,ROUND(F${r}*8.33%,0),0)`
           : `IF(F${r}>0,ROUND((F${r}*8.33%)+((F${r}-H${r})*1.16%),0),0)`
       };
@@ -1382,9 +1399,17 @@ const EPFReports = (props) => {
   // Preview Grid Calculations Helper
   const getPreviewCalculations = (data) => {
     const list = data.map((emp, idx) => {
+      const doj = emp.date_of_joining;
+      const isBefore2014 = doj && doj < '2014-09-01';
+      const isAfter2014 = doj && doj >= '2014-09-01';
+
       const wages = emp.wages || 0;
       const epf_wage = emp.epf_wage || 0;
-      const eps_wage = emp.eps_wage || 0;
+      const ceiling = monthYear >= '2026-09' ? 25000 : 15000;
+      let eps_wage = emp.eps_wage !== undefined && emp.eps_wage !== null ? Number(emp.eps_wage) : 0;
+      if (eps_wage === 0 && isAfter2014 && epf_wage > 0) {
+        eps_wage = Math.min(epf_wage, ceiling);
+      }
       
       const ceilingLimit = Math.min(epf_wage, 25000);
       const wageLimit116 = Math.min(epf_wage, 15000);
@@ -1398,11 +1423,9 @@ const EPFReports = (props) => {
       const erShare = Math.round(epf_wage * 0.12);
       const epsContrib = Math.round(eps_wage * 0.12);
       
-      // Value of column L for employees Joined After 01-09-2014 & Before 01-08-2025 is 8.33% of value in column F
-      const doj = emp.date_of_joining;
-      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+      // Value of column L for employees Joined After 01-09-2014 is 8.33% of value in column F
       const epsRemitted = eps_wage > 0 
-        ? (isAfter2014Before2025
+        ? (isAfter2014
             ? Math.round(eps_wage * 0.0833)
             : Math.round((eps_wage * 0.0833) + (Math.max(0, eps_wage - wageLimit116) * 0.0116)))
         : 0;
@@ -2020,12 +2043,14 @@ const EPFReports = (props) => {
                       const isDep = emp.appointment_type === 'Deputation';
                       const wages = emp.wages || 0;
                       const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
-                      const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
-                      
                       const doj = emp.date_of_joining;
-                      const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+                      const isAfter2014 = doj && doj >= '2014-09-01';
+                      let eps_wage = isDep ? 0 : (emp.eps_wage || 0);
+                      if (eps_wage === 0 && isAfter2014 && epf_wage > 0) {
+                        eps_wage = Math.min(epf_wage, monthYear >= '2026-09' ? 25000 : 15000);
+                      }
                       const eps_contrib = eps_wage > 0 
-                        ? (isAfter2014Before2025
+                        ? (isAfter2014
                             ? Math.round(eps_wage * 0.0833)
                             : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                         : 0;
@@ -2088,11 +2113,14 @@ const EPFReports = (props) => {
                         const isDep = emp.appointment_type === 'Deputation';
                         const wages = emp.wages || 0;
                         const epf_wage = isDep ? 0 : (emp.epf_wage || 0);
-                        const eps_wage = isDep ? 0 : (emp.eps_wage || 0);
                         const doj = emp.date_of_joining;
-                        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
+                        const isAfter2014 = doj && doj >= '2014-09-01';
+                        let eps_wage = isDep ? 0 : (emp.eps_wage || 0);
+                        if (eps_wage === 0 && isAfter2014 && epf_wage > 0) {
+                          eps_wage = Math.min(epf_wage, monthYear >= '2026-09' ? 25000 : 15000);
+                        }
                         const eps_contrib = eps_wage > 0 
-                          ? (isAfter2014Before2025
+                          ? (isAfter2014
                               ? Math.round(eps_wage * 0.0833)
                               : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
                           : 0;
@@ -2234,11 +2262,15 @@ const EPFReports = (props) => {
                         const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
                         const edli_wages = Math.min(epf_wage, edliCeiling);
                         const doj = emp.date_of_joining;
-                        const isAfter2014Before2025 = doj && doj >= '2014-09-01' && doj < '2025-08-01';
-                        const eps_contrib = eps_wage > 0 
-                          ? (isAfter2014Before2025
-                              ? Math.round(eps_wage * 0.0833)
-                              : Math.round(eps_wage * 0.0833 + Math.max(0, eps_wage - 15000) * 0.0116))
+                        const isAfter2014 = doj && doj >= '2014-09-01';
+                        let eps_wage_val = emp.eps_wage || 0;
+                        if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+                          eps_wage_val = Math.min(epf_wage, edliCeiling);
+                        }
+                        const eps_contrib = eps_wage_val > 0 
+                          ? (isAfter2014
+                              ? Math.round(eps_wage_val * 0.0833)
+                              : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
                           : 0;
                         const er_pf_contrib = Math.round(epf_wage * 0.12) - eps_contrib;
 
@@ -2248,7 +2280,7 @@ const EPFReports = (props) => {
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'left' }}>{emp.name ? String(emp.name).toUpperCase() : ''}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(emp.wages || 0)}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(epf_wage)}</td>
-                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(eps_wage)}</td>
+                            <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(eps_wage_val)}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(edli_wages)}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(emp.employee_contribution || 0)}</td>
                             <td style={{ border: 'none', padding: '4px 6px', textAlign: 'right' }}>{formatCurrency(eps_contrib)}</td>
