@@ -606,7 +606,7 @@ const EPFReports = (props) => {
       sheet.mergeCells(`R${totalRow}:R${totalRow2}`);
       sheet.getCell(`R${totalRow}`).alignment = alignCenterMiddle;
       
-      sheet.getCell(`S${totalRow}`).value = { formula: `SUM(S8:S${totalRow-1})`, result: sumS };
+      sheet.getCell(`S${totalRow}`).value = { formula: `ROUND(SUM(S8:S${totalRow-1}),0)`, result: Math.round(sumS) };
       sheet.mergeCells(`S${totalRow}:S${totalRow2}`);
       sheet.getCell(`S${totalRow}`).alignment = alignCenterMiddle;
       
@@ -663,7 +663,7 @@ const EPFReports = (props) => {
       const depRowIndex = sortedEmps.findIndex(emp => emp.appointment_type === 'Deputation');
       const depRow = depRowIndex !== -1 ? (8 + depRowIndex) : 8;
       const depRemit = depRowIndex !== -1 ? (sortedEmps[depRowIndex].employee_contribution || 0) : 0;
-      const epfoRemit = sumS - depRemit;
+      const epfoRemit = Math.round(sumS) - depRemit;
 
       sheet.getCell(`G${remitRow1}`).value = { 
         formula: `SUM(O8:O${totalRow-1})-O${depRow}+F${totalRow2}+J${totalRow}+K${totalRow}+L${totalRow}`,
@@ -693,7 +693,7 @@ const EPFReports = (props) => {
       
       sheet.getCell(`G${remitTotalRow}`).value = { 
         formula: `SUM(G${remitRow1}:G${remitRow2})`,
-        result: sumS
+        result: Math.round(sumS)
       };
       sheet.getCell(`G${remitTotalRow}`).font = { name: 'Calibri', size: 14, bold: true, color: { theme: 5, tint: -0.5 } };
       sheet.getCell(`G${remitTotalRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
