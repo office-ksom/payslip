@@ -2703,10 +2703,41 @@ const Reports = () => {
             summarySheet.getCell('A2').value = `Pay Bill for the month of ${monthDisplay}`;
             summarySheet.getCell('B2').value = `Salary Summary- ${monthDisplay}`;
 
-            // Set Gross Salary (D4) and Employer EPF Sum (D5)
+            // Calculate EPF values based on EPF reports / EPF Remittance Statement
+            const edliCeiling = monthYear >= '2026-09' ? 25000 : 15000;
+            let sumF = 0, sumG = 0, sumJ = 0, sumK = 0;
+            epfData.forEach(item => {
+              const isDep = (item.appointment_type || '').toLowerCase() === 'deputation';
+              const epf_wage = isDep ? 0 : (parseFloat(item.epf_wage) || 0);
+              const doj = item.date_of_joining;
+              const isAfter2014 = doj && doj >= '2014-09-01';
+              let eps_wage_val = isDep ? 0 : (parseFloat(item.eps_wage) || 0);
+              if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+                eps_wage_val = Math.min(epf_wage, edliCeiling);
+              }
+              const eps_contrib = eps_wage_val > 0 
+                ? (isAfter2014
+                    ? Math.round(eps_wage_val * 0.0833)
+                    : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
+                : 0;
+              const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
+              const admin_charges = isDep ? 0 : (epf_wage * 0.005);
+              const edli = isDep ? 0 : (Math.min(epf_wage, edliCeiling) * 0.005);
+
+              sumF += pf_contrib;
+              sumG += eps_contrib;
+              sumJ += admin_charges;
+              sumK += edli;
+            });
+
+            const roundedAdminCharges = Math.round(sumJ);
+            const roundedEdli = Math.round(sumK);
+            const epfERTotal = sumF + sumG + roundedAdminCharges + roundedEdli;
+
+            // Set Gross Salary (D4), Employer EPF Sum (D5), and Debit Total (D7)
             summarySheet.getCell('D4').value = sumGross;
-            const epfERTotal = epfData.reduce((sum, item) => sum + (parseFloat(item.employer_contribution) || 0) + (parseFloat(item.admin_charges) || 0) + (parseFloat(item.edli) || 0), 0);
             summarySheet.getCell('D5').value = epfERTotal;
+            summarySheet.getCell('D7').value = { formula: 'D4+D5', result: sumGross + epfERTotal };
 
             // Copy employee rows template (row 10), total row template (row 24), and cheque row template (row 25)
             const empRowTemplate = tempSheet.getRow(10);
@@ -2782,17 +2813,39 @@ const Reports = () => {
             }
 
             let currentRow = 10;
+            const sumPerCol = {};
+
             filteredData.forEach((emp, index) => {
               const destRow = summarySheet.getRow(currentRow);
               destRow.height = empRowTemplate.height;
 
-              // Match EPF details
-              const epfItem = epfData.find(item => item.emp_id === emp.emp_id) || {};
-              const epfEE = Math.round(parseFloat(emp.epf) || 0);
-              const epfER = Math.round(parseFloat(epfItem.employer_contribution) || 0);
-              const epfAdmin = Math.round(parseFloat(epfItem.admin_charges) || 0);
-              const epfEDLI = Math.round(parseFloat(epfItem.edli) || 0);
-              const epfSum = epfEE + epfER + epfAdmin + epfEDLI;
+              // Fetch from Total Remittance to EPFO column of EPF remittance statement
+              const epfItem = epfData.find(item => item.emp_id === emp.emp_id);
+              let totalRemit = 0;
+              if (epfItem) {
+                const isDep = (epfItem.appointment_type || emp.appointment_type || '').toLowerCase() === 'deputation';
+                const epf_wage = isDep ? 0 : (parseFloat(epfItem.epf_wage) || 0);
+                const doj = epfItem.date_of_joining || emp.date_of_joining;
+                const isAfter2014 = doj && doj >= '2014-09-01';
+                let eps_wage_val = isDep ? 0 : (parseFloat(epfItem.eps_wage) || 0);
+                if (eps_wage_val === 0 && isAfter2014 && epf_wage > 0) {
+                  eps_wage_val = Math.min(epf_wage, edliCeiling);
+                }
+                const eps_contrib = eps_wage_val > 0 
+                  ? (isAfter2014
+                      ? Math.round(eps_wage_val * 0.0833)
+                      : Math.round(eps_wage_val * 0.0833 + Math.max(0, eps_wage_val - 15000) * 0.0116))
+                  : 0;
+                const pf_contrib = isDep ? 0 : (Math.round(epf_wage * 0.12) - eps_contrib);
+                const admin_charges = isDep ? 0 : (epf_wage * 0.005);
+                const edli = isDep ? 0 : (Math.min(epf_wage, edliCeiling) * 0.005);
+                const total_er = isDep ? 0 : (pf_contrib + eps_contrib + admin_charges + edli);
+                const ee_contrib = parseFloat(epfItem.employee_contribution) || parseFloat(emp.epf) || 0;
+                totalRemit = total_er + ee_contrib;
+              } else if (parseFloat(emp.epf) > 0) {
+                totalRemit = parseFloat(emp.epf) || 0;
+              }
+              const epfColValue = totalRemit > 0 ? parseFloat(totalRemit.toFixed(2)) : null;
 
               const fullName = (emp.title ? `${emp.title} ` : '') + (emp.name || '');
               const it = Math.round(parseFloat(emp.income_tax) || 0);
@@ -2816,7 +2869,7 @@ const Reports = () => {
               colValues[1] = index + 1;
               colValues[2] = fullName;
               colValues[3] = it || null;
-              colValues[4] = epfSum || null;
+              colValues[4] = epfColValue;
               colValues[5] = gis || null;
               colValues[6] = sli || null;
               colValues[7] = hra || null;
@@ -2837,8 +2890,14 @@ const Reports = () => {
                 const tColIdx = col <= 7 ? col : (col === netCol ? 8 : 7);
                 const tCell = empRowTemplate.getCell(tColIdx);
                 destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
+                if (col === 4) {
+                  destCell.numFmt = '0.00';
+                }
                 if (colValues[col] !== undefined) {
                   destCell.value = colValues[col];
+                  if (colValues[col] !== null) {
+                    sumPerCol[col] = (sumPerCol[col] || 0) + colValues[col];
+                  }
                 }
               }
               destRow.commit();
@@ -2864,7 +2923,17 @@ const Reports = () => {
                 return result;
               };
               const letter = getColLetter(col);
-              totalColValues[col] = { formula: `SUM(${letter}10:${letter}${currentRow - 1})` };
+              if (col === 4) {
+                totalColValues[col] = {
+                  formula: `ROUND(SUM(${letter}10:${letter}${currentRow - 1}),0)`,
+                  result: Math.round(sumPerCol[col] || 0)
+                };
+              } else {
+                totalColValues[col] = {
+                  formula: `SUM(${letter}10:${letter}${currentRow - 1})`,
+                  result: sumPerCol[col] || 0
+                };
+              }
             }
 
             for (let col = 1; col <= totalCols; col++) {
@@ -2872,6 +2941,9 @@ const Reports = () => {
               const tColIdx = col <= 7 ? col : (col === netCol ? 8 : 7);
               const tCell = totalRowTemplate.getCell(tColIdx);
               destCell.style = JSON.parse(JSON.stringify(tCell.style || {}));
+              if (col === 4) {
+                destCell.numFmt = '0.00';
+              }
               if (totalColValues[col] !== undefined) {
                 destCell.value = totalColValues[col];
               }
