@@ -158,6 +158,28 @@ export async function onRequestPost(context) {
     const logDesc = `${isUnlock ? 'Unlocked' : 'Locked/Revoked unlock for'} pages: ${targetModules.join(', ')} (${period_key}) by ${userEmail}`;
     await logActivity(db, userEmail, logAction, logDesc);
 
+    // When locking an active period (not ALL), sync approval date & time to earnings tables
+    if (!isUnlock && period_key && period_key !== 'ALL') {
+      const now = new Date().toISOString();
+      for (const mod of targetModules) {
+        if (mod === 'paybill' || mod === 'paybill_permanent') {
+          await db.prepare("UPDATE monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {});
+        }
+        if (mod === 'paybill' || mod === 'paybill_contract') {
+          await db.prepare("UPDATE contract_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {});
+        }
+        if (mod === 'paybill' || mod === 'paybill_visiting') {
+          await db.prepare("UPDATE visiting_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {});
+        }
+        if (mod === 'paybill' || mod === 'paybill_daily_wage') {
+          await db.prepare("UPDATE daily_wage_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {});
+        }
+        if (mod === 'supplementary') {
+          await db.prepare("UPDATE supplementary_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {});
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, updated: results, status: newStatus }), {
       headers: { 'Content-Type': 'application/json' }
     });

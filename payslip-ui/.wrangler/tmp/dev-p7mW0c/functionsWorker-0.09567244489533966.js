@@ -449,13 +449,60 @@ async function onRequestGet7(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
-    const approvalInfo = await db.prepare(`
+    let approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
       FROM contract_monthly_earnings 
-      WHERE month_year = ?
-      ORDER BY is_approved DESC
+      WHERE month_year = ? AND is_approved = 1
+      ORDER BY approved_on DESC
       LIMIT 1
     `).bind(monthYear).first();
+    if (!approvalInfo) {
+      approvalInfo = await db.prepare(`
+        SELECT is_approved, approved_on, approved_by 
+        FROM contract_monthly_earnings 
+        WHERE month_year = ?
+        ORDER BY is_approved DESC, approved_on DESC
+        LIMIT 1
+      `).bind(monthYear).first();
+    }
+    const consentLock = await db.prepare(`
+      SELECT granted_by, granted_at 
+      FROM edit_consents 
+      WHERE (module = 'paybill' OR module = 'paybill_contract') 
+        AND period_key = ? 
+        AND status = 'revoked'
+      ORDER BY granted_at DESC 
+      LIMIT 1
+    `).bind(monthYear).first();
+    if (consentLock && consentLock.granted_at) {
+      if (!approvalInfo || !approvalInfo.approved_on || new Date(consentLock.granted_at) > new Date(approvalInfo.approved_on)) {
+        await db.prepare(`
+          UPDATE contract_monthly_earnings 
+          SET is_approved = 1, approved_on = ?, approved_by = ?
+          WHERE month_year = ?
+        `).bind(consentLock.granted_at, consentLock.granted_by, monthYear).run().catch(() => {
+        });
+        if (approvalInfo) {
+          approvalInfo.is_approved = 1;
+          approvalInfo.approved_on = consentLock.granted_at;
+          approvalInfo.approved_by = consentLock.granted_by;
+        } else {
+          approvalInfo = {
+            is_approved: 1,
+            approved_on: consentLock.granted_at,
+            approved_by: consentLock.granted_by
+          };
+        }
+      }
+    }
+    if (approvalInfo && approvalInfo.is_approved === 1 && approvalInfo.approved_on) {
+      await db.prepare(`
+        UPDATE contract_monthly_earnings 
+        SET approved_on = ?, approved_by = ?
+        WHERE month_year = ? AND is_approved = 1 AND (approved_on IS NULL OR approved_on < ?)
+      `).bind(approvalInfo.approved_on, approvalInfo.approved_by, monthYear, approvalInfo.approved_on).run().catch(() => {
+      });
+    }
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -529,13 +576,60 @@ async function onRequestGet8(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
-    const approvalInfo = await db.prepare(`
+    let approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
       FROM daily_wage_monthly_earnings 
-      WHERE month_year = ?
-      ORDER BY is_approved DESC
+      WHERE month_year = ? AND is_approved = 1
+      ORDER BY approved_on DESC
       LIMIT 1
     `).bind(monthYear).first();
+    if (!approvalInfo) {
+      approvalInfo = await db.prepare(`
+        SELECT is_approved, approved_on, approved_by 
+        FROM daily_wage_monthly_earnings 
+        WHERE month_year = ?
+        ORDER BY is_approved DESC, approved_on DESC
+        LIMIT 1
+      `).bind(monthYear).first();
+    }
+    const consentLock = await db.prepare(`
+      SELECT granted_by, granted_at 
+      FROM edit_consents 
+      WHERE (module = 'paybill' OR module = 'paybill_daily_wage') 
+        AND period_key = ? 
+        AND status = 'revoked'
+      ORDER BY granted_at DESC 
+      LIMIT 1
+    `).bind(monthYear).first();
+    if (consentLock && consentLock.granted_at) {
+      if (!approvalInfo || !approvalInfo.approved_on || new Date(consentLock.granted_at) > new Date(approvalInfo.approved_on)) {
+        await db.prepare(`
+          UPDATE daily_wage_monthly_earnings 
+          SET is_approved = 1, approved_on = ?, approved_by = ?
+          WHERE month_year = ?
+        `).bind(consentLock.granted_at, consentLock.granted_by, monthYear).run().catch(() => {
+        });
+        if (approvalInfo) {
+          approvalInfo.is_approved = 1;
+          approvalInfo.approved_on = consentLock.granted_at;
+          approvalInfo.approved_by = consentLock.granted_by;
+        } else {
+          approvalInfo = {
+            is_approved: 1,
+            approved_on: consentLock.granted_at,
+            approved_by: consentLock.granted_by
+          };
+        }
+      }
+    }
+    if (approvalInfo && approvalInfo.is_approved === 1 && approvalInfo.approved_on) {
+      await db.prepare(`
+        UPDATE daily_wage_monthly_earnings 
+        SET approved_on = ?, approved_by = ?
+        WHERE month_year = ? AND is_approved = 1 AND (approved_on IS NULL OR approved_on < ?)
+      `).bind(approvalInfo.approved_on, approvalInfo.approved_by, monthYear, approvalInfo.approved_on).run().catch(() => {
+      });
+    }
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -609,13 +703,60 @@ async function onRequestGet9(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
-    const approvalInfo = await db.prepare(`
+    let approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
       FROM visiting_monthly_earnings 
-      WHERE month_year = ?
-      ORDER BY is_approved DESC
+      WHERE month_year = ? AND is_approved = 1
+      ORDER BY approved_on DESC
       LIMIT 1
     `).bind(monthYear).first();
+    if (!approvalInfo) {
+      approvalInfo = await db.prepare(`
+        SELECT is_approved, approved_on, approved_by 
+        FROM visiting_monthly_earnings 
+        WHERE month_year = ?
+        ORDER BY is_approved DESC, approved_on DESC
+        LIMIT 1
+      `).bind(monthYear).first();
+    }
+    const consentLock = await db.prepare(`
+      SELECT granted_by, granted_at 
+      FROM edit_consents 
+      WHERE (module = 'paybill' OR module = 'paybill_visiting') 
+        AND period_key = ? 
+        AND status = 'revoked'
+      ORDER BY granted_at DESC 
+      LIMIT 1
+    `).bind(monthYear).first();
+    if (consentLock && consentLock.granted_at) {
+      if (!approvalInfo || !approvalInfo.approved_on || new Date(consentLock.granted_at) > new Date(approvalInfo.approved_on)) {
+        await db.prepare(`
+          UPDATE visiting_monthly_earnings 
+          SET is_approved = 1, approved_on = ?, approved_by = ?
+          WHERE month_year = ?
+        `).bind(consentLock.granted_at, consentLock.granted_by, monthYear).run().catch(() => {
+        });
+        if (approvalInfo) {
+          approvalInfo.is_approved = 1;
+          approvalInfo.approved_on = consentLock.granted_at;
+          approvalInfo.approved_by = consentLock.granted_by;
+        } else {
+          approvalInfo = {
+            is_approved: 1,
+            approved_on: consentLock.granted_at,
+            approved_by: consentLock.granted_by
+          };
+        }
+      }
+    }
+    if (approvalInfo && approvalInfo.is_approved === 1 && approvalInfo.approved_on) {
+      await db.prepare(`
+        UPDATE visiting_monthly_earnings 
+        SET approved_on = ?, approved_by = ?
+        WHERE month_year = ? AND is_approved = 1 AND (approved_on IS NULL OR approved_on < ?)
+      `).bind(approvalInfo.approved_on, approvalInfo.approved_by, monthYear, approvalInfo.approved_on).run().catch(() => {
+      });
+    }
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -1680,13 +1821,60 @@ async function onRequestGet18(context) {
     } else if (category === "daily_wage") {
       tableName = "daily_wage_employees";
     }
-    const approvalInfo = await db.prepare(`
+    let approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
       FROM supplementary_earnings 
-      WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
-      ORDER BY is_approved DESC
+      WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName}) AND is_approved = 1
+      ORDER BY approved_on DESC
       LIMIT 1
     `).bind(monthYear).first();
+    if (!approvalInfo) {
+      approvalInfo = await db.prepare(`
+        SELECT is_approved, approved_on, approved_by 
+        FROM supplementary_earnings 
+        WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
+        ORDER BY is_approved DESC, approved_on DESC
+        LIMIT 1
+      `).bind(monthYear).first();
+    }
+    const consentLock = await db.prepare(`
+      SELECT granted_by, granted_at 
+      FROM edit_consents 
+      WHERE module = 'supplementary' 
+        AND period_key = ? 
+        AND status = 'revoked'
+      ORDER BY granted_at DESC 
+      LIMIT 1
+    `).bind(monthYear).first();
+    if (consentLock && consentLock.granted_at) {
+      if (!approvalInfo || !approvalInfo.approved_on || new Date(consentLock.granted_at) > new Date(approvalInfo.approved_on)) {
+        await db.prepare(`
+          UPDATE supplementary_earnings 
+          SET is_approved = 1, approved_on = ?, approved_by = ?
+          WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName})
+        `).bind(consentLock.granted_at, consentLock.granted_by, monthYear).run().catch(() => {
+        });
+        if (approvalInfo) {
+          approvalInfo.is_approved = 1;
+          approvalInfo.approved_on = consentLock.granted_at;
+          approvalInfo.approved_by = consentLock.granted_by;
+        } else {
+          approvalInfo = {
+            is_approved: 1,
+            approved_on: consentLock.granted_at,
+            approved_by: consentLock.granted_by
+          };
+        }
+      }
+    }
+    if (approvalInfo && approvalInfo.is_approved === 1 && approvalInfo.approved_on) {
+      await db.prepare(`
+        UPDATE supplementary_earnings 
+        SET approved_on = ?, approved_by = ?
+        WHERE month_year = ? AND emp_id IN (SELECT emp_id FROM ${tableName}) AND is_approved = 1 AND (approved_on IS NULL OR approved_on < ?)
+      `).bind(approvalInfo.approved_on, approvalInfo.approved_by, monthYear, approvalInfo.approved_on).run().catch(() => {
+      });
+    }
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -2801,13 +2989,60 @@ async function onRequestGet30(context) {
   try {
     const monthYear = context.params.month_year;
     const db = context.env.ksom_payslip_db;
-    const approvalInfo = await db.prepare(`
+    let approvalInfo = await db.prepare(`
       SELECT is_approved, approved_on, approved_by 
       FROM monthly_earnings 
-      WHERE month_year = ?
-      ORDER BY is_approved DESC
+      WHERE month_year = ? AND is_approved = 1
+      ORDER BY approved_on DESC
       LIMIT 1
     `).bind(monthYear).first();
+    if (!approvalInfo) {
+      approvalInfo = await db.prepare(`
+        SELECT is_approved, approved_on, approved_by 
+        FROM monthly_earnings 
+        WHERE month_year = ?
+        ORDER BY is_approved DESC, approved_on DESC
+        LIMIT 1
+      `).bind(monthYear).first();
+    }
+    const consentLock = await db.prepare(`
+      SELECT granted_by, granted_at 
+      FROM edit_consents 
+      WHERE (module = 'paybill' OR module = 'paybill_permanent') 
+        AND period_key = ? 
+        AND status = 'revoked'
+      ORDER BY granted_at DESC 
+      LIMIT 1
+    `).bind(monthYear).first();
+    if (consentLock && consentLock.granted_at) {
+      if (!approvalInfo || !approvalInfo.approved_on || new Date(consentLock.granted_at) > new Date(approvalInfo.approved_on)) {
+        await db.prepare(`
+          UPDATE monthly_earnings 
+          SET is_approved = 1, approved_on = ?, approved_by = ?
+          WHERE month_year = ?
+        `).bind(consentLock.granted_at, consentLock.granted_by, monthYear).run().catch(() => {
+        });
+        if (approvalInfo) {
+          approvalInfo.is_approved = 1;
+          approvalInfo.approved_on = consentLock.granted_at;
+          approvalInfo.approved_by = consentLock.granted_by;
+        } else {
+          approvalInfo = {
+            is_approved: 1,
+            approved_on: consentLock.granted_at,
+            approved_by: consentLock.granted_by
+          };
+        }
+      }
+    }
+    if (approvalInfo && approvalInfo.is_approved === 1 && approvalInfo.approved_on) {
+      await db.prepare(`
+        UPDATE monthly_earnings 
+        SET approved_on = ?, approved_by = ?
+        WHERE month_year = ? AND is_approved = 1 AND (approved_on IS NULL OR approved_on < ?)
+      `).bind(approvalInfo.approved_on, approvalInfo.approved_by, monthYear, approvalInfo.approved_on).run().catch(() => {
+      });
+    }
     return new Response(JSON.stringify(approvalInfo || { is_approved: 0 }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -4009,6 +4244,31 @@ async function onRequestPost33(context) {
     const logAction = isUnlock ? "Unlock Pages for Admin" : "Lock / Revoke Page Unlock";
     const logDesc = `${isUnlock ? "Unlocked" : "Locked/Revoked unlock for"} pages: ${targetModules.join(", ")} (${period_key}) by ${userEmail}`;
     await logActivity(db, userEmail, logAction, logDesc);
+    if (!isUnlock && period_key && period_key !== "ALL") {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      for (const mod of targetModules) {
+        if (mod === "paybill" || mod === "paybill_permanent") {
+          await db.prepare("UPDATE monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {
+          });
+        }
+        if (mod === "paybill" || mod === "paybill_contract") {
+          await db.prepare("UPDATE contract_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {
+          });
+        }
+        if (mod === "paybill" || mod === "paybill_visiting") {
+          await db.prepare("UPDATE visiting_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {
+          });
+        }
+        if (mod === "paybill" || mod === "paybill_daily_wage") {
+          await db.prepare("UPDATE daily_wage_monthly_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {
+          });
+        }
+        if (mod === "supplementary") {
+          await db.prepare("UPDATE supplementary_earnings SET is_approved = 1, approved_on = ?, approved_by = ? WHERE month_year = ?").bind(now, userEmail, period_key).run().catch(() => {
+          });
+        }
+      }
+    }
     return new Response(JSON.stringify({ success: true, updated: results, status: newStatus }), {
       headers: { "Content-Type": "application/json" }
     });

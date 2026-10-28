@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle, Trash2, UserPlus, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { useOutletContext, Link } from 'react-router-dom';
+import { formatApprovedDateTime } from '../utils/dateUtils';
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -785,7 +786,7 @@ const SupplementaryPaybill = (props) => {
                 return approvedUser && approvedUser.name
                   ? (approvedUser.designation ? `${approvedUser.name}, ${approvedUser.designation}, KSoM` : `${approvedUser.name}, KSoM`)
                   : approvalInfo.approved_by;
-              })()}</strong> on <strong>{approvalInfo?.approved_on ? new Date(approvalInfo.approved_on).toLocaleString() : 'N/A'}</strong>.
+              })()}</strong> on <strong>{approvalInfo?.approved_on ? formatApprovedDateTime(approvalInfo.approved_on) : 'N/A'}</strong>.
               {user?.role === 'super_admin' && (
                 <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button 

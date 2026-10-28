@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { formatApprovedDateTime } from '../utils/dateUtils';
 
 const fmt = (v) => Math.round(parseFloat(v) || 0).toFixed(2);
 
@@ -74,12 +75,11 @@ const addSealAndWatermark = (doc, logoImg, sealImg, margin, pageW, sigY, record,
 
   let tsString = "";
   if (record.is_approved === 1) {
-    const appDate = new Date(record.approved_on);
-    const appDateStr = appDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    const appDateStr = formatApprovedDateTime(record.approved_on);
     tsString = `Verified on ${appDateStr}`;
   } else {
     const now = new Date();
-    tsString = `Statement generated at: ${now.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    tsString = `Statement generated at: ${formatApprovedDateTime(now)}`;
   }
 
   doc.setFontSize(7);
@@ -1331,47 +1331,60 @@ const Reports = () => {
       if (type === 'regular') {
         let earnEndpoint = '';
         let deduxEndpoint = '';
+        let approveEndpoint = '';
         if (employeeCategory === 'permanent') {
           earnEndpoint = `/api/earnings/${targetMonth}`;
           deduxEndpoint = `/api/deductions/${targetMonth}`;
+          approveEndpoint = `/api/approve/${targetMonth}`;
         } else if (employeeCategory === 'visiting') {
           earnEndpoint = `/api/earnings/visiting/${targetMonth}`;
           deduxEndpoint = `/api/deductions/visiting/${targetMonth}`;
+          approveEndpoint = `/api/approve/visiting/${targetMonth}`;
         } else if (employeeCategory === 'contract') {
           earnEndpoint = `/api/earnings/contract/${targetMonth}`;
           deduxEndpoint = `/api/deductions/contract/${targetMonth}`;
+          approveEndpoint = `/api/approve/contract/${targetMonth}`;
         } else if (employeeCategory === 'daily_wage') {
           earnEndpoint = `/api/earnings/daily_wage/${targetMonth}`;
           deduxEndpoint = `/api/deductions/daily_wage/${targetMonth}`;
+          approveEndpoint = `/api/approve/daily_wage/${targetMonth}`;
         }
         
-        const [earnRes, deduxRes] = await Promise.all([
+        const [earnRes, deduxRes, approveRes] = await Promise.all([
           fetch(earnEndpoint),
-          fetch(deduxEndpoint)
+          fetch(deduxEndpoint),
+          approveEndpoint ? fetch(approveEndpoint).catch(() => null) : Promise.resolve(null)
         ]);
         const earnData = await earnRes.json();
         const deduxData = await deduxRes.json();
+        const approvalData = approveRes && approveRes.ok ? await approveRes.json().catch(() => null) : null;
+        const lastApprovedOn = approvalData?.approved_on;
+        const lastApprovedBy = approvalData?.approved_by;
+        const isMonthApproved = approvalData?.is_approved === 1;
 
         const combined = earnData.map(e => {
           const d = deduxData.find(x => x.emp_id === e.emp_id) || {};
+          const isRowApproved = (isMonthApproved && e.is_approved !== 0) || e.is_approved === 1;
+          const rowApprovedOn = lastApprovedOn || e.approved_on;
+          const rowApprovedBy = lastApprovedBy || e.approved_by;
           if (employeeCategory === 'permanent') {
             const da = (e.da_state||0) + (e.da_ugc||0);
             const hra = (e.hra_state||0) + (e.hra_ugc||0);
             const gross = (e.basic_pay||0)+(e.dp_gp||0)+da+hra+(e.cca||0)+(e.spl_pay||0)+(e.tr_allow||0)+(e.spl_allow||0)+(e.fest_allow||0)+(e.other_earnings||0);
             const dedux = (d.epf||0)+(d.cpf||0)+(d.professional_tax||0)+(d.income_tax||0)+(d.sli||0)+(d.gis||0)+(d.lic||0)+(d.onam_advance||0)+(d.hra_recovery||0)+(d.other_deductions||0);
-            return { ...e, ...d, da, hra, gross, dedux, net: gross - dedux };
+            return { ...e, ...d, is_approved: isRowApproved ? 1 : e.is_approved, approved_on: rowApprovedOn, approved_by: rowApprovedBy, da, hra, gross, dedux, net: gross - dedux };
           } else if (employeeCategory === 'daily_wage') {
             const gross = (e.total_wage||0)+(e.other_earnings||0);
             const dedux = (d.income_tax||0)+(d.hra||0)+(d.epf||0)+(d.other_deductions||0);
-            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
+            return { ...e, ...d, is_approved: isRowApproved ? 1 : e.is_approved, approved_on: rowApprovedOn, approved_by: rowApprovedBy, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
           } else if (employeeCategory === 'contract') {
             const gross = (e.basic_pay||0)+(e.other_earnings||0);
             const dedux = (d.income_tax||0)+(d.hra||0)+(d.epf||0)+(d.other_deductions||0);
-            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
+            return { ...e, ...d, is_approved: isRowApproved ? 1 : e.is_approved, approved_on: rowApprovedOn, approved_by: rowApprovedBy, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0, epf: d.epf || 0 };
           } else {
             const gross = (e.basic_pay||0)+(e.other_earnings||0);
             const dedux = (d.income_tax||0)+(d.hra||0)+(d.other_deductions||0);
-            return { ...e, ...d, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0 };
+            return { ...e, ...d, is_approved: isRowApproved ? 1 : e.is_approved, approved_on: rowApprovedOn, approved_by: rowApprovedBy, gross, dedux, net: gross - dedux, da: 0, hra: d.hra || 0 };
           }
         });
 
