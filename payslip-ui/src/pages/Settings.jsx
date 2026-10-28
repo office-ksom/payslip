@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save, AlertCircle, Plus, Calendar, Pencil, ShieldCheck, RefreshCw, Terminal, Download as DownloadIcon } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { 
+  Save, AlertCircle, Plus, Calendar, Pencil, ShieldCheck, RefreshCw, 
+  Terminal, Download as DownloadIcon, Unlock, Lock, Coins, FileText, 
+  Calculator, ExternalLink, CheckCircle2 
+} from 'lucide-react';
 
 const Settings = (props) => {
   if (props.user && props.user.role === 'viewer') {
@@ -23,8 +28,173 @@ const Settings = (props) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [message, setMessage] = useState(null);
 
-  // States for system logs
-  const [activeTab, setActiveTab] = useState('allowances');
+  // Unlock Locked Pages State for Admin users
+  const UNLOCKABLE_PAGES = [
+    { id: 'paybill', name: 'Paybill', path: '/paybill', icon: FileText, desc: 'Monthly salary paybill with earnings & deductions' },
+    { id: 'supplementary', name: 'Supplementary paybill', path: '/supplementary-bill', icon: FileText, desc: 'Supplementary salary allowances & claims' },
+    { id: 'surrender', name: 'Surrender Bill', path: '/surrender-bill', icon: Calendar, desc: 'Earned leave surrender encashment bills' },
+    { id: 'arrears', name: 'Arrear Bill', path: '/arrear-bill', icon: Calculator, desc: 'DA, pay revision & other arrears' },
+    { id: 'festival', name: 'Festival allowance Bill', path: '/festival-bill', icon: ShieldCheck, desc: 'Festival and special occasion allowances' },
+    { id: 'epf', name: 'EPF Entry', path: '/epf-entry', icon: Coins, desc: 'Provident fund contribution sheets & EDLI' }
+  ];
+
+  const [unlockMonth, setUnlockMonth] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [unlockAllMonths, setUnlockAllMonths] = useState(false);
+  const [selectedPages, setSelectedPages] = useState(new Set());
+  const [pageStatuses, setPageStatuses] = useState({});
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const [unlockingPages, setUnlockingPages] = useState(false);
+  const [unlockMessage, setUnlockMessage] = useState(null);
+
+  const fetchPageStatuses = async () => {
+    setLoadingStatuses(true);
+    try {
+      const periodKey = unlockAllMonths ? 'ALL' : unlockMonth;
+      const res = await fetch(`/api/edit-consent?period_key=${periodKey}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPageStatuses(data.statuses || {});
+      }
+    } catch (err) {
+      console.error("Failed to fetch unlock statuses", err);
+    } finally {
+      setLoadingStatuses(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPageStatuses();
+  }, [unlockMonth, unlockAllMonths]);
+
+  const handleTogglePageSelect = (pageId) => {
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId);
+      else next.add(pageId);
+      return next;
+    });
+  };
+
+  const handleSelectAllPages = () => {
+    if (selectedPages.size === UNLOCKABLE_PAGES.length) {
+      setSelectedPages(new Set());
+    } else {
+      setSelectedPages(new Set(UNLOCKABLE_PAGES.map(p => p.id)));
+    }
+  };
+
+  const handleUnlockPages = async () => {
+    if (selectedPages.size === 0) {
+      setUnlockMessage({ type: 'error', text: 'Please select at least one page to unlock.' });
+      return;
+    }
+    setUnlockingPages(true);
+    setUnlockMessage(null);
+    try {
+      const periodKey = unlockAllMonths ? 'ALL' : unlockMonth;
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modules: Array.from(selectedPages),
+          period_key: periodKey,
+          action: 'unlock',
+          notes: `Unlocked by Admin via Settings (${periodKey})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const pageNames = UNLOCKABLE_PAGES.filter(p => selectedPages.has(p.id)).map(p => p.name).join(', ');
+        const periodText = unlockAllMonths ? 'all months' : unlockMonth;
+        setUnlockMessage({
+          type: 'success',
+          text: `Successfully unlocked ${pageNames} for ${periodText}! Edit feature is now enabled on these pages.`
+        });
+        fetchPageStatuses();
+      } else {
+        setUnlockMessage({ type: 'error', text: data.error || 'Failed to unlock selected pages.' });
+      }
+    } catch (err) {
+      setUnlockMessage({ type: 'error', text: 'Network error occurred while unlocking pages.' });
+    } finally {
+      setUnlockingPages(false);
+    }
+  };
+
+  const handleLockPages = async () => {
+    if (selectedPages.size === 0) {
+      setUnlockMessage({ type: 'error', text: 'Please select at least one page to lock.' });
+      return;
+    }
+    if (!window.confirm("Are you sure you want to lock / revoke edit permissions for the selected pages?")) return;
+    setUnlockingPages(true);
+    setUnlockMessage(null);
+    try {
+      const periodKey = unlockAllMonths ? 'ALL' : unlockMonth;
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modules: Array.from(selectedPages),
+          period_key: periodKey,
+          action: 'lock',
+          notes: `Locked by Admin via Settings (${periodKey})`
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const pageNames = UNLOCKABLE_PAGES.filter(p => selectedPages.has(p.id)).map(p => p.name).join(', ');
+        const periodText = unlockAllMonths ? 'all months' : unlockMonth;
+        setUnlockMessage({
+          type: 'info',
+          text: `Lock restored for ${pageNames} (${periodText}). Edit permissions revoked.`
+        });
+        fetchPageStatuses();
+      } else {
+        setUnlockMessage({ type: 'error', text: data.error || 'Failed to lock selected pages.' });
+      }
+    } catch (err) {
+      setUnlockMessage({ type: 'error', text: 'Network error occurred.' });
+    } finally {
+      setUnlockingPages(false);
+    }
+  };
+
+  // States for system logs and tabs
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    return tabParam && ['allowances', 'unlock', 'logs'].includes(tabParam) ? tabParam : 'allowances';
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['allowances', 'unlock', 'logs'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (activeTab === 'unlock') {
+      fetchPageStatuses();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (activeTab === 'unlock') {
+        fetchPageStatuses();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [activeTab, unlockMonth, unlockAllMonths]);
+
   const [logs, setLogs] = useState('');
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsSearch, setLogsSearch] = useState('');
@@ -246,31 +416,57 @@ const Settings = (props) => {
         }
       `}</style>
 
-      {/* Tab bar for Super Admin */}
-      {isSuperAdmin && (
-        <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem' }}>
-          <button 
-            onClick={() => setActiveTab('allowances')}
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'allowances' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              color: activeTab === 'allowances' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              transition: 'all 0.2s',
-              outline: 'none',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Allowance & Workflow Settings
-          </button>
+      {/* Tab bar */}
+      <div className="tabs-scrollable" style={{ borderBottom: '1px solid var(--color-border)', marginBottom: '2rem', display: 'flex', gap: '0.5rem' }}>
+        <button 
+          onClick={() => setActiveTab('allowances')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'allowances' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'allowances' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Calendar size={18} />
+          Allowance & Workflow Settings
+        </button>
+        <button 
+          onClick={() => setActiveTab('unlock')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'unlock' ? '2px solid var(--color-primary)' : '2px solid transparent',
+            color: activeTab === 'unlock' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            transition: 'all 0.2s',
+            outline: 'none',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Unlock size={18} />
+          Unlock Locked Pages
+        </button>
+        {isSuperAdmin && (
           <button 
             onClick={() => setActiveTab('logs')}
             style={{
-              padding: '0.75rem 1rem',
+              padding: '0.75rem 1.25rem',
               background: 'none',
               border: 'none',
               borderBottom: activeTab === 'logs' ? '2px solid var(--color-primary)' : '2px solid transparent',
@@ -280,15 +476,19 @@ const Settings = (props) => {
               fontSize: '0.95rem',
               transition: 'all 0.2s',
               outline: 'none',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}
           >
+            <Terminal size={18} />
             System Activity Logs
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {activeTab === 'allowances' ? (
+      {activeTab === 'allowances' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
@@ -440,8 +640,283 @@ const Settings = (props) => {
             </div>
           </div>
         </>
-      ) : (
-        /* System Activity Logs Tab view */
+      )}
+
+      {/* Unlock Locked Pages Tab View */}
+      {activeTab === 'unlock' && (
+        <div className="card" style={{ maxWidth: '1000px', width: '100%', marginBottom: '2.5rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-md)', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, var(--color-bg-surface) 100%)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ 
+                padding: '0.6rem', 
+                borderRadius: '10px', 
+                backgroundColor: 'rgba(59, 130, 246, 0.15)', 
+                color: 'var(--color-accent-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Unlock size={24} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.15rem', fontWeight: 700 }}>Unlock Locked Pages for Admin Users</h2>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
+                  Select verified and locked bill pages to enable editing and saving records for Admin users.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Period Selector Controls */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '1.25rem', 
+            padding: '1rem', 
+            backgroundColor: 'var(--color-bg-secondary)', 
+            borderRadius: 'var(--radius-md)', 
+            marginTop: '1.25rem',
+            marginBottom: '1.5rem', 
+            flexWrap: 'wrap', 
+            border: '1px solid var(--color-border)' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Calendar size={16} /> Month:
+              </label>
+              <input 
+                type="month" 
+                className="form-control" 
+                value={unlockMonth} 
+                disabled={unlockAllMonths || unlockingPages}
+                onChange={(e) => setUnlockMonth(e.target.value)} 
+                style={{ width: '160px', padding: '0.4rem 0.75rem' }} 
+              />
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={unlockAllMonths} 
+                disabled={unlockingPages}
+                onChange={(e) => setUnlockAllMonths(e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }} 
+              />
+              Apply to All Months (Global Unlock)
+            </label>
+
+            <button 
+              type="button"
+              className="btn btn-secondary" 
+              onClick={fetchPageStatuses}
+              disabled={loadingStatuses || unlockingPages}
+              style={{ marginLeft: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              title="Refresh page lock & consent statuses"
+            >
+              <RefreshCw size={14} className={loadingStatuses ? 'spin-animation' : ''} />
+              {loadingStatuses ? 'Refreshing...' : 'Refresh Status'}
+            </button>
+          </div>
+
+          {/* Selection Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              Select Pages to Unlock:
+              <span style={{ marginLeft: '0.5rem', color: selectedPages.size > 0 ? 'var(--color-accent-primary)' : 'var(--color-text-muted)', fontWeight: 700 }}>
+                ({selectedPages.size} of {UNLOCKABLE_PAGES.length} selected)
+              </span>
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary"
+                onClick={handleSelectAllPages}
+                disabled={unlockingPages}
+                style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}
+              >
+                {selectedPages.size === UNLOCKABLE_PAGES.length ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+          </div>
+
+          {/* Page Selection Cards Grid */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+            gap: '1rem', 
+            marginBottom: '1.75rem' 
+          }}>
+            {UNLOCKABLE_PAGES.map(page => {
+              const isSelected = selectedPages.has(page.id);
+              const status = pageStatuses[page.id];
+              // A page is locked ONLY if it has verified/locked records AND is not currently unlocked
+              const isLocked = Boolean(status?.is_locked !== undefined ? status.is_locked : ((status?.locked_count || 0) > 0 && !status?.unlocked));
+
+              return (
+                <div 
+                  key={page.id}
+                  onClick={() => handleTogglePageSelect(page.id)}
+                  style={{
+                    border: isSelected ? '2px solid var(--color-accent-primary)' : '1px solid var(--color-border)',
+                    backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.08)' : 'var(--color-bg-secondary)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.1rem',
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // Handled by container onClick
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: '0.98rem', color: isSelected ? 'var(--color-accent-primary)' : 'var(--color-text-primary)' }}>
+                          {page.name}
+                        </span>
+                      </div>
+                      <Link 
+                        to={page.path}
+                        onClick={(e) => e.stopPropagation()}
+                        title={`Open ${page.name}`}
+                        style={{ color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', padding: '2px' }}
+                      >
+                        <ExternalLink size={14} />
+                      </Link>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem 1.8rem', lineHeight: '1.4' }}>
+                      {page.desc}
+                    </p>
+                  </div>
+
+                  <div style={{ marginLeft: '1.8rem', marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    {isLocked ? (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid rgba(239, 68, 68, 0.25)'
+                      }}>
+                        <Lock size={12} /> Locked {status?.locked_count > 0 ? `(${status.locked_count} verified)` : ''}
+                      </span>
+                    ) : (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10b981',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        border: '1px solid rgba(16, 185, 129, 0.25)'
+                      }}>
+                        <Unlock size={12} /> Unlocked
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Action Buttons Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', paddingTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                className="btn btn-primary"
+                onClick={handleUnlockPages}
+                disabled={unlockingPages || selectedPages.size === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.7rem 1.5rem',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  backgroundColor: '#16a34a',
+                  borderColor: '#16a34a',
+                  boxShadow: selectedPages.size > 0 ? '0 0 15px rgba(22, 163, 74, 0.4)' : 'none'
+                }}
+              >
+                <Unlock size={18} />
+                {unlockingPages ? 'Unlocking...' : `Unlock Selected Pages (${selectedPages.size})`}
+              </button>
+
+              <button 
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleLockPages}
+                disabled={unlockingPages || selectedPages.size === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.7rem 1.25rem',
+                  fontSize: '0.9rem'
+                }}
+                title="Re-lock / revoke edit permissions on selected pages"
+              >
+                <Lock size={16} />
+                Lock / Revoke Selected
+              </button>
+            </div>
+
+            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+              {selectedPages.size === 0 ? 'Select page(s) above to unlock' : 'Click Unlock to enable editing on selected pages'}
+            </span>
+          </div>
+
+          {/* Notification Banner */}
+          {unlockMessage && (
+            <div style={{ 
+              marginTop: '1.5rem',
+              padding: '1rem 1.25rem', 
+              borderRadius: 'var(--radius-md)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              backgroundColor: unlockMessage.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : (unlockMessage.type === 'info' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
+              border: unlockMessage.type === 'success' ? '1px solid rgba(16, 185, 129, 0.3)' : (unlockMessage.type === 'info' ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'),
+              color: unlockMessage.type === 'success' ? 'var(--color-success)' : (unlockMessage.type === 'info' ? 'var(--color-accent-primary)' : 'var(--color-danger)')
+            }}>
+              <AlertCircle size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{unlockMessage.text}</div>
+                {unlockMessage.type === 'success' && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                    Quick Jump to edit: {' '}
+                    {UNLOCKABLE_PAGES.filter(p => selectedPages.has(p.id)).map((p, idx, arr) => (
+                      <span key={p.id}>
+                        <Link to={p.path} style={{ textDecoration: 'underline', fontWeight: 600, color: 'var(--color-accent-primary)' }}>{p.name}</Link>
+                        {idx < arr.length - 1 ? ' • ' : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* System Activity Logs Tab View */}
+      {activeTab === 'logs' && isSuperAdmin && (
         <div className="card" style={{ maxWidth: '1000px', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

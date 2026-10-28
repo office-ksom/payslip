@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/bundle-86Cwbv/checked-fetch.js
+// .wrangler/tmp/bundle-RL1Cr1/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -27,7 +27,7 @@ globalThis.fetch = new Proxy(globalThis.fetch, {
   }
 });
 
-// .wrangler/tmp/pages-1DZrgM/functionsWorker-0.004917126145871364.mjs
+// .wrangler/tmp/pages-zBrF7u/functionsWorker-0.09567244489533966.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 var urls2 = /* @__PURE__ */ new Set();
@@ -760,8 +760,13 @@ __name2(ensureConsentTable, "ensureConsentTable");
 async function hasAdminConsent(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
+    const isPaybill = module === "paybill" || module && module.startsWith("paybill_");
     const row = await db.prepare(
-      "SELECT status FROM edit_consents WHERE module = ? AND period_key = ? AND status = 'active' LIMIT 1"
+      `SELECT status FROM edit_consents 
+       WHERE (module = ? ${isPaybill ? "OR module = 'paybill' OR module LIKE 'paybill_%'" : ""})
+         AND (period_key = ? OR period_key = 'ALL')
+         AND status = 'active'
+       LIMIT 1`
     ).bind(module, periodKey).first();
     return !!row;
   } catch (err) {
@@ -774,9 +779,14 @@ __name2(hasAdminConsent, "hasAdminConsent");
 async function getConsentStatus(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
+    const isPaybill = module === "paybill" || module && module.startsWith("paybill_");
     const row = await db.prepare(
-      "SELECT module, period_key, granted_by, granted_at, status, notes FROM edit_consents WHERE module = ? AND period_key = ? LIMIT 1"
-    ).bind(module, periodKey).first();
+      `SELECT module, period_key, granted_by, granted_at, status, notes FROM edit_consents 
+       WHERE (module = ? ${isPaybill ? "OR module = 'paybill' OR module LIKE 'paybill_%'" : ""})
+         AND (period_key = ? OR period_key = 'ALL')
+       ORDER BY (CASE WHEN status = 'active' THEN 0 ELSE 1 END), (CASE WHEN period_key = ? THEN 0 ELSE 1 END)
+       LIMIT 1`
+    ).bind(module, periodKey, periodKey).first();
     return row || null;
   } catch (err) {
     console.error("getConsentStatus error:", err);
@@ -798,6 +808,13 @@ async function setConsentStatus(db, module, periodKey, grantedBy, status = "acti
         status = excluded.status,
         notes = excluded.notes
     `).bind(module, periodKey, grantedBy, now, status, notes).run();
+    if (status === "revoked") {
+      await db.prepare(`
+        UPDATE edit_consents 
+        SET status = 'revoked', granted_by = ?, granted_at = ?
+        WHERE module = ? AND period_key = 'ALL'
+      `).bind(grantedBy, now, module).run();
+    }
     return { success: true, module, period_key: periodKey, granted_by: grantedBy, granted_at: now, status, notes };
   } catch (err) {
     console.error("setConsentStatus error:", err);
@@ -3880,16 +3897,73 @@ async function onRequestGet38(context) {
   try {
     const url = new URL(context.request.url);
     const module = url.searchParams.get("module");
-    const periodKey = url.searchParams.get("period_key");
+    const periodKey = url.searchParams.get("period_key") || "";
     const db = context.env.ksom_payslip_db;
-    if (!module || !periodKey) {
-      return new Response(JSON.stringify({ error: "Missing module or period_key parameter" }), { status: 400 });
+    if (!periodKey) {
+      return new Response(JSON.stringify({ error: "Missing period_key parameter" }), { status: 400 });
     }
-    const consent = await getConsentStatus(db, module, periodKey);
-    const isActive = consent ? consent.status === "active" : false;
+    if (module && module !== "all") {
+      const consent = await getConsentStatus(db, module, periodKey);
+      const isActive = consent ? consent.status === "active" : false;
+      return new Response(JSON.stringify({
+        has_consent: isActive,
+        consent
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const modulesList = [
+      { id: "paybill", name: "Paybill" },
+      { id: "supplementary", name: "Supplementary paybill" },
+      { id: "surrender", name: "Surrender Bill" },
+      { id: "arrears", name: "Arrear Bill" },
+      { id: "festival", name: "Festival allowance Bill" },
+      { id: "epf", name: "EPF Entry" }
+    ];
+    const isAllMonths = periodKey === "ALL";
+    const statuses = {};
+    for (const m of modulesList) {
+      const consent = await getConsentStatus(db, m.id, periodKey);
+      const isConsentActive = consent ? consent.status === "active" : false;
+      let lockedCount = 0;
+      try {
+        if (m.id === "paybill") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM monthly_earnings WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM monthly_earnings WHERE month_year = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        } else if (m.id === "supplementary") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM supplementary_earnings WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM supplementary_earnings WHERE month_year = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        } else if (m.id === "surrender") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM surrender_bills WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM surrender_bills WHERE substr(bill_date, 1, 7) = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        } else if (m.id === "arrears") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM arrear_bills WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM arrear_bills WHERE substr(bill_date, 1, 7) = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        } else if (m.id === "festival") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM festival_allowance_bills WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM festival_allowance_bills WHERE substr(bill_date, 1, 7) = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        } else if (m.id === "epf") {
+          const res = isAllMonths ? await db.prepare("SELECT count(*) as count FROM epf_entries WHERE is_approved = 1").first("count") : await db.prepare("SELECT count(*) as count FROM epf_entries WHERE month_year = ? AND is_approved = 1").bind(periodKey).first("count");
+          lockedCount = res || 0;
+        }
+      } catch (err) {
+        console.error(`Error querying locked count for ${m.id}:`, err);
+      }
+      const isLocked = lockedCount > 0 && !isConsentActive;
+      const isUnlocked = !isLocked;
+      statuses[m.id] = {
+        id: m.id,
+        name: m.name,
+        is_locked: isLocked,
+        unlocked: isUnlocked,
+        is_consent_active: isConsentActive,
+        locked_count: lockedCount,
+        consent
+      };
+    }
     return new Response(JSON.stringify({
-      has_consent: isActive,
-      consent
+      period_key: periodKey,
+      statuses
     }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -3904,29 +3978,38 @@ async function onRequestPost33(context) {
   const userEmail = context.request.headers.get("X-User-Email");
   try {
     const body = await context.request.json().catch(() => ({}));
-    const { module, period_key, action, notes } = body;
+    const { module, modules, period_key, action, notes } = body;
     const db = context.env.ksom_payslip_db;
-    if (!module || !period_key) {
-      return new Response(JSON.stringify({ error: "Missing module or period_key" }), { status: 400 });
+    const targetModules = Array.isArray(modules) && modules.length > 0 ? modules : module ? [module] : [];
+    if (targetModules.length === 0 || !period_key) {
+      return new Response(JSON.stringify({ error: "Missing module(s) or period_key" }), { status: 400 });
     }
     if (action === "request") {
       if (userRole !== "admin" && userRole !== "super_admin") {
         return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
       }
-      await logActivity(db, userEmail, "Request Edit Permission", `Admin requested edit consent for locked ${module} (${period_key}): ${notes || "No note"}`);
+      await logActivity(db, userEmail, "Request Edit Permission", `Admin requested edit consent for locked ${targetModules.join(", ")} (${period_key}): ${notes || "No note"}`);
       return new Response(JSON.stringify({ success: true, message: "Edit request submitted to Super Admin." }), {
         headers: { "Content-Type": "application/json" }
       });
     }
-    if (userRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "Only Super Admins can grant or revoke edit consent." }), { status: 403 });
+    if (userRole !== "admin" && userRole !== "super_admin") {
+      return new Response(JSON.stringify({ error: "Only Admins and Super Admins can unlock locked pages." }), { status: 403 });
     }
-    const newStatus = action === "revoke" ? "revoked" : "active";
-    const result = await setConsentStatus(db, module, period_key, userEmail, newStatus, notes || "");
-    const logAction = newStatus === "active" ? "Grant Edit Consent" : "Revoke Edit Consent";
-    const logDesc = `${newStatus === "active" ? "Granted" : "Revoked"} edit consent to Admin for locked ${module} (${period_key})`;
+    const isUnlock = action === "grant" || action === "unlock";
+    const newStatus = isUnlock ? "active" : "revoked";
+    const results = [];
+    for (const mod of targetModules) {
+      const subMods = mod === "paybill" ? ["paybill", "paybill_permanent", "paybill_contract", "paybill_daily_wage", "paybill_visiting"] : [mod];
+      for (const m of subMods) {
+        const res = await setConsentStatus(db, m, period_key, userEmail, newStatus, notes || "");
+        results.push(res);
+      }
+    }
+    const logAction = isUnlock ? "Unlock Pages for Admin" : "Lock / Revoke Page Unlock";
+    const logDesc = `${isUnlock ? "Unlocked" : "Locked/Revoked unlock for"} pages: ${targetModules.join(", ")} (${period_key}) by ${userEmail}`;
     await logActivity(db, userEmail, logAction, logDesc);
-    return new Response(JSON.stringify({ success: true, consent: result }), {
+    return new Response(JSON.stringify({ success: true, updated: results, status: newStatus }), {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
@@ -5807,7 +5890,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-86Cwbv/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-RL1Cr1/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -5839,7 +5922,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-86Cwbv/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-RL1Cr1/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -5939,4 +6022,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.004917126145871364.js.map
+//# sourceMappingURL=functionsWorker-0.09567244489533966.js.map

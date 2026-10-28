@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X, Edit, Unlock } from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
+import { Calculator, Save, ShieldCheck, Search, Trash2, Calendar, FileText, AlertTriangle, XCircle, X, Edit, Unlock, Lock } from 'lucide-react';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const getFinancialYear = (dateStr) => {
   if (!dateStr) return '';
@@ -77,6 +77,7 @@ const SurrenderBill = (props) => {
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [editingBillId, setEditingBillId] = useState(null);
   const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [lockingPage, setLockingPage] = useState(false);
   const [togglingConsent, setTogglingConsent] = useState(false);
   const [requestingConsent, setRequestingConsent] = useState(false);
 
@@ -475,6 +476,18 @@ const SurrenderBill = (props) => {
       });
       const data = await res.json();
       if (res.ok) {
+        // Also revoke edit consent
+        await fetch('/api/edit-consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            module: 'surrender',
+            period_key: monthYear,
+            action: 'lock',
+            notes: `Auto-locked on approval by ${user?.email}`
+          })
+        }).catch(() => {});
+        setAdminConsentActive(false);
         alert('Selected surrender bills approved successfully!');
         loadBillsForMonth(monthYear);
       } else {
@@ -484,6 +497,35 @@ const SurrenderBill = (props) => {
       alert('Error: ' + err.message);
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleLockPage = async () => {
+    if (!window.confirm(`Lock Surrender Bills for ${formatMonthYear(monthYear)}? This will disable editing and secure the bills.`)) return;
+    setLockingPage(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'surrender',
+          period_key: monthYear,
+          action: 'lock',
+          notes: `Locked by ${user?.email || 'Admin'} from Surrender Bill page`
+        })
+      });
+      if (res.ok) {
+        setAdminConsentActive(false);
+        alert('Surrender Bills successfully locked! Edit feature is now disabled.');
+        loadBillsForMonth(monthYear);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to lock surrender bills: ' + (err.error || 'Server error'));
+      }
+    } catch (err) {
+      alert('Network error while locking surrender bills: ' + err.message);
+    } finally {
+      setLockingPage(false);
     }
   };
 
@@ -608,18 +650,40 @@ const SurrenderBill = (props) => {
           <ShieldCheck size={32} style={{ color: adminConsentActive ? '#16a34a' : (user?.role === 'approver' ? '#a16207' : 'var(--color-success)') }} />
           <div style={{ flex: 1, minWidth: '240px' }}>
             <h3 style={{ fontSize: '1.1rem', color: adminConsentActive ? '#15803d' : (user?.role === 'approver' ? '#713f12' : 'var(--color-success)'), margin: 0 }}>
-              {adminConsentActive ? 'EDIT CONSENT ACTIVE (SUPER ADMIN GRANTED)' : (approvedCount === totalCount ? 'ALL SURRENDER BILLS SEALED' : 'SOME SURRENDER BILLS SEALED')}
+              {adminConsentActive ? 'EDIT FEATURE UNLOCKED (ACTIVE)' : (approvedCount === totalCount ? 'ALL SURRENDER BILLS SEALED' : 'SOME SURRENDER BILLS SEALED')}
             </h3>
             <p style={{ fontSize: '0.875rem', color: adminConsentActive ? '#166534' : (user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)'), margin: '0.25rem 0 0 0' }}>
               <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> surrender bills in {formatMonthYear(monthYear)} are verified and locked.
               {adminConsentActive && (
                 <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600, color: '#15803d' }}>
-                  ✓ Super Admin has granted consent. Admins can now edit dates, leaves & amounts directly.
+                  ✓ Edit access is unlocked. Admins can now edit dates, leaves & amounts directly.
                 </span>
               )}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {adminConsentActive && (
+              <button 
+                className="btn btn-sm" 
+                onClick={handleLockPage}
+                disabled={lockingPage}
+                style={{ 
+                  backgroundColor: '#dc2626', 
+                  color: '#fff',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Lock size={14} /> {lockingPage ? 'Locking...' : 'Lock Page'}
+              </button>
+            )}
             {user?.role === 'super_admin' && (
               <>
                 <button 
@@ -665,26 +729,46 @@ const SurrenderBill = (props) => {
               </>
             )}
             {user?.role === 'admin' && !adminConsentActive && (
-              <button 
-                className="btn btn-sm" 
-                onClick={handleRequestConsent}
-                disabled={requestingConsent}
-                style={{ 
-                  backgroundColor: '#3b82f6', 
-                  color: '#fff',
-                  border: 'none',
-                  padding: '7px 14px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                Request Edit Permission from Super Admin
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-sm"
+                  disabled
+                  style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    cursor: 'default',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Lock size={14} /> Locked
+                </button>
+                <Link
+                  to="/settings?tab=unlock"
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-accent-primary)',
+                    border: '1px solid var(--color-border)',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <Unlock size={13} /> Unlock in Settings
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -962,8 +1046,8 @@ const SurrenderBill = (props) => {
                 <Search size={16} /> Preview Full Sheet
               </button>
             )}
-            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin')) && filteredBills.length > 0 && (
-              <div style={{ display: 'flex', gap: '1rem' }}>
+            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin') || adminConsentActive) && filteredBills.length > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <button 
                   className="btn btn-primary" 
                   onClick={handleApprove} 

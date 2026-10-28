@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle, Trash2, UserPlus, Eye, EyeOff } from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
+import { Calculator, Save, Copy, X, ShieldCheck, Search, ShieldAlert, XCircle, Trash2, UserPlus, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -48,6 +48,7 @@ const SupplementaryPaybill = (props) => {
   const [approvalInfo, setApprovalInfo] = useState(null);
   const [approving, setApproving] = useState(false);
   const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [lockingPage, setLockingPage] = useState(false);
   const [togglingConsent, setTogglingConsent] = useState(false);
   const [requestingConsent, setRequestingConsent] = useState(false);
   const [requireApproval, setRequireApproval] = useState(true);
@@ -466,6 +467,18 @@ const SupplementaryPaybill = (props) => {
       });
       const data = await res.json();
       if (res.ok) {
+        // Revoke edit consent so lock reflects immediately in Settings
+        await fetch('/api/edit-consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            module: 'supplementary',
+            period_key: monthYear,
+            action: 'lock',
+            notes: `Auto-locked on approval by ${user?.email}`
+          })
+        }).catch(() => {});
+        setAdminConsentActive(false);
         alert('Supplementary paybill approved successfully!');
         setIsApproved(true);
         setApprovalInfo(data);
@@ -476,6 +489,36 @@ const SupplementaryPaybill = (props) => {
       alert('Error: ' + err.message);
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleLockPage = async () => {
+    if (!window.confirm(`Lock supplementary paybill for ${formatMonthYear(monthYear)}? This will disable editing and secure the records.`)) return;
+    setLockingPage(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'supplementary',
+          period_key: monthYear,
+          action: 'lock',
+          notes: `Locked by ${user?.email || 'Admin'} from Supplementary Paybill page`
+        })
+      });
+      if (res.ok) {
+        setAdminConsentActive(false);
+        setIsApproved(true);
+        alert('Supplementary paybill successfully locked! Edit feature is now disabled.');
+        loadDataForMonth(monthYear);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to lock supplementary paybill: ' + (err.error || 'Server error'));
+      }
+    } catch (err) {
+      alert('Network error while locking supplementary paybill: ' + err.message);
+    } finally {
+      setLockingPage(false);
     }
   };
 
@@ -785,37 +828,84 @@ const SupplementaryPaybill = (props) => {
                 </div>
               )}
               {user?.role === 'admin' && (
-                <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   {adminConsentActive ? (
-                    <span style={{ 
-                      display: 'inline-block', 
-                      padding: '4px 10px', 
-                      backgroundColor: '#10b981', 
-                      color: '#fff', 
-                      borderRadius: '4px', 
-                      fontSize: '0.8rem', 
-                      fontWeight: 600 
-                    }}>
-                      ✓ Super Admin Consent Granted: You can edit and save records
-                    </span>
+                    <>
+                      <span style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '5px 12px', 
+                        backgroundColor: '#10b981', 
+                        color: '#fff', 
+                        borderRadius: '6px', 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600 
+                      }}>
+                        <Unlock size={14} /> Edit Feature Unlocked: You can edit and save records
+                      </span>
+                      <button
+                        className="btn btn-sm"
+                        onClick={handleLockPage}
+                        disabled={lockingPage}
+                        style={{
+                          backgroundColor: '#dc2626',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                      >
+                        <Lock size={14} /> {lockingPage ? 'Locking...' : 'Lock Page'}
+                      </button>
+                    </>
                   ) : (
-                    <button
-                      className="btn btn-sm"
-                      onClick={handleRequestConsent}
-                      disabled={requestingConsent}
-                      style={{
-                        backgroundColor: '#3b82f6',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '6px 14px',
-                        borderRadius: '6px',
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {requestingConsent ? 'Requesting...' : 'Request Edit Permission from Super Admin'}
-                    </button>
+                    <>
+                      <button
+                        className="btn btn-sm"
+                        disabled
+                        style={{
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: '700',
+                          cursor: 'default',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem'
+                        }}
+                      >
+                        <Lock size={14} /> Locked
+                      </button>
+                      <Link
+                        to="/settings?tab=unlock"
+                        className="btn btn-sm"
+                        style={{
+                          backgroundColor: 'transparent',
+                          color: 'var(--color-accent-primary)',
+                          border: '1px solid var(--color-border)',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <Unlock size={13} /> Unlock in Settings
+                      </Link>
+                    </>
                   )}
                 </div>
               )}
@@ -884,11 +974,11 @@ const SupplementaryPaybill = (props) => {
                 <button className="btn btn-primary" onClick={handleSave} disabled={saving || isReadOnly}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Paybill'}
                 </button>
-                {!requireApproval ? (
+                {(!requireApproval || adminConsentActive) ? (
                   <button 
                     className="btn" 
-                    onClick={handleApprove} 
-                    disabled={saving || approving || isReadOnly}
+                    onClick={adminConsentActive ? handleLockPage : handleApprove} 
+                    disabled={saving || approving || lockingPage}
                     style={{ 
                       backgroundColor: 'var(--color-success)', 
                       color: '#fff', 
@@ -901,7 +991,7 @@ const SupplementaryPaybill = (props) => {
                       gap: '0.5rem'
                     }}
                   >
-                    <ShieldCheck size={18} /> {approving ? 'Locking...' : 'Verify & Lock'}
+                    <ShieldCheck size={18} /> {lockingPage ? 'Locking...' : (adminConsentActive ? 'Lock Paybill' : (approving ? 'Locking...' : 'Verify & Lock'))}
                   </button>
                 ) : (
                   !isSubmitted && (
@@ -926,6 +1016,27 @@ const SupplementaryPaybill = (props) => {
                   )
                 )}
               </>
+            )}
+            {isApproved && !adminConsentActive && (
+              <button 
+                className="btn" 
+                disabled 
+                style={{ 
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)', 
+                  color: '#10b981', 
+                  border: '1px solid rgba(16, 185, 129, 0.4)', 
+                  padding: '0.6rem 1.2rem', 
+                  fontWeight: 'bold', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem', 
+                  cursor: 'default' 
+                }}
+                title="Supplementary paybill is verified and locked"
+              >
+                <Lock size={18} /> Locked
+              </button>
             )}
             {isSubmitted && !isApproved && requireApproval && (
               <div style={{ 

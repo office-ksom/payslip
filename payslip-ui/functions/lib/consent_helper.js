@@ -20,9 +20,13 @@ export async function ensureConsentTable(db) {
 export async function hasAdminConsent(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
-    // Period key check: if periodKey is provided, check exact match or prefix if relevant
+    const isPaybill = module === 'paybill' || (module && module.startsWith('paybill_'));
     const row = await db.prepare(
-      "SELECT status FROM edit_consents WHERE module = ? AND period_key = ? AND status = 'active' LIMIT 1"
+      `SELECT status FROM edit_consents 
+       WHERE (module = ? ${isPaybill ? "OR module = 'paybill' OR module LIKE 'paybill_%'" : ""})
+         AND (period_key = ? OR period_key = 'ALL')
+         AND status = 'active'
+       LIMIT 1`
     ).bind(module, periodKey).first();
     return !!row;
   } catch (err) {
@@ -34,9 +38,14 @@ export async function hasAdminConsent(db, module, periodKey) {
 export async function getConsentStatus(db, module, periodKey) {
   try {
     await ensureConsentTable(db);
+    const isPaybill = module === 'paybill' || (module && module.startsWith('paybill_'));
     const row = await db.prepare(
-      "SELECT module, period_key, granted_by, granted_at, status, notes FROM edit_consents WHERE module = ? AND period_key = ? LIMIT 1"
-    ).bind(module, periodKey).first();
+      `SELECT module, period_key, granted_by, granted_at, status, notes FROM edit_consents 
+       WHERE (module = ? ${isPaybill ? "OR module = 'paybill' OR module LIKE 'paybill_%'" : ""})
+         AND (period_key = ? OR period_key = 'ALL')
+       ORDER BY (CASE WHEN status = 'active' THEN 0 ELSE 1 END), (CASE WHEN period_key = ? THEN 0 ELSE 1 END)
+       LIMIT 1`
+    ).bind(module, periodKey, periodKey).first();
     return row || null;
   } catch (err) {
     console.error("getConsentStatus error:", err);
@@ -57,6 +66,16 @@ export async function setConsentStatus(db, module, periodKey, grantedBy, status 
         status = excluded.status,
         notes = excluded.notes
     `).bind(module, periodKey, grantedBy, now, status, notes).run();
+
+    if (status === 'revoked') {
+      // Also ensure any global 'ALL' entry for this module is marked revoked
+      await db.prepare(`
+        UPDATE edit_consents 
+        SET status = 'revoked', granted_by = ?, granted_at = ?
+        WHERE module = ? AND period_key = 'ALL'
+      `).bind(grantedBy, now, module).run();
+    }
+
     return { success: true, module, period_key: periodKey, granted_by: grantedBy, granted_at: now, status, notes };
   } catch (err) {
     console.error("setConsentStatus error:", err);

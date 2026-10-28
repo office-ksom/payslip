@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, ShieldCheck, Coins, AlertCircle, Loader2, Lock, Unlock, X, Eye } from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const formatMonthYear = (myStr) => {
   if (!myStr || !/^\d{4}-\d{2}$/.test(myStr)) return myStr;
@@ -293,10 +293,52 @@ const EPFEntry = (props) => {
         throw new Error(errorData.error || 'Failed to lock EPF entries');
       }
 
+      // Also revoke edit consent
+      await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'epf',
+          period_key: monthYear,
+          action: 'lock',
+          notes: `Auto-locked on approval by ${user?.email}`
+        })
+      }).catch(() => {});
+      setAdminConsentActive(false);
+
       setMessage({ type: 'success', text: 'EPF sheet verified and locked successfully!' });
       loadEPFEntries(monthYear, activeTab);
     } catch (err) {
       console.error(err);
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLocking(false);
+    }
+  };
+
+  const handleLockPage = async () => {
+    if (!window.confirm(`Lock EPF entries for ${formatMonthYear(monthYear)}? This will disable editing and secure the sheet.`)) return;
+    setLocking(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'epf',
+          period_key: monthYear,
+          action: 'lock',
+          notes: `Locked by ${user?.email || 'Admin'} from EPF page`
+        })
+      });
+      if (res.ok) {
+        setAdminConsentActive(false);
+        setMessage({ type: 'success', text: 'EPF sheet successfully locked! Edit feature is now disabled.' });
+        loadEPFEntries(monthYear, activeTab);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: err.error || 'Failed to lock EPF sheet' });
+      }
+    } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {
       setLocking(false);
@@ -441,8 +483,8 @@ const EPFEntry = (props) => {
                 )}
               </button>
               <button
-                onClick={handleLock}
-                disabled={locking || isApprovedRecord}
+                onClick={adminConsentActive ? handleLockPage : handleLock}
+                disabled={locking || (isApprovedRecord && !adminConsentActive)}
                 className="btn"
                 style={{
                   backgroundColor: 'var(--color-success)',
@@ -454,8 +496,8 @@ const EPFEntry = (props) => {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  cursor: isApprovedRecord ? 'not-allowed' : 'pointer',
-                  opacity: isApprovedRecord ? 0.6 : 1
+                  cursor: (isApprovedRecord && !adminConsentActive) ? 'not-allowed' : 'pointer',
+                  opacity: (isApprovedRecord && !adminConsentActive) ? 0.6 : 1
                 }}
               >
                 {locking ? (
@@ -466,7 +508,7 @@ const EPFEntry = (props) => {
                 ) : (
                   <>
                     <ShieldCheck size={18} />
-                    Verify & Lock
+                    {adminConsentActive ? 'Lock EPF Sheet' : 'Verify & Lock'}
                   </>
                 )}
               </button>
@@ -525,35 +567,82 @@ const EPFEntry = (props) => {
             )}
             {user?.role === 'admin' && (
               adminConsentActive ? (
-                <span style={{ 
-                  display: 'inline-block', 
-                  padding: '4px 10px', 
-                  backgroundColor: '#10b981', 
-                  color: '#fff', 
-                  borderRadius: '4px', 
-                  fontSize: '0.8rem', 
-                  fontWeight: 600 
-                }}>
-                  ✓ Super Admin Consent Granted: You can edit and save records
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '5px 12px', 
+                    backgroundColor: '#10b981', 
+                    color: '#fff', 
+                    borderRadius: '6px', 
+                    fontSize: '0.85rem', 
+                    fontWeight: 600 
+                  }}>
+                    <Unlock size={14} /> Edit Feature Unlocked: You can edit and save records
+                  </span>
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleLockPage}
+                    disabled={locking}
+                    style={{
+                      backgroundColor: '#dc2626',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <Lock size={14} /> {locking ? 'Locking...' : 'Lock Page'}
+                  </button>
+                </div>
               ) : (
-                <button
-                  className="btn btn-sm"
-                  onClick={handleRequestConsent}
-                  disabled={requestingConsent}
-                  style={{
-                    backgroundColor: '#3b82f6',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {requestingConsent ? 'Requesting...' : 'Request Edit Permission from Super Admin'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-sm"
+                    disabled
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      cursor: 'default',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <Lock size={14} /> Locked
+                  </button>
+                  <Link
+                    to="/settings?tab=unlock"
+                    className="btn btn-sm"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: 'var(--color-accent-primary)',
+                      border: '1px solid var(--color-border)',
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    <Unlock size={13} /> Unlock in Settings
+                  </Link>
+                </div>
               )
             )}
           </div>

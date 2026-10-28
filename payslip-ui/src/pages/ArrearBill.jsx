@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X, Unlock } from 'lucide-react';
-import { useOutletContext } from 'react-router-dom';
+import { Save, ShieldCheck, Copy, Trash2, Calendar, FileText, Check, XCircle, Search, X, Unlock, Lock } from 'lucide-react';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const fmt = (v) => (parseFloat(v) || 0).toFixed(2);
 
@@ -50,6 +50,7 @@ const ArrearBill = (props) => {
   const [rejecting, setRejecting] = useState(false);
   const [isOverrideActive, setIsOverrideActive] = useState(false);
   const [adminConsentActive, setAdminConsentActive] = useState(false);
+  const [lockingPage, setLockingPage] = useState(false);
   const [togglingConsent, setTogglingConsent] = useState(false);
   const [requestingConsent, setRequestingConsent] = useState(false);
 
@@ -347,6 +348,18 @@ const ArrearBill = (props) => {
       });
       const data = await res.json();
       if (res.ok) {
+        // Also revoke edit consent
+        await fetch('/api/edit-consent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            module: 'arrears',
+            period_key: monthYear,
+            action: 'lock',
+            notes: `Auto-locked on approval by ${user?.email}`
+          })
+        }).catch(() => {});
+        setAdminConsentActive(false);
         alert('Selected arrear bills approved successfully!');
         loadArrearData(monthYear, staffCategory);
       } else {
@@ -356,6 +369,35 @@ const ArrearBill = (props) => {
       alert('Error: ' + err.message);
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleLockPage = async () => {
+    if (!window.confirm(`Lock Arrear Bills for ${formatMonthYear(monthYear)}? This will disable editing and secure the bills.`)) return;
+    setLockingPage(true);
+    try {
+      const res = await fetch('/api/edit-consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: 'arrears',
+          period_key: monthYear,
+          action: 'lock',
+          notes: `Locked by ${user?.email || 'Admin'} from Arrear Bill page`
+        })
+      });
+      if (res.ok) {
+        setAdminConsentActive(false);
+        alert('Arrear Bills successfully locked! Edit feature is now disabled.');
+        loadArrearData(monthYear, staffCategory);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to lock arrear bills: ' + (err.error || 'Server error'));
+      }
+    } catch (err) {
+      alert('Network error while locking arrear bills: ' + err.message);
+    } finally {
+      setLockingPage(false);
     }
   };
 
@@ -434,18 +476,40 @@ const ArrearBill = (props) => {
           <ShieldCheck size={32} style={{ color: adminConsentActive ? '#16a34a' : (user?.role === 'approver' ? '#a16207' : 'var(--color-success)') }} />
           <div style={{ flex: 1, minWidth: '240px' }}>
             <h3 style={{ fontSize: '1.1rem', color: adminConsentActive ? '#15803d' : (user?.role === 'approver' ? '#713f12' : 'var(--color-success)'), margin: 0 }}>
-              {adminConsentActive ? 'EDIT CONSENT ACTIVE (SUPER ADMIN GRANTED)' : (approvedCount === totalCount ? 'ALL ARREARS VERIFIED & SEALED' : 'SOME ARREARS VERIFIED & SEALED')}
+              {adminConsentActive ? 'EDIT FEATURE UNLOCKED (ACTIVE)' : (approvedCount === totalCount ? 'ALL ARREARS VERIFIED & SEALED' : 'SOME ARREARS VERIFIED & SEALED')}
             </h3>
             <p style={{ fontSize: '0.875rem', color: adminConsentActive ? '#166534' : (user?.role === 'approver' ? '#854d0e' : 'var(--color-text-secondary)'), margin: '0.25rem 0 0 0' }}>
               <strong>{approvedCount}</strong> out of <strong>{totalCount}</strong> active arrear bills in {formatMonthYear(monthYear)} ({arrearType}) are verified and locked.
               {adminConsentActive && (
                 <span style={{ display: 'block', marginTop: '0.25rem', fontWeight: 600, color: '#15803d' }}>
-                  ✓ Super Admin has granted consent. Admins can now edit dates, amounts & deductions directly.
+                  ✓ Edit access is unlocked. Admins can now edit dates, amounts & deductions directly.
                 </span>
               )}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {adminConsentActive && (
+              <button 
+                className="btn btn-sm" 
+                onClick={handleLockPage}
+                disabled={lockingPage}
+                style={{ 
+                  backgroundColor: '#dc2626', 
+                  color: '#fff',
+                  border: 'none',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Lock size={14} /> {lockingPage ? 'Locking...' : 'Lock Page'}
+              </button>
+            )}
             {user?.role === 'super_admin' && (
               <>
                 <button 
@@ -491,26 +555,46 @@ const ArrearBill = (props) => {
               </>
             )}
             {user?.role === 'admin' && !adminConsentActive && (
-              <button 
-                className="btn btn-sm" 
-                onClick={handleRequestConsent}
-                disabled={requestingConsent}
-                style={{ 
-                  backgroundColor: '#3b82f6', 
-                  color: '#fff',
-                  border: 'none',
-                  padding: '7px 14px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                Request Edit Permission from Super Admin
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-sm"
+                  disabled
+                  style={{
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    cursor: 'default',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Lock size={14} /> Locked
+                </button>
+                <Link
+                  to="/settings?tab=unlock"
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: 'var(--color-accent-primary)',
+                    border: '1px solid var(--color-border)',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    textDecoration: 'none'
+                  }}
+                >
+                  <Unlock size={13} /> Unlock in Settings
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -641,7 +725,7 @@ const ArrearBill = (props) => {
                 <Save size={18} /> {saving ? 'Saving...' : 'Save Arrear Grid'}
               </button>
             )}
-            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin')) && filteredEmployees.length > 0 && (
+            {(user?.role === 'approver' || user?.role === 'super_admin' || (!requireApproval && user?.role === 'admin') || adminConsentActive) && filteredEmployees.length > 0 && (
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button 
                   className="btn btn-primary" 
